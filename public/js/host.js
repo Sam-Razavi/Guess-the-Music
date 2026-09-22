@@ -415,20 +415,28 @@ Sortable.create(playlistList, {
 const prevScores = new Map();
 
 function renderScoreboard(state) {
-  const sorted = [...state.players].sort((a, b) => b.score - a.score);
-  hostScoreboard.innerHTML = sorted.map(p => `
+  // Deliberately NOT sorted by score (unlike the TV/player boards) — this is
+  // a control panel the host is actively tapping, not a public leaderboard.
+  // Re-sorting on every score change used to shuffle row positions the
+  // instant you tapped +1, so a quick second tap (natural when awarding
+  // several points fast) could land on whichever player's row had just
+  // slid into that screen position, awarding THEM the point instead.
+  const players = state.players;
+  hostScoreboard.innerHTML = players.map(p => `
     <div class="score-row">
       <div class="name"><span class="dot ${p.connected ? 'connected' : ''}"></span>${escapeHtml(p.name)}</div>
       <div class="actions">
-        <button data-adjust="${p.id}:-1">−</button>
-        <span class="pts" data-score-id="${p.id}">${p.score}</span>
-        <button data-adjust="${p.id}:1">+</button>
+        <div class="score-adjust">
+          <button data-adjust="${p.id}:-1">−</button>
+          <span class="pts" data-score-id="${p.id}">${p.score}</span>
+          <button data-adjust="${p.id}:1">+</button>
+        </div>
         <button class="danger" data-remove-player="${p.id}" title="Remove player">✕</button>
       </div>
     </div>
   `).join('') || '<p class="muted">No one has joined yet.</p>';
 
-  sorted.forEach(p => {
+  players.forEach(p => {
     const prev = prevScores.get(p.id);
     if (prev !== undefined && prev !== p.score) {
       const el = hostScoreboard.querySelector(`[data-score-id="${p.id}"]`);

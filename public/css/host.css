@@ -179,8 +179,10 @@
 @media (max-width: 600px) {
   .playlist-row button { padding: 0.55em 1em; font-size: 1rem; }
   .buzz-row button { min-width: 3.2rem; min-height: 2.6rem; font-size: 1.1rem; }
-  .score-row .actions button { width: 2.6rem; height: 2.6rem; font-size: 1.3rem; }
-  .score-row .actions { gap: 0.6rem; }
+  .score-row .actions button { width: 3rem; height: 3rem; font-size: 1.4rem; }
+  .score-row .actions button.danger { width: 2.3rem; height: 2.3rem; font-size: 1.05rem; }
+  .score-row .actions { gap: 1.3rem; }
+  .score-adjust { gap: 0.6rem; }
 }
 
 .host-scoreboard { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -195,18 +197,23 @@
 .score-row .name { display: flex; align-items: center; gap: 0.5em; }
 .score-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
 .score-row .dot.connected { background: var(--good); }
-.score-row .actions { display: flex; align-items: center; gap: 0.5rem; }
+.score-row .actions { display: flex; align-items: center; gap: 1.1rem; }
+.score-adjust { display: flex; align-items: center; gap: 0.5rem; }
 .score-row .actions button {
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
+/* The remove button is destructive and sits right next to the score
+   controls the host is repeatedly tapping — kept visibly smaller and set
+   further apart so a fast tap meant for +/- can't land on it by accident. */
+.score-row .actions button.danger { width: 2.2rem; height: 2.2rem; font-size: 1rem; }
 .score-row .pts { color: var(--gold); font-weight: 700; min-width: 2ch; text-align: center; display: inline-block; }
 .score-row .pts.score-pulse { animation: score-pulse 0.5s ease; }
 @keyframes score-pulse {
