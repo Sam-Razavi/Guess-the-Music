@@ -47,6 +47,7 @@
 }
 
 .panel { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.9rem; }
+.panel[hidden] { display: none; }
 .panel h1 { font-size: 3.2rem; max-width: 18ch; }
 .panel p { font-size: 1.3rem; }
 

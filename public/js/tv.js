@@ -22,6 +22,27 @@ fetch('/join-info').then(r => r.json()).then(({ url }) => {
 // ---- YouTube player ----
 let player = null;
 let loadedYoutubeId = null;
+let latestState = null;
+
+// The IFrame API loads asynchronously and can finish after a 'state' event
+// has already arrived (or after a round is already 'playing' when this page
+// loads) — so syncing on the socket event alone can miss it forever. Sync
+// from both the socket event and player-ready callback, whichever is last.
+function syncVideo(state) {
+  if (!state || !player || typeof player.loadVideoById !== 'function') return;
+
+  if (state.currentSong && state.currentSong.youtubeId && state.roundStatus === 'playing'
+      && state.currentSong.youtubeId !== loadedYoutubeId) {
+    loadedYoutubeId = state.currentSong.youtubeId;
+    player.loadVideoById(state.currentSong.youtubeId);
+    player.playVideo();
+  }
+
+  if (state.roundStatus === 'idle') {
+    loadedYoutubeId = null;
+    if (typeof player.stopVideo === 'function') player.stopVideo();
+  }
+}
 
 window.onYouTubeIframeAPIReady = function () {
   player = new YT.Player('yt-player', {
@@ -36,6 +57,9 @@ window.onYouTubeIframeAPIReady = function () {
       fs: 0,
       disablekb: 1,
       playsinline: 1,
+    },
+    events: {
+      onReady: () => syncVideo(latestState),
     },
   });
 };
@@ -61,6 +85,7 @@ function escapeHtml(s) {
 }
 
 socket.on('state', (state) => {
+  latestState = state;
   renderScoreboard(state.players);
   showPanel(state.roundStatus);
 
@@ -73,16 +98,5 @@ socket.on('state', (state) => {
     revealArtistEl.textContent = state.currentSong.artist || '';
   }
 
-  if (state.currentSong && state.currentSong.youtubeId && player && typeof player.loadVideoById === 'function') {
-    if (state.roundStatus === 'playing' && state.currentSong.youtubeId !== loadedYoutubeId) {
-      loadedYoutubeId = state.currentSong.youtubeId;
-      player.loadVideoById(state.currentSong.youtubeId);
-      player.playVideo();
-    }
-  }
-
-  if (state.roundStatus === 'idle') {
-    loadedYoutubeId = null;
-    if (player && typeof player.stopVideo === 'function') player.stopVideo();
-  }
+  syncVideo(state);
 });
