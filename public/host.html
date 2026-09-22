@@ -27,12 +27,17 @@
         <h2>Current round</h2>
         <div class="pill" id="round-status-pill">idle</div>
         <span class="pill" id="timer-pill" hidden></span>
+        <span class="pill" id="auto-advance-pill" hidden></span>
         <div id="current-song-info" class="song-info muted">No round started.</div>
         <div id="buzz-order-list" class="buzz-list"></div>
         <div class="round-actions">
           <button id="reveal-btn" class="primary">Reveal answer</button>
           <button id="reset-buzzers-btn">Reset buzzers</button>
           <button id="close-round-btn">Close round</button>
+        </div>
+        <div class="timer-row">
+          <label for="auto-advance-input">Auto-advance after reveal (sec, 0 = off)</label>
+          <input id="auto-advance-input" type="number" min="0" step="5" value="0">
         </div>
       </section>
 
@@ -82,6 +87,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/host.js"></script>
 </body>

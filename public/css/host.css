@@ -93,8 +93,9 @@
   border-radius: 10px;
   padding: 0.6em 0.8em;
 }
-.playlist-row.drag-over { outline: 2px dashed var(--gold); outline-offset: -2px; }
-.playlist-row .grip { cursor: grab; color: var(--text-muted); flex-shrink: 0; }
+.playlist-row.sortable-ghost { outline: 2px dashed var(--gold); outline-offset: -2px; opacity: 0.4; }
+.playlist-row.sortable-chosen { background: #372a54; }
+.playlist-row .grip { cursor: grab; color: var(--text-muted); flex-shrink: 0; touch-action: none; }
 .playlist-row .info { min-width: 0; flex: 1; }
 .playlist-row .info .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .playlist-row .info .a { color: var(--text-muted); font-size: 0.9rem; }

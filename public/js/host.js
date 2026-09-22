@@ -8,6 +8,8 @@ socket.on('connect', () => socket.emit('register', { role: 'host' }));
 const connPill = document.getElementById('conn-pill');
 const roundStatusPill = document.getElementById('round-status-pill');
 const timerPill = document.getElementById('timer-pill');
+const autoAdvancePill = document.getElementById('auto-advance-pill');
+const autoAdvanceInput = document.getElementById('auto-advance-input');
 const currentSongInfo = document.getElementById('current-song-info');
 const buzzOrderList = document.getElementById('buzz-order-list');
 const playlistList = document.getElementById('playlist-list');
@@ -117,7 +119,10 @@ importBtn.addEventListener('click', async () => {
 });
 
 // ---------- round controls ----------
-document.getElementById('reveal-btn').addEventListener('click', () => socket.emit('host:revealAnswer'));
+document.getElementById('reveal-btn').addEventListener('click', () => {
+  const autoAdvanceSeconds = Number(autoAdvanceInput.value) || 0;
+  socket.emit('host:revealAnswer', { autoAdvanceSeconds });
+});
 document.getElementById('reset-buzzers-btn').addEventListener('click', () => socket.emit('host:resetBuzzers'));
 document.getElementById('close-round-btn').addEventListener('click', () => socket.emit('host:closeRound'));
 document.getElementById('reset-game-btn').addEventListener('click', () => {
@@ -133,6 +138,7 @@ function escapeHtml(s) {
 
 // ---------- rendering ----------
 let timerInterval = null;
+let autoAdvanceInterval = null;
 
 function updateTimerPill(state) {
   if (state.buzzingLocked) {
@@ -149,6 +155,16 @@ function updateTimerPill(state) {
   timerPill.textContent = `⏱ ${remaining}s`;
 }
 
+function updateAutoAdvancePill(state) {
+  if (!state.autoAdvance) {
+    autoAdvancePill.hidden = true;
+    return;
+  }
+  const remaining = Math.max(0, Math.ceil((state.autoAdvance.endsAt - Date.now()) / 1000));
+  autoAdvancePill.hidden = false;
+  autoAdvancePill.textContent = `⏭ Next song in ${remaining}s`;
+}
+
 function renderRound(state) {
   roundStatusPill.textContent = state.roundStatus;
 
@@ -156,6 +172,12 @@ function renderRound(state) {
   updateTimerPill(state);
   if (state.roundTimer && !state.buzzingLocked) {
     timerInterval = setInterval(() => updateTimerPill(state), 500);
+  }
+
+  clearInterval(autoAdvanceInterval);
+  updateAutoAdvancePill(state);
+  if (state.autoAdvance) {
+    autoAdvanceInterval = setInterval(() => updateAutoAdvancePill(state), 500);
   }
 
   if (state.currentSong) {
@@ -208,7 +230,7 @@ function renderCategoryFilter(state) {
 function renderPlaylist(state) {
   const songs = categoryFilter === 'All' ? state.playlist : state.playlist.filter(s => s.category === categoryFilter);
   playlistList.innerHTML = songs.map(song => `
-    <div class="playlist-row ${song.played ? 'played' : ''}" draggable="true" data-id="${song.id}">
+    <div class="playlist-row ${song.played ? 'played' : ''}" data-id="${song.id}">
       <span class="grip" title="Drag to reorder">⠿</span>
       <div class="info">
         <div class="t">${escapeHtml(song.title)}</div>
@@ -235,27 +257,35 @@ function renderPlaylist(state) {
       if (confirm('Remove this song from the playlist?')) socket.emit('host:removeSong', { id: btn.dataset.remove });
     });
   });
-
-  // ---- drag-to-reorder ----
-  let dragSrcId = null;
-  playlistList.querySelectorAll('.playlist-row').forEach(row => {
-    row.addEventListener('dragstart', () => { dragSrcId = row.dataset.id; });
-    row.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('drag-over'); });
-    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
-    row.addEventListener('drop', (e) => {
-      e.preventDefault();
-      row.classList.remove('drag-over');
-      const targetId = row.dataset.id;
-      if (!dragSrcId || dragSrcId === targetId || !latestState) return;
-      const ids = latestState.playlist.map(s => s.id);
-      const from = ids.indexOf(dragSrcId);
-      const to = ids.indexOf(targetId);
-      if (from === -1 || to === -1) return;
-      ids.splice(to, 0, ids.splice(from, 1)[0]);
-      socket.emit('host:reorderPlaylist', { ids });
-    });
-  });
 }
+
+// ---- drag-to-reorder (mouse + touch, via SortableJS) ----
+// Initialized once: renderPlaylist() only replaces playlistList's children
+// via innerHTML, and Sortable reads children live, so one instance keeps
+// working across every re-render.
+Sortable.create(playlistList, {
+  handle: '.grip',
+  animation: 150,
+  delay: 150,
+  delayOnTouchOnly: true, // avoids mistaking a scroll-through-the-grip for a drag on touch, no delay added for mouse
+  ghostClass: 'sortable-ghost',
+  chosenClass: 'sortable-chosen',
+  onEnd: (evt) => {
+    if (!latestState) return;
+    const draggedId = evt.item.dataset.id;
+    const rows = [...playlistList.querySelectorAll('.playlist-row')];
+    const nextRow = rows[rows.indexOf(evt.item) + 1];
+    const anchorId = nextRow ? nextRow.dataset.id : null;
+
+    const ids = latestState.playlist.map(s => s.id);
+    const from = ids.indexOf(draggedId);
+    if (from === -1) return;
+    ids.splice(from, 1);
+    const to = anchorId ? ids.indexOf(anchorId) : ids.length;
+    ids.splice(to, 0, draggedId);
+    socket.emit('host:reorderPlaylist', { ids });
+  },
+});
 
 function renderScoreboard(state) {
   const sorted = [...state.players].sort((a, b) => b.score - a.score);
