@@ -19,6 +19,19 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 const PLAYLIST_FILE = path.join(__dirname, 'playlist.json');
 const PLAYERS_FILE = path.join(__dirname, 'players.json');
+const SETTINGS_FILE = path.join(__dirname, 'settings.json');
+
+const DEFAULT_SETTINGS = {
+  stealMechanic: false,
+  speedBonus: false,
+  pointValues: false,
+  blindMode: false,
+  teamMode: false,
+  sessionStats: false,
+  karaokeHint: false,
+  autoCategories: false,
+  extraAnimations: true,
+};
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
@@ -50,6 +63,20 @@ function loadPlayers() {
 
 function savePlayers() {
   fs.writeFileSync(PLAYERS_FILE, JSON.stringify(state.players, null, 2));
+}
+
+function loadSettings() {
+  try {
+    // Merge over defaults so a settings.json from before a new toggle was
+    // added still gets that toggle's default, instead of it reading undefined.
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function saveSettings() {
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(state.settings, null, 2));
 }
 
 function getLanIp() {
@@ -86,6 +113,8 @@ const state = {
   buzzingLocked: false,           // true once the timer expires with no buzz — host still controls reveal/close
   language: 'en',                 // 'en' | 'fa' — TV/player display language, set by the host
   autoAdvance: null,               // {endsAt} | null — pending auto-start of the next unplayed song after a reveal
+  settings: loadSettings(),       // host-toggleable game options — see DEFAULT_SETTINGS
+  roundHadMiss: false,             // true once resetBuzzers has fired this round — powers the steal-mechanic bonus
 };
 
 let roundTimerHandle = null;
@@ -124,6 +153,7 @@ function startRound(id, timerSeconds) {
   state.currentIndex = idx;
   state.roundStatus = 'playing';
   state.buzzOrder = [];
+  state.roundHadMiss = false;
   clearRoundTimer();
   clearAutoAdvance();
   if (timerSeconds > 0) startRoundTimer(timerSeconds);
@@ -164,6 +194,7 @@ function payloadFor(role) {
     buzzingLocked: state.buzzingLocked,
     language: state.language,
     autoAdvance: state.autoAdvance,
+    settings: state.settings,
   };
 
   if (role === 'host') {
@@ -454,9 +485,17 @@ io.on('connection', (socket) => {
     if (current && state.players[current.id] && state.players[current.id].socketId) {
       io.to(state.players[current.id].socketId).emit('wrong');
     }
+    // Marks this round as "had a miss" — powers the steal-mechanic bonus if
+    // whoever buzzes in next actually gets it right (see host:awardPoint).
+    if (current) state.roundHadMiss = true;
     const priorTimerSeconds = state.roundTimer ? state.roundTimer.seconds : 0;
     state.roundStatus = 'playing';
     clearRoundTimer();
+    // Also cancel any pending auto-advance — resetBuzzers can fire while
+    // 'revealed' (e.g. the R shortcut hit out of habit), and without this
+    // the countdown pill just silently vanishes with nothing happening,
+    // instead of visibly cancelling.
+    clearAutoAdvance();
     if (priorTimerSeconds > 0) startRoundTimer(priorTimerSeconds);
     broadcast();
   });
@@ -495,15 +534,26 @@ io.on('connection', (socket) => {
 
   socket.on('host:awardPoint', ({ id, delta }) => {
     if (state.players[id]) {
-      state.players[id].score += delta;
-      savePlayers();
       // Confetti/chime on the TV only for the natural "they got it right"
       // case — the current buzz-in leader (the most recent buzzer, not
       // necessarily the first of the round if there was a reset in
       // between) getting a point — not just any manual scoreboard tweak
       // elsewhere on the host page.
       const currentBuzzer = state.buzzOrder[state.buzzOrder.length - 1];
-      if (delta > 0 && state.roundStatus === 'buzzed' && currentBuzzer && currentBuzzer.id === id) {
+      const isNaturalCorrectAward = delta > 0 && state.roundStatus === 'buzzed' && currentBuzzer && currentBuzzer.id === id;
+      // A "steal": this round already had a miss (resetBuzzers fired), and
+      // whoever buzzed in after that miss just got it right — bonus point
+      // on top of the normal award. Only one bonus per steal opportunity,
+      // so a second manual +1 on the same buzzer doesn't re-trigger it.
+      const isSteal = isNaturalCorrectAward && state.settings.stealMechanic && state.roundHadMiss;
+
+      state.players[id].score += delta + (isSteal ? 1 : 0);
+      savePlayers();
+
+      if (isSteal) {
+        state.roundHadMiss = false;
+        io.to('tv').emit('steal', { name: state.players[id].name });
+      } else if (isNaturalCorrectAward) {
         io.to('tv').emit('correct', { name: state.players[id].name });
       }
       broadcast();
@@ -513,6 +563,19 @@ io.on('connection', (socket) => {
   socket.on('host:setLanguage', (lang) => {
     if (lang !== 'en' && lang !== 'fa') return;
     state.language = lang;
+    broadcast();
+  });
+
+  socket.on('host:updateSettings', (patch) => {
+    if (!patch || typeof patch !== 'object') return;
+    // Only accept known keys with boolean values — never let an arbitrary
+    // client payload widen state.settings beyond DEFAULT_SETTINGS's shape.
+    for (const key of Object.keys(patch)) {
+      if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key) && typeof patch[key] === 'boolean') {
+        state.settings[key] = patch[key];
+      }
+    }
+    saveSettings();
     broadcast();
   });
 

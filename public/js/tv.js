@@ -237,6 +237,24 @@ socket.on('correct', () => {
   playChime();
 });
 
+// ---- steal mechanic: a wrong answer reopened buzzing, and whoever stole it
+// got it right ---- confetti/chime always play (same baseline as a normal
+// correct answer); the extra banner is the "extra animations" flourish.
+function spawnStealBanner(name) {
+  if (reduceMotion) return;
+  const banner = document.createElement('div');
+  banner.className = 'steal-banner';
+  banner.textContent = `🔥 ${name} stole it!`;
+  document.getElementById('stage').appendChild(banner);
+  banner.addEventListener('animationend', () => banner.remove());
+}
+
+socket.on('steal', ({ name }) => {
+  spawnConfetti();
+  playChime();
+  if (latestState && latestState.settings && latestState.settings.extraAnimations) spawnStealBanner(name);
+});
+
 // ---- round timer countdown (soft cutoff — purely a display, the server
 // enforces the actual buzz lockout) ----
 let timerInterval = null;

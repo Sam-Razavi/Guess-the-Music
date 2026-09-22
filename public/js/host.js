@@ -461,6 +461,20 @@ function renderScoreboard(state) {
   });
 }
 
+// ---------- game options ----------
+document.querySelectorAll('#options-card [data-setting]').forEach(input => {
+  input.addEventListener('change', () => {
+    socket.emit('host:updateSettings', { [input.dataset.setting]: input.checked });
+  });
+});
+
+function renderSettings(state) {
+  document.querySelectorAll('[data-setting]').forEach(input => {
+    const key = input.dataset.setting;
+    if (state.settings && key in state.settings) input.checked = state.settings[key];
+  });
+}
+
 function renderAddSongCollapse(state) {
   // Nothing to do in "Add a song" while a round is actively live — free
   // up visual priority for the Current Round card and Scoreboard.
@@ -477,4 +491,5 @@ socket.on('state', (state) => {
   renderScoreboard(state);
   renderLangToggle(state);
   renderAddSongCollapse(state);
+  renderSettings(state);
 });

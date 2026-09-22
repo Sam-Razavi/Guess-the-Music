@@ -204,6 +204,31 @@
   100% { transform: translateY(-65vh) rotate(20deg); opacity: 0; }
 }
 
+.steal-banner {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translate(-50%, -50%);
+  z-index: 45;
+  background: linear-gradient(135deg, var(--coral), var(--gold));
+  color: #21170a;
+  font-family: var(--font-fun);
+  font-weight: 700;
+  font-size: 2.2rem;
+  padding: 0.5em 1.2em;
+  border-radius: 999px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: steal-banner-pop 1.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes steal-banner-pop {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+  15% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+  25% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  85% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0; }
+}
+
 .confetti-piece {
   position: fixed;
   top: -20px;
