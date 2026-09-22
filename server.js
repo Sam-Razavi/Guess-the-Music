@@ -215,8 +215,14 @@ function payloadFor(role) {
 
   if (role === 'tv') {
     const revealed = state.roundStatus === 'revealed';
+    // Blind mode: TV shows names but not scores until results, for
+    // suspense. Only the TV's own copy of players is touched here — host
+    // always sees real scores, and each player still sees their own on
+    // their own phone (that's personal, not a public leaderboard reveal).
+    const hideScores = state.settings.blindMode && state.roundStatus !== 'results';
     return {
       ...base,
+      players: hideScores ? base.players.map(p => ({ ...p, score: null })) : base.players,
       currentSong: song
         ? { youtubeId: song.youtubeId, title: revealed ? song.title : null, artist: revealed ? song.artist : null }
         : null,

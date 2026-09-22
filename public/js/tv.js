@@ -139,7 +139,7 @@ function renderScoreboard(players) {
   scoreboardEl.innerHTML = sorted.map(p => `
     <div class="pill ${p.score === top && top > 0 ? 'lead' : ''}">
       <span>${escapeHtml(p.name)}</span>
-      <span class="score" data-score-id="${p.id}">${p.score}</span>
+      <span class="score" data-score-id="${p.id}">${p.score === null ? '🔒' : p.score}</span>
     </div>
   `).join('');
 
