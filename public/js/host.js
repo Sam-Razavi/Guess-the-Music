@@ -1,5 +1,9 @@
 const socket = io();
-socket.emit('register', { role: 'host' });
+// Re-registering on every 'connect' (not just once at load) matters because
+// Socket.IO fires 'connect' again after any auto-reconnect (network blip,
+// screen lock) — without this, a reconnected socket silently stops
+// receiving 'state' broadcasts until the page is manually reloaded.
+socket.on('connect', () => socket.emit('register', { role: 'host' }));
 
 const connPill = document.getElementById('conn-pill');
 const roundStatusPill = document.getElementById('round-status-pill');

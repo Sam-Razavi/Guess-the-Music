@@ -12,6 +12,7 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 const PLAYLIST_FILE = path.join(__dirname, 'playlist.json');
+const PLAYERS_FILE = path.join(__dirname, 'players.json');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -27,6 +28,21 @@ function loadPlaylist() {
 
 function savePlaylist() {
   fs.writeFileSync(PLAYLIST_FILE, JSON.stringify(state.playlist, null, 2));
+}
+
+function loadPlayers() {
+  try {
+    const players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
+    // No live socket survives a restart — always come back disconnected.
+    Object.values(players).forEach(p => { p.connected = false; p.socketId = null; });
+    return players;
+  } catch {
+    return {};
+  }
+}
+
+function savePlayers() {
+  fs.writeFileSync(PLAYERS_FILE, JSON.stringify(state.players, null, 2));
 }
 
 function getLanIp() {
@@ -58,7 +74,7 @@ const state = {
   currentIndex: -1,
   roundStatus: 'idle',            // idle | playing | buzzed | revealed
   buzzOrder: [],                  // [{id, name, time}]
-  players: {},                    // playerId -> {name, score, connected, socketId}
+  players: loadPlayers(),         // playerId -> {name, score, connected, socketId}
 };
 
 function currentSong() {
@@ -148,6 +164,7 @@ io.on('connection', (socket) => {
         state.players[playerId].socketId = socket.id;
         if (name) state.players[playerId].name = name;
       }
+      savePlayers();
       broadcast();
     } else {
       socket.emit('state', payloadFor(role));
@@ -157,6 +174,7 @@ io.on('connection', (socket) => {
   socket.on('player:rename', ({ name }) => {
     if (playerId && state.players[playerId] && name && name.trim()) {
       state.players[playerId].name = name.trim().slice(0, 24);
+      savePlayers();
       broadcast();
     }
   });
@@ -223,6 +241,7 @@ io.on('connection', (socket) => {
   socket.on('host:awardPoint', ({ id, delta }) => {
     if (state.players[id]) {
       state.players[id].score += delta;
+      savePlayers();
       broadcast();
     }
   });
@@ -238,6 +257,7 @@ io.on('connection', (socket) => {
     Object.values(state.players).forEach(p => { p.score = 0; });
     state.playlist.forEach(s => { s.played = false; });
     savePlaylist();
+    savePlayers();
     state.currentIndex = -1;
     state.roundStatus = 'idle';
     state.buzzOrder = [];

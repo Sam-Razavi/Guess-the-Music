@@ -1,5 +1,6 @@
 const socket = io();
-socket.emit('register', { role: 'tv' });
+// See host.js for why this re-registers on every 'connect' rather than once.
+socket.on('connect', () => socket.emit('register', { role: 'tv' }));
 
 const overlay = document.getElementById('overlay');
 const panels = {

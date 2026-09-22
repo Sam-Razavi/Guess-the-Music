@@ -10,6 +10,15 @@ function getPlayerId() {
 const myId = getPlayerId();
 const socket = io();
 
+let currentName = null;
+function sendRegister() {
+  if (currentName) socket.emit('register', { role: 'player', id: myId, name: currentName });
+}
+// See host.js for why this re-registers on every 'connect' rather than once
+// — otherwise a phone that locks/drops WiFi mid-game stops getting updates
+// until the page is manually reloaded.
+socket.on('connect', sendRegister);
+
 const nameScreen = document.getElementById('name-screen');
 const buzzerScreen = document.getElementById('buzzer-screen');
 const nameInput = document.getElementById('name-input');
@@ -20,11 +29,12 @@ const buzzLabel = document.getElementById('buzz-label');
 const statusText = document.getElementById('status-text');
 
 function join(name) {
+  currentName = name;
   localStorage.setItem('gtm_player_name', name);
   nameChip.textContent = name;
   nameScreen.hidden = true;
   buzzerScreen.hidden = false;
-  socket.emit('register', { role: 'player', id: myId, name });
+  sendRegister();
 }
 
 document.getElementById('name-submit').addEventListener('click', () => {
