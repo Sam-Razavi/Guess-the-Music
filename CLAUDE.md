@@ -44,6 +44,14 @@ Phase 7 (shipped):
 
 Icon generation approach (reusable next time an icon changes): draw/load the design onto an offscreen `<canvas>` in a temp page under `public/`, `canvas.toDataURL('image/png')`, and POST it to a temporary `/_save-icon` Express route that writes the decoded buffer to disk — needed because the base64 data URL is too large to return through this session's tool output directly. Remove the temp route, temp HTML file, and any JSON body-size-limit bump afterward.
 
+Phase 8 (shipped):
+
+- Diagnosed "video unavailable": many official-label YouTube uploads have embedding disabled by the publisher — not fixable client-side. TV now relays its real YouTube player state/errors to the host (socket event, deliberately kept out of state/broadcast() since it's TV-local monitoring info, not shared game state) so the host sees "🔊 Playing" / "⏳ Buffering…" / "❌ Embedding disabled…" next to the round-status pill instead of guessing from silence.
+- Playlist import now batch-checks embeddability via the YouTube Data API (videos?part=status, up to 50 ids/call) and drops unplayable entries before they can ruin a round; import status reports a skipped count. Manual single-song add gets the same check as a best-effort, non-blocking warning (only when YOUTUBE_API_KEY is set — manual add still works with zero API setup).
+- TV visual polish: the record's ring texture was perfectly rotationally symmetric so spinning it showed no visible motion — added an asymmetric diagonal shine streak. Reveal title/artist render in a playful "Fredoka" font (Vazirmatn for Farsi, same RTL font-token override pattern as --font-display/--font-body). Generalized the old buzz-only entrance animation into a shared .panel-enter effect for every panel switch. Scoreboard entries pulse (scale + color flash) on both host and TV when a score changes.
+- Host layout: "Add a song" card (manual add + import) collapses during a live round (playing/buzzed) to keep focus on the Current Round card and Scoreboard, reopens on idle/revealed/results.
+- Explicitly out of scope: displaying song lyrics on screen was requested but refused — reproducing copyrighted lyrics to the audience isn't something to build regardless of source or implementation.
+
 Next ideas, not yet started:
 
 - Resuming round progress after a restart (currently only scores persist — round state intentionally resets to idle).
