@@ -115,7 +115,11 @@ const state = {
   autoAdvance: null,               // {endsAt} | null — pending auto-start of the next unplayed song after a reveal
   settings: loadSettings(),       // host-toggleable game options — see DEFAULT_SETTINGS
   roundHadMiss: false,             // true once resetBuzzers has fired this round — powers the steal-mechanic bonus
+  roundStartedAt: null,            // Date.now() when the current round began — powers the speed-bonus window
+  speedBonusPaid: false,           // true once this round's speed bonus has been awarded once
 };
+
+const SPEED_BONUS_WINDOW_MS = 3000;
 
 let roundTimerHandle = null;
 let autoAdvanceHandle = null;
@@ -154,6 +158,8 @@ function startRound(id, timerSeconds) {
   state.roundStatus = 'playing';
   state.buzzOrder = [];
   state.roundHadMiss = false;
+  state.roundStartedAt = Date.now();
+  state.speedBonusPaid = false;
   clearRoundTimer();
   clearAutoAdvance();
   if (timerSeconds > 0) startRoundTimer(timerSeconds);
@@ -546,15 +552,23 @@ io.on('connection', (socket) => {
       // on top of the normal award. Only one bonus per steal opportunity,
       // so a second manual +1 on the same buzzer doesn't re-trigger it.
       const isSteal = isNaturalCorrectAward && state.settings.stealMechanic && state.roundHadMiss;
+      // Speed bonus: buzzed in within the first few seconds of the round
+      // actually starting (not of the reveal, or of this award — the buzz
+      // timestamp itself). One bonus per round, same one-shot guard pattern
+      // as the steal bonus above.
+      const isSpeedBonus = isNaturalCorrectAward && state.settings.speedBonus && !state.speedBonusPaid
+        && state.roundStartedAt && (currentBuzzer.time - state.roundStartedAt) <= SPEED_BONUS_WINDOW_MS;
 
-      state.players[id].score += delta + (isSteal ? 1 : 0);
+      state.players[id].score += delta + (isSteal ? 1 : 0) + (isSpeedBonus ? 1 : 0);
       savePlayers();
+
+      if (isSpeedBonus) state.speedBonusPaid = true;
 
       if (isSteal) {
         state.roundHadMiss = false;
-        io.to('tv').emit('steal', { name: state.players[id].name });
+        io.to('tv').emit('steal', { name: state.players[id].name, speedBonus: isSpeedBonus });
       } else if (isNaturalCorrectAward) {
-        io.to('tv').emit('correct', { name: state.players[id].name });
+        io.to('tv').emit('correct', { name: state.players[id].name, speedBonus: isSpeedBonus });
       }
       broadcast();
     }
