@@ -22,6 +22,12 @@ const autoAdvanceHintEl = document.getElementById('auto-advance-hint');
 const revealCaptionEl = document.getElementById('reveal-caption');
 const captionTitleEl = document.getElementById('caption-title');
 const captionArtistEl = document.getElementById('caption-artist');
+const mysteryBannerEl = document.getElementById('mystery-banner');
+const categoryVotePanelEl = document.getElementById('category-vote-panel');
+const idleJoinBlockEl = document.getElementById('idle-join-block');
+const voteHeadingEl = document.getElementById('vote-heading');
+const voteOptionsTvEl = document.getElementById('vote-options-tv');
+const voteTvStatusEl = document.getElementById('vote-tv-status');
 
 // ---- join QR ----
 fetch('/join-info').then(r => r.json()).then(({ url }) => {
@@ -304,6 +310,41 @@ function updateAutoAdvanceHint(state) {
   autoAdvanceHintEl.textContent = t('nextSongIn', currentLang).replace('{s}', remaining);
 }
 
+// ---- mystery modifier round banner ----
+// Only ever present in state once the flagged song is actually the one
+// playing (see server.js payloadFor) — so this is the surprise reveal
+// itself, not a preview. Stays up for the round's whole life (playing →
+// buzzed → revealed), which is why it lives outside .overlay.
+function updateMysteryBanner(state) {
+  const active = !!state.mysteryRound && state.roundStatus !== 'idle' && state.roundStatus !== 'results';
+  mysteryBannerEl.hidden = !active;
+  if (active) mysteryBannerEl.textContent = `🎭 Mystery Round: ${state.mysteryRound.label}`;
+}
+
+// ---- category vote ----
+function renderCategoryVoteTV(state) {
+  const vote = state.categoryVote;
+  const active = state.roundStatus === 'idle' && !!vote;
+  categoryVotePanelEl.hidden = !active;
+  idleJoinBlockEl.hidden = active;
+  if (!active) return;
+
+  if (!vote.closed) {
+    voteHeadingEl.textContent = '🗳️ Vote for the next category!';
+    const totalVotes = Object.values(vote.counts).reduce((a, b) => a + b, 0);
+    voteOptionsTvEl.innerHTML = vote.options.map(c => `
+      <div class="vote-option-tv"><span>${escapeHtml(c)}</span><span class="count">${vote.counts[c] || 0}</span></div>
+    `).join('');
+    voteTvStatusEl.textContent = `${totalVotes} vote${totalVotes === 1 ? '' : 's'} so far — grab your phone!`;
+  } else {
+    voteHeadingEl.textContent = `🏆 Winner: ${vote.result}!`;
+    voteOptionsTvEl.innerHTML = vote.options.map(c => `
+      <div class="vote-option-tv ${c === vote.result ? 'winner' : ''}"><span>${escapeHtml(c)}</span><span class="count">${vote.counts[c] || 0}</span></div>
+    `).join('');
+    voteTvStatusEl.textContent = '';
+  }
+}
+
 let wasBuzzed = false;
 let resultsShown = false;
 let lastPlayingSongId = null;
@@ -379,6 +420,8 @@ socket.on('state', (state) => {
   applyTranslations(currentLang);
   renderScoreboard(state.players);
   showPanel(state.roundStatus);
+  updateMysteryBanner(state);
+  renderCategoryVoteTV(state);
 
   if (state.currentSong && state.currentSong.hint) {
     hintTextEl.textContent = state.currentSong.hint;

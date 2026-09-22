@@ -111,6 +111,7 @@ input::placeholder { color: var(--text-muted); }
   padding: 0.35em 0.9em;
   font-weight: 600;
 }
+.pill.gold { background: rgba(245, 185, 66, 0.18); color: var(--gold); }
 
 .muted { color: var(--text-muted); }
 

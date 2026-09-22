@@ -45,6 +45,33 @@
 }
 .auto-advance-hint:empty { display: none; }
 
+.mystery-banner {
+  position: absolute;
+  left: 4%;
+  top: 4%;
+  z-index: 10;
+  background: rgba(245, 185, 66, 0.15);
+  border: 1px solid rgba(245, 185, 66, 0.4);
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding: 0.5em 1.2em;
+  border-radius: 999px;
+}
+
+.vote-options-tv { display: flex; flex-direction: column; gap: 0.6rem; margin: 1rem 0; min-width: 280px; }
+.vote-option-tv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 0.6em 1.2em;
+  font-size: 1.2rem;
+}
+.vote-option-tv .count { color: var(--gold); font-weight: 700; }
+.vote-option-tv.winner { box-shadow: 0 0 0 2px var(--gold) inset; }
+
 .reveal-caption {
   position: absolute;
   left: 50%;

@@ -37,9 +37,16 @@
     </header>
 
     <main>
+      <div id="vote-block" hidden>
+        <h2>🗳️ Vote for the next category!</h2>
+        <div id="vote-options-player" class="vote-options-player"></div>
+        <p class="muted small" id="vote-player-status"></p>
+      </div>
+
       <button id="buzz-btn" class="buzz-btn" disabled>
         <span id="buzz-label">Get ready…</span>
       </button>
+      <p class="muted" id="mystery-note" hidden></p>
       <p class="muted" id="status-text">Waiting for the host to start a round…</p>
     </main>
   </div>

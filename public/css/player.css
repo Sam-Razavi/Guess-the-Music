@@ -94,6 +94,19 @@ body { min-height: 100vh; }
 }
 
 #status-text { text-align: center; max-width: 28ch; }
+#mystery-note { text-align: center; color: var(--gold); font-weight: 600; }
+
+#vote-block { text-align: center; width: 100%; max-width: 360px; }
+#vote-block h2 { font-size: 1.2rem; margin-bottom: 0.8rem; }
+.vote-options-player { display: flex; flex-direction: column; gap: 0.6rem; }
+.vote-option-btn {
+  width: 100%;
+  padding: 0.9em;
+  font-size: 1.05rem;
+  background: var(--surface-2);
+  border-radius: 12px;
+}
+.vote-option-btn.selected { background: var(--gold); color: #21170a; }
 
 #my-score { display: inline-block; }
 #my-score.score-pulse { animation: score-pulse 0.5s ease; }

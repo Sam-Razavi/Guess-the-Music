@@ -39,6 +39,7 @@
         <button id="open-youtube-fallback-btn" hidden>▶ Open on YouTube</button>
         <span class="pill" id="timer-pill" hidden></span>
         <span class="pill" id="auto-advance-pill" hidden></span>
+        <span class="pill gold" id="mystery-pill" hidden></span>
         <div id="current-song-info" class="song-info muted">No round started.</div>
         <div id="buzz-order-list" class="buzz-list"></div>
         <div class="round-actions">
@@ -134,6 +135,36 @@
             <input type="checkbox" data-setting="autoCategories">
             <span><strong>Auto-categories</strong><br><span class="muted small">Suggest a category per song from its artist's Spotify genre (needs SPOTIFY_CLIENT_ID/SECRET in .env — see README). Never overrides a category you typed yourself.</span></span>
           </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="mysteryRound">
+            <span><strong>Mystery modifier round</strong><br><span class="muted small">One random song each game gets a surprise twist — double points, no hints, or a blind score reveal — kept secret until that round actually starts.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="categoryVoting">
+            <span><strong>Category voting</strong><br><span class="muted small">Let players vote on which category the next song comes from. Start a vote from the new card below while the round is idle.</span></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card" id="category-vote-card" hidden>
+        <h2>Category vote</h2>
+        <div id="vote-setup">
+          <div id="vote-category-checks" class="options-list"></div>
+          <div class="timer-row">
+            <label for="vote-timer-input">Vote duration (sec, 0 = manual close)</label>
+            <input id="vote-timer-input" type="number" min="0" step="5" value="0">
+          </div>
+          <button id="start-vote-btn" class="primary">🗳️ Start category vote</button>
+          <p class="muted small" id="vote-status"></p>
+        </div>
+        <div id="vote-live" hidden>
+          <span class="pill" id="vote-countdown" hidden></span>
+          <div id="vote-tally" class="vote-tally"></div>
+          <button id="close-vote-btn">Close vote</button>
+        </div>
+        <div id="vote-result" hidden>
+          <p>🏆 Winner: <strong id="vote-winner-text"></strong></p>
+          <button id="apply-vote-filter-btn">Filter playlist to this category</button>
         </div>
       </section>
 

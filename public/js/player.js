@@ -29,6 +29,14 @@ const myScoreEl = document.getElementById('my-score');
 const buzzBtn = document.getElementById('buzz-btn');
 const buzzLabel = document.getElementById('buzz-label');
 const statusText = document.getElementById('status-text');
+const mysteryNoteEl = document.getElementById('mystery-note');
+const voteBlockEl = document.getElementById('vote-block');
+const voteOptionsPlayerEl = document.getElementById('vote-options-player');
+const votePlayerStatusEl = document.getElementById('vote-player-status');
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 function join(name, team) {
   currentName = name;
@@ -125,12 +133,45 @@ if (savedName) {
   nameInput.focus();
 }
 
+// Only ever present once this game's flagged mystery song is actually the
+// one playing (see server.js payloadFor) — so this doubles as the reveal.
+function renderMysteryNote(state) {
+  const active = !!state.mysteryRound && state.roundStatus !== 'idle' && state.roundStatus !== 'results';
+  mysteryNoteEl.hidden = !active;
+  if (active) mysteryNoteEl.textContent = `🎭 Mystery Round: ${state.mysteryRound.label}`;
+}
+
+function renderCategoryVote(state) {
+  const vote = state.categoryVote;
+  const active = state.roundStatus === 'idle' && !!vote;
+  voteBlockEl.hidden = !active;
+  buzzBtn.hidden = active;
+  statusText.hidden = active;
+  if (!active) return;
+
+  const myVote = vote.votes[myId];
+  if (!vote.closed) {
+    voteOptionsPlayerEl.innerHTML = vote.options.map(c => `
+      <button class="vote-option-btn ${c === myVote ? 'selected' : ''}" data-vote="${escapeHtml(c)}">${escapeHtml(c)}</button>
+    `).join('');
+    voteOptionsPlayerEl.querySelectorAll('[data-vote]').forEach(btn => {
+      btn.addEventListener('click', () => socket.emit('player:voteCategory', { category: btn.dataset.vote }));
+    });
+    votePlayerStatusEl.textContent = myVote ? `You voted: ${myVote}` : 'Tap a category to vote!';
+  } else {
+    voteOptionsPlayerEl.innerHTML = '';
+    votePlayerStatusEl.textContent = `🏆 Winner: ${vote.result}!`;
+  }
+}
+
 let prevMyScore = null;
 let wasArmed = false;
 
 socket.on('state', (state) => {
   const lang = state.language || 'en';
   applyTranslations(lang);
+  renderMysteryNote(state);
+  renderCategoryVote(state);
 
   const me = state.players.find(p => p.id === myId);
   if (me) {

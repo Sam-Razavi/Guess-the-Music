@@ -29,6 +29,18 @@ const checkPlaylistStatus = document.getElementById('check-playlist-status');
 const brokenVideosList = document.getElementById('broken-videos-list');
 const addSongCard = document.getElementById('add-song-card');
 const addSongCollapsedHint = document.getElementById('add-song-collapsed-hint');
+const mysteryPill = document.getElementById('mystery-pill');
+const categoryVoteCard = document.getElementById('category-vote-card');
+const voteSetupEl = document.getElementById('vote-setup');
+const voteCategoryChecksEl = document.getElementById('vote-category-checks');
+const voteTimerInput = document.getElementById('vote-timer-input');
+const startVoteBtn = document.getElementById('start-vote-btn');
+const voteStatusEl = document.getElementById('vote-status');
+const voteLiveEl = document.getElementById('vote-live');
+const voteCountdownEl = document.getElementById('vote-countdown');
+const voteTallyEl = document.getElementById('vote-tally');
+const voteResultEl = document.getElementById('vote-result');
+const voteWinnerTextEl = document.getElementById('vote-winner-text');
 
 let latestState = null;
 let categoryFilter = 'All';
@@ -312,7 +324,17 @@ function renderRound(state) {
     currentSongInfo.classList.add('muted');
   }
 
-  revealHintBtn.hidden = !(state.settings && state.settings.karaokeHint && state.roundStatus === 'playing');
+  // Only appears once the mystery song is actually the one playing — see
+  // server.js payloadFor(), which withholds it until then on purpose.
+  if (state.mysteryRound) {
+    mysteryPill.hidden = false;
+    mysteryPill.textContent = `🎭 Mystery Round: ${state.mysteryRound.label}`;
+  } else {
+    mysteryPill.hidden = true;
+  }
+
+  revealHintBtn.hidden = !(state.settings && state.settings.karaokeHint && state.roundStatus === 'playing')
+    || (state.mysteryRound && state.mysteryRound.modifier === 'noHint');
 
   // With "Point values per song" on, awarding a correct buzz gives that
   // song's assigned value instead of a flat point — defaults to 1, so this
@@ -367,7 +389,7 @@ function renderPlaylist(state) {
     <div class="playlist-row ${song.played ? 'played' : ''}" data-id="${song.id}">
       <span class="grip" title="Drag to reorder">⠿</span>
       <div class="info">
-        <div class="t">${escapeHtml(song.title)}</div>
+        <div class="t">${song.id === state.mysterySongId ? '<span class="mystery-badge" title="This game\'s Mystery Round song — modifier stays secret until it plays">🎭</span> ' : ''}${escapeHtml(song.title)}</div>
         <div class="a">${escapeHtml(song.artist || '')}</div>
         ${song.category ? `<span class="cat">${escapeHtml(song.category)}</span>` : ''}
       </div>
@@ -494,6 +516,74 @@ function renderSettings(state) {
   });
 }
 
+// ---------- category vote ----------
+startVoteBtn.addEventListener('click', () => {
+  const categories = [...voteCategoryChecksEl.querySelectorAll('input:checked')].map(el => el.value);
+  const seconds = Number(voteTimerInput.value) || 0;
+  socket.emit('host:startCategoryVote', { categories, seconds });
+});
+document.getElementById('close-vote-btn').addEventListener('click', () => socket.emit('host:closeCategoryVote'));
+document.getElementById('apply-vote-filter-btn').addEventListener('click', () => {
+  if (!latestState || !latestState.categoryVote || !latestState.categoryVote.result) return;
+  categoryFilter = latestState.categoryVote.result;
+  renderPlaylist(latestState);
+  renderCategoryFilter(latestState);
+});
+
+let voteInterval = null;
+function updateVoteCountdown(state) {
+  const vote = state.categoryVote;
+  if (!vote || vote.closed || !vote.endsAt) {
+    voteCountdownEl.hidden = true;
+    return;
+  }
+  const remaining = Math.max(0, Math.ceil((vote.endsAt - Date.now()) / 1000));
+  voteCountdownEl.hidden = false;
+  voteCountdownEl.textContent = `⏳ ${remaining}s left`;
+}
+
+function renderCategoryVote(state) {
+  const enabled = state.settings && state.settings.categoryVoting;
+  categoryVoteCard.hidden = !enabled;
+  clearInterval(voteInterval);
+  if (!enabled) return;
+
+  const vote = state.categoryVote;
+
+  if (!vote) {
+    voteSetupEl.hidden = false;
+    voteLiveEl.hidden = true;
+    voteResultEl.hidden = true;
+    const available = [...new Set(state.playlist.filter(s => !s.played && s.category).map(s => s.category))].sort();
+    voteCategoryChecksEl.innerHTML = available.length
+      ? available.map(c => `
+          <label class="option-row"><input type="checkbox" value="${escapeHtml(c)}" checked><span>${escapeHtml(c)}</span></label>
+        `).join('')
+      : `<p class="muted small">Tag at least 2 categories on unplayed songs first.</p>`;
+    const notIdle = state.roundStatus !== 'idle';
+    startVoteBtn.disabled = notIdle || available.length < 2;
+    voteStatusEl.textContent = notIdle ? "Voting only runs between rounds — close or finish the current round first." : '';
+    return;
+  }
+
+  if (!vote.closed) {
+    voteSetupEl.hidden = true;
+    voteLiveEl.hidden = false;
+    voteResultEl.hidden = true;
+    const totalVotes = Object.values(vote.counts).reduce((a, b) => a + b, 0);
+    voteTallyEl.innerHTML = vote.options.map(c => `
+      <div class="vote-row"><span>${escapeHtml(c)}</span><span>${vote.counts[c] || 0}</span></div>
+    `).join('') + `<p class="muted small">${totalVotes} vote${totalVotes === 1 ? '' : 's'} so far</p>`;
+    updateVoteCountdown(state);
+    if (vote.endsAt) voteInterval = setInterval(() => updateVoteCountdown(state), 500);
+  } else {
+    voteSetupEl.hidden = true;
+    voteLiveEl.hidden = true;
+    voteResultEl.hidden = false;
+    voteWinnerTextEl.textContent = vote.result;
+  }
+}
+
 function renderAddSongCollapse(state) {
   // Nothing to do in "Add a song" while a round is actively live — free
   // up visual priority for the Current Round card and Scoreboard.
@@ -511,4 +601,5 @@ socket.on('state', (state) => {
   renderLangToggle(state);
   renderAddSongCollapse(state);
   renderSettings(state);
+  renderCategoryVote(state);
 });

@@ -160,6 +160,7 @@
 .playlist-row .grip { cursor: grab; color: var(--text-muted); flex-shrink: 0; touch-action: none; }
 .playlist-row .info { min-width: 0; flex: 1; }
 .playlist-row .info .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mystery-badge { display: inline-block; }
 .playlist-row .info .a { color: var(--text-muted); font-size: 0.9rem; }
 .playlist-row .info .cat {
   display: inline-block;
@@ -249,6 +250,21 @@
 .option-row input[type="checkbox"] { width: 1.3rem; height: 1.3rem; margin-top: 0.15rem; flex-shrink: 0; accent-color: var(--gold); }
 .option-row:has(input:disabled) { cursor: not-allowed; opacity: 0.5; }
 .option-row strong { font-size: 0.95rem; }
+
+#category-vote-card #vote-setup .options-list { margin-bottom: 0.8rem; }
+#category-vote-card .timer-row { margin-bottom: 0.8rem; }
+.vote-tally { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.6rem 0; }
+.vote-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 0.5em 0.8em;
+}
+.vote-row span:last-child { color: var(--gold); font-weight: 700; }
+#vote-result p { margin-bottom: 0.6rem; }
+#vote-result strong { color: var(--gold); }
 
 .join-card { text-align: center; }
 .join-card img { border-radius: 10px; background: var(--text); padding: 8px; margin: 0.6rem 0 1rem; }

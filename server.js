@@ -37,7 +37,20 @@ const DEFAULT_SETTINGS = {
   karaokeHint: false,
   autoCategories: false,
   extraAnimations: true,
+  mysteryRound: false,
+  categoryVoting: false,
 };
+
+// Mystery Modifier Round: exactly one song per game gets a random surprise
+// twist, built entirely from toggles/mechanics that already exist elsewhere
+// (point values per song, the karaoke hint, blind-mode's score hiding) —
+// see ensureMysterySong() and payloadFor() for how each one is applied.
+const MYSTERY_LABELS = {
+  double: 'Double Points!',
+  noHint: 'No Hints!',
+  blind: 'Blind Reveal!',
+};
+const MYSTERY_MODIFIER_KEYS = Object.keys(MYSTERY_LABELS);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
@@ -137,12 +150,16 @@ const state = {
   speedBonusPaid: false,           // true once this round's speed bonus has been awarded once
   stats: loadStats(),              // all-time records — see DEFAULT_STATS; only recorded while sessionStats is on
   hintRevealedIndices: [],         // character indices of the current song's title already revealed — see buildHintMask
+  mysterySongId: null,             // id of this game's one Mystery Modifier Round song, or null — see ensureMysterySong()
+  mysteryModifier: null,           // 'double' | 'noHint' | 'blind' | null — only revealed (via payloadFor) once that song's round starts
+  categoryVote: null,              // {options, votes: {playerId: category}, closed, result, endsAt} | null — see host:startCategoryVote
 };
 
 const SPEED_BONUS_WINDOW_MS = 3000;
 
 let roundTimerHandle = null;
 let autoAdvanceHandle = null;
+let voteTimerHandle = null;
 
 function clearRoundTimer() {
   clearTimeout(roundTimerHandle);
@@ -181,10 +198,59 @@ function startRound(id, timerSeconds) {
   state.roundStartedAt = Date.now();
   state.speedBonusPaid = false;
   state.hintRevealedIndices = [];
+  // The vote (if any) has done its job of picking a category to play from —
+  // clear it so a stale result doesn't linger once the round it fed into begins.
+  clearVoteTimer();
+  state.categoryVote = null;
   clearRoundTimer();
   clearAutoAdvance();
   if (timerSeconds > 0) startRoundTimer(timerSeconds);
   return true;
+}
+
+// Picks this game's one Mystery Modifier Round song, lazily and stickily:
+// called on every broadcast, it only actually assigns once (when the toggle
+// is on and no song is currently flagged), and never re-rolls afterwards —
+// including once that song's been played — so it's truly one song per game.
+// resetGame is what clears it for a fresh pick next game.
+function ensureMysterySong() {
+  if (!state.settings.mysteryRound) {
+    if (state.mysterySongId) { state.mysterySongId = null; state.mysteryModifier = null; }
+    return;
+  }
+  if (state.mysterySongId && state.playlist.some(s => s.id === state.mysterySongId)) return;
+  const candidates = state.playlist.filter(s => !s.played);
+  if (!candidates.length) return; // nothing to assign yet — retried on the next broadcast
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  state.mysterySongId = pick.id;
+  state.mysteryModifier = MYSTERY_MODIFIER_KEYS[Math.floor(Math.random() * MYSTERY_MODIFIER_KEYS.length)];
+}
+
+// ---------- category voting ----------
+
+function clearVoteTimer() {
+  clearTimeout(voteTimerHandle);
+  voteTimerHandle = null;
+}
+
+function tallyVotes(vote) {
+  const counts = {};
+  vote.options.forEach(c => { counts[c] = 0; });
+  Object.values(vote.votes).forEach(c => { if (counts[c] !== undefined) counts[c]++; });
+  return counts;
+}
+
+function closeCategoryVote() {
+  if (!state.categoryVote || state.categoryVote.closed) return;
+  clearVoteTimer();
+  const counts = tallyVotes(state.categoryVote);
+  const max = Math.max(0, ...Object.values(counts));
+  const winners = state.categoryVote.options.filter(c => counts[c] === max);
+  // Nobody voted at all (max === 0) — pick at random rather than leaving the
+  // host stuck with no result.
+  const result = winners.length ? winners[Math.floor(Math.random() * winners.length)] : null;
+  state.categoryVote.closed = true;
+  state.categoryVote.result = result;
 }
 
 // Karaoke hint: a copyright-safe guessing aid built from the song's own
@@ -233,6 +299,12 @@ function teamOf(playerId) {
 
 function payloadFor(role) {
   const song = currentSong();
+  // The mystery modifier only ever surfaces once its flagged song is the
+  // one actually being played — never previewed ahead of time, so it stays
+  // a surprise for host, TV and players alike.
+  const isMysterySong = !!(song && state.settings.mysteryRound && state.mysterySongId === song.id);
+  const mysteryModifier = isMysterySong ? state.mysteryModifier : null;
+
   const base = {
     roundStatus: state.roundStatus,
     buzzOrder: state.buzzOrder.map(b => ({ id: b.id, name: b.name })),
@@ -243,6 +315,17 @@ function payloadFor(role) {
     autoAdvance: state.autoAdvance,
     settings: state.settings,
     stats: state.stats,
+    mysteryRound: mysteryModifier ? { modifier: mysteryModifier, label: MYSTERY_LABELS[mysteryModifier] } : null,
+    categoryVote: state.categoryVote
+      ? {
+          options: state.categoryVote.options,
+          votes: state.categoryVote.votes,
+          counts: tallyVotes(state.categoryVote),
+          closed: state.categoryVote.closed,
+          result: state.categoryVote.result,
+          endsAt: state.categoryVote.endsAt,
+        }
+      : null,
   };
 
   if (role === 'host') {
@@ -250,7 +333,15 @@ function payloadFor(role) {
       ...base,
       playlist: state.playlist,
       currentIndex: state.currentIndex,
-      currentSong: song,
+      // "Double points" reuses the points-per-song pipeline exactly — just
+      // overriding the runtime value shown/awarded for this one round. The
+      // song's own stored points field never changes.
+      currentSong: song && mysteryModifier === 'double' ? { ...song, points: (song.points || 1) * 2 } : song,
+      // Which unplayed song is this game's mystery song — shown as a badge
+      // in the host's playlist so they can choose when to play it. The
+      // MODIFIER itself is still withheld (via mysteryRound above) until
+      // that round actually starts, so it's a surprise for the host too.
+      mysterySongId: state.settings.mysteryRound ? state.mysterySongId : null,
     };
   }
 
@@ -260,8 +351,12 @@ function payloadFor(role) {
     // suspense. Only the TV's own copy of players is touched here — host
     // always sees real scores, and each player still sees their own on
     // their own phone (that's personal, not a public leaderboard reveal).
-    const hideScores = state.settings.blindMode && state.roundStatus !== 'results';
-    const showHint = state.settings.karaokeHint && state.roundStatus === 'playing' && song;
+    // A mystery "blind reveal" round does the same thing but scoped to just
+    // that one round — hidden while it's live, back to normal the moment it
+    // reaches 'revealed', regardless of whether blindMode itself is on.
+    const isMysteryBlindLive = mysteryModifier === 'blind' && (state.roundStatus === 'playing' || state.roundStatus === 'buzzed');
+    const hideScores = (state.settings.blindMode && state.roundStatus !== 'results') || isMysteryBlindLive;
+    const showHint = state.settings.karaokeHint && state.roundStatus === 'playing' && song && mysteryModifier !== 'noHint';
     return {
       ...base,
       players: hideScores ? base.players.map(p => ({ ...p, score: null })) : base.players,
@@ -281,6 +376,7 @@ function payloadFor(role) {
 }
 
 function broadcast() {
+  ensureMysterySong();
   io.to('host').emit('state', payloadFor('host'));
   io.to('tv').emit('state', payloadFor('tv'));
   io.to('player').emit('state', payloadFor('player'));
@@ -771,6 +867,9 @@ io.on('connection', (socket) => {
   socket.on('host:revealHintLetter', () => {
     const song = currentSong();
     if (!song || state.roundStatus !== 'playing') return;
+    // Defense in depth — the host UI already hides this button during a
+    // "no hints" mystery round, but never let a stray event through.
+    if (state.settings.mysteryRound && state.mysterySongId === song.id && state.mysteryModifier === 'noHint') return;
     const revealed = new Set(state.hintRevealedIndices);
     const revealable = [...song.title].map((ch, i) => i).filter(i => /[a-zA-Z0-9]/.test(song.title[i]) && !revealed.has(i));
     if (!revealable.length) return; // nothing left to reveal
@@ -788,7 +887,53 @@ io.on('connection', (socket) => {
         state.settings[key] = patch[key];
       }
     }
+    // Turning voting off mid-vote shouldn't leave a dangling vote around —
+    // the mystery song equivalent is handled automatically by
+    // ensureMysterySong() on the next broadcast, but a vote needs its
+    // pending timer cleared explicitly.
+    if (!state.settings.categoryVoting && state.categoryVote) {
+      clearVoteTimer();
+      state.categoryVote = null;
+    }
     saveSettings();
+    broadcast();
+  });
+
+  // Category voting: host offers a set of categories (derived from unplayed
+  // songs) and players tap one to vote; most votes wins, chosen either by
+  // the optional soft-cutoff timer or the host closing it manually — same
+  // pattern as the round timer / auto-advance. Deliberately idle-only, so it
+  // never competes with an in-progress buzz round.
+  socket.on('host:startCategoryVote', ({ categories, seconds } = {}) => {
+    if (!state.settings.categoryVoting || state.roundStatus !== 'idle') return;
+    const available = [...new Set(state.playlist.filter(s => !s.played && s.category).map(s => s.category))];
+    const requested = Array.isArray(categories) && categories.length ? categories : available;
+    const options = [...new Set(requested)].filter(c => available.includes(c));
+    if (options.length < 2) return;
+    clearVoteTimer();
+    const voteSeconds = Number(seconds) || 0;
+    state.categoryVote = {
+      options,
+      votes: {},
+      closed: false,
+      result: null,
+      endsAt: voteSeconds > 0 ? Date.now() + voteSeconds * 1000 : null,
+    };
+    if (voteSeconds > 0) {
+      voteTimerHandle = setTimeout(() => { closeCategoryVote(); broadcast(); }, voteSeconds * 1000);
+    }
+    broadcast();
+  });
+
+  socket.on('host:closeCategoryVote', () => {
+    closeCategoryVote();
+    broadcast();
+  });
+
+  socket.on('player:voteCategory', ({ category } = {}) => {
+    if (!playerId || !state.categoryVote || state.categoryVote.closed) return;
+    if (!state.categoryVote.options.includes(category)) return;
+    state.categoryVote.votes[playerId] = category;
     broadcast();
   });
 
@@ -854,6 +999,11 @@ io.on('connection', (socket) => {
     state.currentIndex = -1;
     state.roundStatus = 'idle';
     state.buzzOrder = [];
+    // Fresh game, fresh mystery pick and a clean slate for voting.
+    state.mysterySongId = null;
+    state.mysteryModifier = null;
+    clearVoteTimer();
+    state.categoryVote = null;
     clearRoundTimer();
     clearAutoAdvance();
     broadcast();

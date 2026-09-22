@@ -28,10 +28,21 @@
         <div class="panel" id="panel-idle">
           <div class="record spin" aria-hidden="true"></div>
           <h1 data-i18n="waitingRound">Waiting for the next round…</h1>
-          <p data-i18n="scanToBuzz">Scan to grab a buzzer:</p>
-          <img id="qr" alt="QR code to join as a player" width="180" height="180">
-          <p class="muted" id="join-url"></p>
-          <p class="muted" id="idle-hint"></p>
+
+          <!-- Category vote: swaps in for the join block below while a
+               vote is active, so it doesn't need a state of its own. -->
+          <div id="category-vote-panel" hidden>
+            <h2 id="vote-heading">🗳️ Vote for the next category!</h2>
+            <div id="vote-options-tv" class="vote-options-tv"></div>
+            <p class="muted small" id="vote-tv-status"></p>
+          </div>
+
+          <div id="idle-join-block">
+            <p data-i18n="scanToBuzz">Scan to grab a buzzer:</p>
+            <img id="qr" alt="QR code to join as a player" width="180" height="180">
+            <p class="muted" id="join-url"></p>
+            <p class="muted" id="idle-hint"></p>
+          </div>
         </div>
 
         <!-- playing state -->
@@ -63,6 +74,11 @@
           <div id="session-stats" class="session-stats" hidden></div>
         </div>
       </div>
+
+      <!-- Also outside .overlay for the same reason as the hint below: needs
+           to stay visible through 'playing' → 'buzzed' → 'revealed' as one
+           continuous banner for that round, not tied to a single panel. -->
+      <div class="mystery-banner" id="mystery-banner" hidden></div>
 
       <!-- Lives outside .overlay: the overlay fades out entirely during the
            'revealed' state to show the real video, but this hint needs to
