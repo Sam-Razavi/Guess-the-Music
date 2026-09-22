@@ -73,8 +73,8 @@
   100% { transform: translateX(0); opacity: 1; }
 }
 .buzz-row .order { color: var(--gold); font-weight: 700; margin-right: 0.5em; }
-.buzz-row .actions { display: flex; gap: 0.4rem; }
-.buzz-row button { padding: 0.35em 0.7em; font-size: 0.9rem; }
+.buzz-row .actions { display: flex; gap: 0.5rem; }
+.buzz-row button { min-width: 3rem; min-height: 2.4rem; padding: 0.4em 0.9em; font-size: 1.05rem; }
 
 .round-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
 
@@ -172,7 +172,16 @@
 }
 .playlist-row.played { opacity: 0.55; }
 .playlist-row .actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
-.playlist-row button { padding: 0.4em 0.8em; font-size: 0.9rem; }
+.playlist-row button { padding: 0.4em 0.8em; font-size: 0.9rem; min-height: 2.4rem; }
+
+/* Bigger touch targets on a phone-sized host screen — this control panel is
+   most often run from the host's own phone mid-party, not a desktop. */
+@media (max-width: 600px) {
+  .playlist-row button { padding: 0.55em 1em; font-size: 1rem; }
+  .buzz-row button { min-width: 3.2rem; min-height: 2.6rem; font-size: 1.1rem; }
+  .score-row .actions button { width: 2.6rem; height: 2.6rem; font-size: 1.3rem; }
+  .score-row .actions { gap: 0.6rem; }
+}
 
 .host-scoreboard { display: flex; flex-direction: column; gap: 0.5rem; }
 .score-row {
@@ -187,7 +196,17 @@
 .score-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
 .score-row .dot.connected { background: var(--good); }
 .score-row .actions { display: flex; align-items: center; gap: 0.5rem; }
-.score-row .actions button { padding: 0.3em 0.7em; font-size: 0.9rem; }
+.score-row .actions button {
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  font-size: 1.2rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 .score-row .pts { color: var(--gold); font-weight: 700; min-width: 2ch; text-align: center; display: inline-block; }
 .score-row .pts.score-pulse { animation: score-pulse 0.5s ease; }
 @keyframes score-pulse {
