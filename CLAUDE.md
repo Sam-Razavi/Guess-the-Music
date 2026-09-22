@@ -24,9 +24,15 @@ Phase 4 (shipped):
 
 Also fixed: tv.js's buzzed-panel, the correct-answer confetti gating, and player.js's "locked in"/"buzzed first" logic all used to key off `buzzOrder[0]` (the first buzzer of the round) instead of the current one — stale after a reset + a different second buzzer. All three now use `buzzOrder[buzzOrder.length - 1]`. Verified directly with a two-player buzz/reset/rebuzz sequence.
 
+Phase 5 (shipped):
+
+- Mobile drag-to-reorder: replaced the custom HTML5 drag-and-drop (mouse-only) with SortableJS (CDN), which covers mouse/touch/pen through one library. Handle-only drag (.grip), touch gets a short delay so scrolling through the handle isn't mistaken for a drag.
+- Round auto-advance: opt-in "Auto-advance after reveal (sec, 0 = off)" on host. Server-side timer (state.autoAdvance, mirrors the round-timer pattern) auto-starts the next unplayed song after a reveal, cancelled by any manual round action in the meantime. Live countdown on host + TV.
+
+Note for next time: on tv.html, anything that needs to be visible during the 'revealed' state must live outside `.overlay` (see the `#auto-advance-hint` element, moved there after first placing it inside `#panel-revealed` and finding it never rendered) — `.overlay` intentionally fades to invisible during 'revealed' to show the real video underneath.
+
 Next ideas, not yet started:
 
-- Mobile drag-to-reorder — the current implementation is native HTML5 drag-and-drop, which doesn't support touch, so reordering from a phone still means remove + re-add.
-- Round auto-advance to the next unplayed song after reveal, if the host wants a fully hands-off mode.
 - Resuming round progress after a restart (currently only scores persist — round state intentionally resets to idle).
 - More languages — i18n.js's translations object is keyed by language code, so adding a third is mostly copying the 'en'/'fa' block and adding a toggle button in host.html.
+- Remote play (join from outside the home WiFi) — would need a tunnel (Cloudflare Tunnel recommended) or Tailscale, plus a join PIN since the app currently has zero authentication (anyone with the link can join/control).
