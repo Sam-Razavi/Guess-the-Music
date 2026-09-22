@@ -37,9 +37,15 @@ Phase 6 (shipped):
 - Keyboard shortcuts for hosting from a laptop: Space = reveal, R = reset buzzers, C = close round. Reuses the existing button click handlers; guarded against firing while typing in an input; hint text hidden on touch devices.
 - Home-screen app icon (PWA manifest) for host.html and player.html — "Add to Home Screen" installs a real app icon, opens full-screen, no re-typing the URL. Icon is a simple vinyl-record mark generated via an offscreen canvas (matches the TV screen's existing record animation), at public/icons/. Separate manifest per page (own name/start_url) sharing the same icon set.
 
+Phase 7 (shipped):
+
+- Custom logo: public/logo.svg, a vinyl record with a play triangle worked into the label (same visual language as the TV's existing record animation). Replaces the 🎵 emoji in every header and as the site favicon (SVG preferred, PNG fallback). PWA icons in public/icons/ regenerated from this exact SVG (drawn onto an offscreen canvas) so the header logo, favicon, and home-screen icon are all visually identical — previously the PNG icons had a plain center hole, predating this design.
+- Pre-game readiness pass: confirmed pm2 healthy, reset playlist/scores to a clean unplayed state (a keyboard-shortcut test had marked one song played), and relaunched the actual kiosk window to confirm the full real deployment path (server + kiosk Chrome + autoplay flag) still works with every change applied.
+
+Icon generation approach (reusable next time an icon changes): draw/load the design onto an offscreen `<canvas>` in a temp page under `public/`, `canvas.toDataURL('image/png')`, and POST it to a temporary `/_save-icon` Express route that writes the decoded buffer to disk — needed because the base64 data URL is too large to return through this session's tool output directly. Remove the temp route, temp HTML file, and any JSON body-size-limit bump afterward.
+
 Next ideas, not yet started:
 
 - Resuming round progress after a restart (currently only scores persist — round state intentionally resets to idle).
 - More languages — i18n.js's translations object is keyed by language code, so adding a third is mostly copying the 'en'/'fa' block and adding a toggle button in host.html.
 - Remote play (join from outside the home WiFi) — would need a tunnel (Cloudflare Tunnel recommended) or Tailscale, plus a join PIN since the app currently has zero authentication (anyone with the link can join/control).
-- A proper custom logo (currently just the 🎵 emoji in headers/tab titles) — the vinyl-record PWA icon at public/icons/ could be the starting point for one.
