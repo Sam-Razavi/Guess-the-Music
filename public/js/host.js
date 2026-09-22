@@ -21,9 +21,16 @@ const importBtn = document.getElementById('import-btn');
 const importStatus = document.getElementById('import-status');
 const timerInput = document.getElementById('timer-input');
 const categoryFilterEl = document.getElementById('category-filter');
+const playlistSearchInput = document.getElementById('playlist-search');
 
 let latestState = null;
 let categoryFilter = 'All';
+let searchQuery = '';
+
+playlistSearchInput.addEventListener('input', () => {
+  searchQuery = playlistSearchInput.value.trim().toLowerCase();
+  renderPlaylist(latestState);
+});
 
 // ---------- connection status ----------
 socket.on('connect', () => { connPill.textContent = 'connected'; connPill.className = 'pill online'; });
@@ -228,7 +235,11 @@ function renderCategoryFilter(state) {
 }
 
 function renderPlaylist(state) {
-  const songs = categoryFilter === 'All' ? state.playlist : state.playlist.filter(s => s.category === categoryFilter);
+  let songs = categoryFilter === 'All' ? state.playlist : state.playlist.filter(s => s.category === categoryFilter);
+  if (searchQuery) {
+    songs = songs.filter(s =>
+      s.title.toLowerCase().includes(searchQuery) || (s.artist || '').toLowerCase().includes(searchQuery));
+  }
   playlistList.innerHTML = songs.map(song => `
     <div class="playlist-row ${song.played ? 'played' : ''}" data-id="${song.id}">
       <span class="grip" title="Drag to reorder">⠿</span>
@@ -244,7 +255,7 @@ function renderPlaylist(state) {
         <button class="danger" data-remove="${song.id}">✕</button>
       </div>
     </div>
-  `).join('') || '<p class="muted">No songs yet — add one above.</p>';
+  `).join('') || `<p class="muted">${state.playlist.length ? 'No songs match.' : 'No songs yet — add one above.'}</p>`;
 
   playlistList.querySelectorAll('[data-play]').forEach(btn => {
     btn.addEventListener('click', () => {
