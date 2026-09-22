@@ -51,6 +51,8 @@ body {
     radial-gradient(circle at 85% 100%, rgba(255, 107, 91, 0.05), transparent 50%);
 }
 
+.logo-mark { vertical-align: middle; margin-inline-end: 0.15em; }
+
 h1, h2, h3 { font-family: var(--font-display); font-weight: 600; margin: 0; }
 
 p { margin: 0; color: var(--text-muted); }

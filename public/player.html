@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/css/player.css">
 <link rel="manifest" href="/manifest-player.json">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
 <link rel="icon" href="/icons/icon-192.png">
 <meta name="theme-color" content="#16121f">
 <meta name="mobile-web-app-capable" content="yes">
@@ -21,7 +22,7 @@
 
   <!-- name entry (shown once, or when editing) -->
   <div class="name-screen" id="name-screen">
-    <h1>🎵 <span data-i18n="brand">Guess the Music</span></h1>
+    <h1><img src="/logo.svg" alt="" class="logo-mark" width="44" height="44"> <span data-i18n="brand">Guess the Music</span></h1>
     <p data-i18n="whatShouldTvCallYou">What should the TV call you?</p>
     <input type="text" id="name-input" maxlength="24" placeholder="Your name" data-i18n-placeholder="yourNamePlaceholder" autocomplete="off">
     <button class="primary" id="name-submit" data-i18n="joinGame">Join the game</button>
