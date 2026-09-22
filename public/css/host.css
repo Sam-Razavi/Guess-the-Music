@@ -171,8 +171,19 @@
   margin-top: 0.25em;
 }
 .playlist-row.played { opacity: 0.55; }
-.playlist-row .actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.playlist-row .actions { display: flex; gap: 0.4rem; flex-shrink: 0; align-items: center; }
 .playlist-row button { padding: 0.4em 0.8em; font-size: 0.9rem; min-height: 2.4rem; }
+.playlist-row .points-input {
+  width: 3.2rem;
+  padding: 0.3em;
+  font-size: 0.9rem;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  color: var(--gold);
+  font-weight: 700;
+  border-radius: 8px;
+}
 
 /* Bigger touch targets on a phone-sized host screen — this control panel is
    most often run from the host's own phone mid-party, not a desktop. */

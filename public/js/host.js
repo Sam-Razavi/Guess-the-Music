@@ -310,12 +310,16 @@ function renderRound(state) {
     currentSongInfo.classList.add('muted');
   }
 
+  // With "Point values per song" on, awarding a correct buzz gives that
+  // song's assigned value instead of a flat point — defaults to 1, so this
+  // is a no-op when the setting's off or a song has no value set.
+  const songPoints = (state.currentSong && state.currentSong.points) || 1;
   buzzOrderList.innerHTML = state.buzzOrder.map((b, i) => `
     <div class="buzz-row">
       <div><span class="order">#${i + 1}</span>${escapeHtml(b.name)}</div>
       <div class="actions">
-        <button class="good" data-award="${b.id}:1">+1</button>
-        <button data-award="${b.id}:-1">-1</button>
+        <button class="good" data-award="${b.id}:${songPoints}">+${songPoints}</button>
+        <button data-award="${b.id}:${-songPoints}">-${songPoints}</button>
       </div>
     </div>
   `).join('');
@@ -354,6 +358,7 @@ function renderPlaylist(state) {
     songs = songs.filter(s =>
       s.title.toLowerCase().includes(searchQuery) || (s.artist || '').toLowerCase().includes(searchQuery));
   }
+  const pointValuesOn = state.settings && state.settings.pointValues;
   playlistList.innerHTML = songs.map(song => `
     <div class="playlist-row ${song.played ? 'played' : ''}" data-id="${song.id}">
       <span class="grip" title="Drag to reorder">⠿</span>
@@ -363,6 +368,7 @@ function renderPlaylist(state) {
         ${song.category ? `<span class="cat">${escapeHtml(song.category)}</span>` : ''}
       </div>
       <div class="actions">
+        ${pointValuesOn ? `<input type="number" class="points-input" min="1" step="1" value="${song.points || 1}" data-points="${song.id}" title="Points this song is worth">` : ''}
         <button class="primary" data-play="${song.id}" ${state.currentIndex >= 0 && state.playlist[state.currentIndex].id === song.id ? 'disabled' : ''}>
           ${song.played ? 'Replay' : 'Play'}
         </button>
@@ -380,6 +386,11 @@ function renderPlaylist(state) {
   playlistList.querySelectorAll('[data-remove]').forEach(btn => {
     btn.addEventListener('click', () => {
       if (confirm('Remove this song from the playlist?')) socket.emit('host:removeSong', { id: btn.dataset.remove });
+    });
+  });
+  playlistList.querySelectorAll('[data-points]').forEach(input => {
+    input.addEventListener('change', () => {
+      socket.emit('host:setSongPoints', { id: input.dataset.points, points: input.value });
     });
   });
 }

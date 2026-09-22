@@ -178,6 +178,7 @@ function makeSong(youtubeId, title, artist, category) {
     artist: (artist || '').trim(),
     category: (category || '').trim(),
     played: false,
+    points: 1,                    // how many points a correct buzz on this song is worth — see host:setSongPoints
   };
 }
 
@@ -461,6 +462,15 @@ io.on('connection', (socket) => {
       state.roundStatus = 'idle';
       clearRoundTimer();
     }
+    savePlaylist();
+    broadcast();
+  });
+
+  socket.on('host:setSongPoints', ({ id, points }) => {
+    const song = state.playlist.find(s => s.id === id);
+    const n = Number(points);
+    if (!song || !Number.isFinite(n) || n < 1) return;
+    song.points = Math.round(n);
     savePlaylist();
     broadcast();
   });
