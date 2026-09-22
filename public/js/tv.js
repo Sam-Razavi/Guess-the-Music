@@ -16,6 +16,7 @@ const revealTitleEl = document.getElementById('reveal-title');
 const revealArtistEl = document.getElementById('reveal-artist');
 const playingSubtext = document.getElementById('playing-subtext');
 const resultsListEl = document.getElementById('results-list');
+const sessionStatsEl = document.getElementById('session-stats');
 const autoAdvanceHintEl = document.getElementById('auto-advance-hint');
 const revealCaptionEl = document.getElementById('reveal-caption');
 const captionTitleEl = document.getElementById('caption-title');
@@ -349,6 +350,27 @@ function renderResults(players) {
   `).join('');
 }
 
+function renderSessionStats(state) {
+  const stats = state.stats;
+  const lines = [];
+  if (!state.settings || !state.settings.sessionStats || !stats) {
+    sessionStatsEl.hidden = true;
+    return;
+  }
+  if (stats.fastestBuzz) {
+    lines.push(`🏃 Fastest buzz: <strong>${escapeHtml(stats.fastestBuzz.name)}</strong> (${(stats.fastestBuzz.ms / 1000).toFixed(2)}s)`);
+  }
+  if (stats.mostPointsInRound) {
+    lines.push(`💯 Biggest round: <strong>${escapeHtml(stats.mostPointsInRound.name)}</strong> (+${stats.mostPointsInRound.points})`);
+  }
+  if (!lines.length) {
+    sessionStatsEl.hidden = true;
+    return;
+  }
+  sessionStatsEl.innerHTML = lines.join('<br>');
+  sessionStatsEl.hidden = false;
+}
+
 socket.on('state', (state) => {
   latestState = state;
   currentLang = state.language || 'en';
@@ -395,6 +417,7 @@ socket.on('state', (state) => {
 
   if (state.roundStatus === 'results') {
     renderResults(state.players);
+    renderSessionStats(state);
     if (!resultsShown) {
       resultsShown = true;
       spawnConfetti();

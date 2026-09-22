@@ -20,6 +20,12 @@ const PORT = process.env.PORT || 3000;
 const PLAYLIST_FILE = path.join(__dirname, 'playlist.json');
 const PLAYERS_FILE = path.join(__dirname, 'players.json');
 const SETTINGS_FILE = path.join(__dirname, 'settings.json');
+const STATS_FILE = path.join(__dirname, 'stats.json');
+
+const DEFAULT_STATS = {
+  fastestBuzz: null,          // {name, ms, at} | null — quickest reaction to a round starting, all-time
+  mostPointsInRound: null,    // {name, points, at} | null — biggest single correct-answer award, all-time
+};
 
 const DEFAULT_SETTINGS = {
   stealMechanic: false,
@@ -79,6 +85,18 @@ function saveSettings() {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(state.settings, null, 2));
 }
 
+function loadStats() {
+  try {
+    return { ...DEFAULT_STATS, ...JSON.parse(fs.readFileSync(STATS_FILE, 'utf8')) };
+  } catch {
+    return { ...DEFAULT_STATS };
+  }
+}
+
+function saveStats() {
+  fs.writeFileSync(STATS_FILE, JSON.stringify(state.stats, null, 2));
+}
+
 function getLanIp() {
   const nets = os.networkInterfaces();
   const candidates = [];
@@ -117,6 +135,7 @@ const state = {
   roundHadMiss: false,             // true once resetBuzzers has fired this round — powers the steal-mechanic bonus
   roundStartedAt: null,            // Date.now() when the current round began — powers the speed-bonus window
   speedBonusPaid: false,           // true once this round's speed bonus has been awarded once
+  stats: loadStats(),              // all-time records — see DEFAULT_STATS; only recorded while sessionStats is on
 };
 
 const SPEED_BONUS_WINDOW_MS = 3000;
@@ -202,6 +221,7 @@ function payloadFor(role) {
     language: state.language,
     autoAdvance: state.autoAdvance,
     settings: state.settings,
+    stats: state.stats,
   };
 
   if (role === 'host') {
@@ -420,8 +440,22 @@ io.on('connection', (socket) => {
     // player hadn't buzzed yet — so this is always the buzz that takes
     // the floor, whether it's the round's 1st buzz or a later one after
     // a host:resetBuzzers reopened things.
-    state.buzzOrder.push({ id: playerId, name: state.players[playerId].name, time: Date.now() });
+    const buzzTime = Date.now();
+    const isFirstBuzzOfRound = state.buzzOrder.length === 0;
+    state.buzzOrder.push({ id: playerId, name: state.players[playerId].name, time: buzzTime });
     state.roundStatus = 'buzzed';
+
+    // Fastest-buzz record only counts the round's actual first reaction —
+    // a steal's buzz happens well after the round started and isn't a fair
+    // comparison against a fresh round-start reaction.
+    if (state.settings.sessionStats && isFirstBuzzOfRound && state.roundStartedAt) {
+      const ms = buzzTime - state.roundStartedAt;
+      if (!state.stats.fastestBuzz || ms < state.stats.fastestBuzz.ms) {
+        state.stats.fastestBuzz = { name: state.players[playerId].name, ms, at: buzzTime };
+        saveStats();
+      }
+    }
+
     broadcast();
   });
 
@@ -575,10 +609,20 @@ io.on('connection', (socket) => {
       const isSpeedBonus = isNaturalCorrectAward && state.settings.speedBonus && !state.speedBonusPaid
         && state.roundStartedAt && (currentBuzzer.time - state.roundStartedAt) <= SPEED_BONUS_WINDOW_MS;
 
-      state.players[id].score += delta + (isSteal ? 1 : 0) + (isSpeedBonus ? 1 : 0);
+      const totalAwarded = delta + (isSteal ? 1 : 0) + (isSpeedBonus ? 1 : 0);
+      state.players[id].score += totalAwarded;
       savePlayers();
 
       if (isSpeedBonus) state.speedBonusPaid = true;
+
+      // Only a natural correct-answer award counts as a "round" achievement
+      // for the record book — a manual scoreboard nudge isn't tied to
+      // actually answering anything.
+      if (isNaturalCorrectAward && state.settings.sessionStats && totalAwarded > 0
+          && (!state.stats.mostPointsInRound || totalAwarded > state.stats.mostPointsInRound.points)) {
+        state.stats.mostPointsInRound = { name: state.players[id].name, points: totalAwarded, at: Date.now() };
+        saveStats();
+      }
 
       if (isSteal) {
         state.roundHadMiss = false;
