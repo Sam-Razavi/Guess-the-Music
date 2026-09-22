@@ -63,6 +63,11 @@ Phase 9 (shipped):
 - Lyrics-on-screen was requested again (reasoning: YouTube Music shows lyrics for most songs) and refused again — a lyric being *displayed* somewhere doesn't mean it's *licensed for redistribution*; YouTube Music licenses those specifically, this app doesn't. Not going to change.
 - Incident: while cleaning up a test browser window opened by the YouTube-fallback feature, killed the wrong Chrome process via `Stop-Process -Force`, which disconnected the Claude Code browser automation extension (Chrome itself and the real kiosk TV window survived undamaged — confirmed via `Get-Process`). Lesson: don't `Stop-Process -Force` on a Chrome PID to close one window — closing a specific automation-opened window should go through the automation tooling itself, not raw OS process kill, since Chrome's PID-to-window mapping isn't reliably 1:1.
 
+Phase 10 (shipped):
+
+- Bug fix — "increasing one player's score bumps a different player's score": host.js's scoreboard re-sorted by score on every render, so the instant you tapped +1 the row could jump position; a quick second tap (natural when awarding several points fast) then landed on whichever player's row had just slid into that screen spot. Fix: the host's own scoreboard now stays in a stable (join) order and never reorders on score changes — it's a control panel being actively tapped, not a public leaderboard. TV/player boards are untouched and still rank live, since they're display-only (no click targets to misfire).
+- Bigger, better-spaced touch targets on the host page for mobile: scoreboard +/- are now 2.75rem (3rem under 600px) round buttons, and the destructive remove-player button was made visibly smaller and moved further away (extra gap, wrapped the +/- pair in its own `.score-adjust` group) so a fast tap aimed at +/- can't land on it by mistake. Buzz-row award and playlist Play/Remove buttons got the same treatment. Both this and the scoreboard-order fix are pure static file changes (host.js/host.css) — express.static serves them straight from disk, so neither needed a pm2 restart to go live.
+
 Next ideas, not yet started:
 
 - Resuming round progress after a restart (currently only scores persist — round state intentionally resets to idle).
