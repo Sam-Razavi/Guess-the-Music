@@ -12,13 +12,6 @@ const scoreboardEl = document.getElementById('scoreboard');
 const buzzedNameEl = document.getElementById('buzzed-name');
 const revealTitleEl = document.getElementById('reveal-title');
 const revealArtistEl = document.getElementById('reveal-artist');
-const unlockBtn = document.getElementById('unlock-btn');
-
-// One tap anywhere establishes user activation so later scripted
-// video.playVideo() calls aren't blocked by autoplay policies.
-unlockBtn.addEventListener('click', () => {
-  unlockBtn.remove();
-});
 
 // ---- join QR ----
 fetch('/join-info').then(r => r.json()).then(({ url }) => {

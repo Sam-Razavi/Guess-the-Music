@@ -53,3 +53,69 @@ Scores update live on every screen. **Reset entire game** on the host page wipes
 - This is plain local networking, not a hosted service — it only works while your laptop is running the server and everyone's on the same WiFi. It won't work over mobile data or across different networks.
 - If a device can't reach the site, double check the IP address printed in the terminal is still current (it can change if you reconnect to WiFi) — restart the server if so.
 - Player names/scores are kept in memory for that run of the server; the song playlist is the only thing saved to disk (`playlist.json`).
+
+## Windows always-on setup
+
+This is how the game is deployed on the always-on PC that's HDMI'd into the TV. The server runs under [pm2](https://pm2.keymetrics.io/) so it survives reboots and restarts itself if it crashes, and the TV screen launches automatically in Chrome kiosk mode at logon.
+
+### Server: pm2
+
+Install pm2 and the Windows startup helper globally, then start the app under it:
+
+```powershell
+npm install -g pm2 pm2-windows-startup
+cd C:\Project\guess-the-music\guess-the-music
+pm2 start server.js --name guess-the-music
+pm2 save
+pm2-startup install
+```
+
+- `pm2 save` snapshots the current process list so it comes back after a reboot.
+- `pm2-startup install` registers a `HKCU\...\Run` entry that runs `pm2 resurrect` at logon — the PC needs to be set to auto-login for this to work fully unattended after a reboot.
+
+**Check it's running:**
+
+```powershell
+pm2 status          # should show guess-the-music as "online"
+pm2 logs guess-the-music   # tail the server's console output
+```
+
+### TV screen: Chrome kiosk mode
+
+`scripts/launch-kiosk.ps1` waits for the server to answer on `http://localhost:3000/tv.html` (so it doesn't race the server on boot) and then opens it in Chrome with `--kiosk` and `--autoplay-policy=no-user-gesture-required` (so YouTube audio plays without a manual unlock tap), using a separate Chrome profile so it doesn't touch your normal browsing session.
+
+To register it to launch automatically at logon (creates a shortcut in the Startup folder):
+
+```powershell
+cd C:\Project\guess-the-music\guess-the-music\scripts
+powershell -ExecutionPolicy Bypass -File .\install-kiosk-startup.ps1
+```
+
+To launch it manually / test it without logging out:
+
+```powershell
+powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Project\guess-the-music\guess-the-music\scripts\launch-kiosk.ps1
+```
+
+To exit kiosk mode, `Alt+F4` the Chrome window (or kill it from Task Manager).
+
+### Updating the app later
+
+```powershell
+cd C:\Project\guess-the-music\guess-the-music
+git pull
+npm install
+pm2 restart guess-the-music
+```
+
+### Finding the PC's LAN IP (for the QR code / player join links)
+
+The server prints its own LAN IP on startup (`pm2 logs guess-the-music`), but if you need to check it directly:
+
+```powershell
+ipconfig
+```
+
+Look for the `IPv4 Address` under your active adapter (Wi-Fi or Ethernet). If it's changed since the server last started, restart the pm2 process (`pm2 restart guess-the-music`) so the printed URLs and QR code match.
+
+> Consider setting a **DHCP reservation** for this PC in your router so its LAN IP never changes — otherwise the QR code can go stale after a router reboot or lease renewal.
