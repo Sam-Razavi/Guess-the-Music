@@ -131,6 +131,7 @@ function showPanel(name) {
 }
 
 const prevScores = new Map();
+let currentSoleLeaderId = null;
 
 function renderScoreboard(players) {
   const sorted = [...players].sort((a, b) => b.score - a.score);
@@ -150,6 +151,17 @@ function renderScoreboard(players) {
     }
     prevScores.set(p.id, p.score);
   });
+
+  // "Takes the lead" banner — only for SOLE possession of 1st (not a tie),
+  // and only on an actual change, so it doesn't fire on every re-render
+  // while the same player stays in front.
+  const tiedForTop = sorted.filter(p => p.score === top).length;
+  const soleLeader = top > 0 && tiedForTop === 1 ? sorted[0] : null;
+  if (soleLeader && soleLeader.id !== currentSoleLeaderId
+      && latestState && latestState.settings && latestState.settings.extraAnimations) {
+    spawnLeadBanner(soleLeader.name);
+  }
+  currentSoleLeaderId = soleLeader ? soleLeader.id : null;
 }
 
 function escapeHtml(s) {
@@ -259,17 +271,23 @@ socket.on('steal', ({ name }) => {
 // enforces the actual buzz lockout) ----
 let timerInterval = null;
 
+const TIMER_CRITICAL_SECONDS = 5;
+
 function updatePlayingSubtext(state) {
   if (state.buzzingLocked) {
     playingSubtext.textContent = t('timesUp', currentLang);
+    playingSubtext.classList.remove('timer-critical');
     return;
   }
   if (!state.roundTimer) {
     playingSubtext.textContent = t('buzzInPhone', currentLang);
+    playingSubtext.classList.remove('timer-critical');
     return;
   }
   const remaining = Math.max(0, Math.ceil((state.roundTimer.endsAt - Date.now()) / 1000));
   playingSubtext.textContent = t('buzzInPhoneTimer', currentLang).replace('{s}', remaining);
+  const critical = state.settings && state.settings.extraAnimations && remaining > 0 && remaining <= TIMER_CRITICAL_SECONDS;
+  playingSubtext.classList.toggle('timer-critical', critical);
 }
 
 let autoAdvanceInterval = null;
@@ -285,6 +303,35 @@ function updateAutoAdvanceHint(state) {
 
 let wasBuzzed = false;
 let resultsShown = false;
+let lastPlayingSongId = null;
+
+function spawnGoFlash() {
+  if (reduceMotion) return;
+  const el = document.createElement('div');
+  el.className = 'go-flash';
+  document.getElementById('stage').appendChild(el);
+  const steps = ['3', '2', '1', 'GO!'];
+  let i = 0;
+  function showStep() {
+    el.textContent = steps[i];
+    el.classList.remove('go-flash-pop');
+    void el.offsetWidth; // force reflow so the pop animation restarts each step
+    el.classList.add('go-flash-pop');
+    i++;
+    if (i < steps.length) setTimeout(showStep, 500);
+    else setTimeout(() => el.remove(), 500);
+  }
+  showStep();
+}
+
+function spawnLeadBanner(name) {
+  if (reduceMotion) return;
+  const banner = document.createElement('div');
+  banner.className = 'lead-banner';
+  banner.textContent = `🏆 ${name} takes the lead!`;
+  document.getElementById('stage').appendChild(banner);
+  banner.addEventListener('animationend', () => banner.remove());
+}
 
 function renderResults(players) {
   const sorted = [...players].sort((a, b) => b.score - a.score);
@@ -308,6 +355,16 @@ socket.on('state', (state) => {
   applyTranslations(currentLang);
   renderScoreboard(state.players);
   showPanel(state.roundStatus);
+
+  // "3...2...1...GO" flash the moment a NEW song actually starts playing —
+  // tracked separately from syncVideo's own loadedYoutubeId so this fires
+  // exactly once per round start regardless of video-loading timing.
+  if (state.roundStatus === 'playing' && state.currentSong && state.currentSong.youtubeId !== lastPlayingSongId) {
+    lastPlayingSongId = state.currentSong.youtubeId;
+    if (state.settings && state.settings.extraAnimations) spawnGoFlash();
+  } else if (state.roundStatus !== 'playing') {
+    lastPlayingSongId = null; // replaying the same song later should flash again
+  }
 
   if (state.roundStatus === 'buzzed' && state.buzzOrder.length) {
     // The *current* buzzer is whoever buzzed most recently, not the first
