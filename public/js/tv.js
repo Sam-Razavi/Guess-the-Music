@@ -15,6 +15,7 @@ const buzzedNameEl = document.getElementById('buzzed-name');
 const revealTitleEl = document.getElementById('reveal-title');
 const revealArtistEl = document.getElementById('reveal-artist');
 const playingSubtext = document.getElementById('playing-subtext');
+const hintTextEl = document.getElementById('hint-text');
 const resultsListEl = document.getElementById('results-list');
 const sessionStatsEl = document.getElementById('session-stats');
 const autoAdvanceHintEl = document.getElementById('auto-advance-hint');
@@ -377,6 +378,13 @@ socket.on('state', (state) => {
   applyTranslations(currentLang);
   renderScoreboard(state.players);
   showPanel(state.roundStatus);
+
+  if (state.currentSong && state.currentSong.hint) {
+    hintTextEl.textContent = state.currentSong.hint;
+    hintTextEl.hidden = false;
+  } else {
+    hintTextEl.hidden = true;
+  }
 
   // "3...2...1...GO" flash the moment a NEW song actually starts playing —
   // tracked separately from syncVideo's own loadedYoutubeId so this fires

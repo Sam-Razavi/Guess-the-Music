@@ -91,6 +91,14 @@
 #reveal-title, #reveal-artist { font-family: var(--font-fun); }
 #reveal-title { color: var(--gold); }
 
+#hint-text {
+  font-family: var(--font-fun);
+  letter-spacing: 0.15em;
+  font-size: 1.6rem;
+  color: var(--gold);
+  max-width: 24ch;
+}
+
 .record {
   width: 220px;
   height: 220px;

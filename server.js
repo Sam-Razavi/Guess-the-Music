@@ -136,6 +136,7 @@ const state = {
   roundStartedAt: null,            // Date.now() when the current round began — powers the speed-bonus window
   speedBonusPaid: false,           // true once this round's speed bonus has been awarded once
   stats: loadStats(),              // all-time records — see DEFAULT_STATS; only recorded while sessionStats is on
+  hintRevealedIndices: [],         // character indices of the current song's title already revealed — see buildHintMask
 };
 
 const SPEED_BONUS_WINDOW_MS = 3000;
@@ -179,10 +180,22 @@ function startRound(id, timerSeconds) {
   state.roundHadMiss = false;
   state.roundStartedAt = Date.now();
   state.speedBonusPaid = false;
+  state.hintRevealedIndices = [];
   clearRoundTimer();
   clearAutoAdvance();
   if (timerSeconds > 0) startRoundTimer(timerSeconds);
   return true;
+}
+
+// Karaoke hint: a copyright-safe guessing aid built from the song's own
+// TITLE (data the host typed themselves), never from actual lyrics — there's
+// no licensed lyrics source available, so this is the closest safe
+// equivalent to "blank-per-word, reveal as you go". Letters/digits start
+// masked as underscores; spaces and punctuation stay visible so the word
+// shape is readable.
+function buildHintMask(title, revealedIndices) {
+  const revealed = new Set(revealedIndices);
+  return [...title].map((ch, i) => (/[a-zA-Z0-9]/.test(ch) ? (revealed.has(i) ? ch : '_') : ch)).join(' ');
 }
 
 function currentSong() {
@@ -240,11 +253,17 @@ function payloadFor(role) {
     // always sees real scores, and each player still sees their own on
     // their own phone (that's personal, not a public leaderboard reveal).
     const hideScores = state.settings.blindMode && state.roundStatus !== 'results';
+    const showHint = state.settings.karaokeHint && state.roundStatus === 'playing' && song;
     return {
       ...base,
       players: hideScores ? base.players.map(p => ({ ...p, score: null })) : base.players,
       currentSong: song
-        ? { youtubeId: song.youtubeId, title: revealed ? song.title : null, artist: revealed ? song.artist : null }
+        ? {
+            youtubeId: song.youtubeId,
+            title: revealed ? song.title : null,
+            artist: revealed ? song.artist : null,
+            hint: showHint ? buildHintMask(song.title, state.hintRevealedIndices) : null,
+          }
         : null,
     };
   }
@@ -637,6 +656,17 @@ io.on('connection', (socket) => {
   socket.on('host:setLanguage', (lang) => {
     if (lang !== 'en' && lang !== 'fa') return;
     state.language = lang;
+    broadcast();
+  });
+
+  socket.on('host:revealHintLetter', () => {
+    const song = currentSong();
+    if (!song || state.roundStatus !== 'playing') return;
+    const revealed = new Set(state.hintRevealedIndices);
+    const revealable = [...song.title].map((ch, i) => i).filter(i => /[a-zA-Z0-9]/.test(song.title[i]) && !revealed.has(i));
+    if (!revealable.length) return; // nothing left to reveal
+    const pick = revealable[Math.floor(Math.random() * revealable.length)];
+    state.hintRevealedIndices.push(pick);
     broadcast();
   });
 

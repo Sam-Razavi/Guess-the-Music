@@ -226,6 +226,8 @@ document.getElementById('reveal-btn').addEventListener('click', () => {
 });
 document.getElementById('reset-buzzers-btn').addEventListener('click', () => socket.emit('host:resetBuzzers'));
 document.getElementById('close-round-btn').addEventListener('click', () => socket.emit('host:closeRound'));
+const revealHintBtn = document.getElementById('reveal-hint-btn');
+revealHintBtn.addEventListener('click', () => socket.emit('host:revealHintLetter'));
 document.getElementById('reset-game-btn').addEventListener('click', () => {
   if (confirm('Reset all scores and mark every song unplayed?')) {
     socket.emit('host:resetGame');
@@ -309,6 +311,8 @@ function renderRound(state) {
     currentSongInfo.textContent = 'No round started — pick a song from the playlist below.';
     currentSongInfo.classList.add('muted');
   }
+
+  revealHintBtn.hidden = !(state.settings && state.settings.karaokeHint && state.roundStatus === 'playing');
 
   // With "Point values per song" on, awarding a correct buzz gives that
   // song's assigned value instead of a flat point — defaults to 1, so this

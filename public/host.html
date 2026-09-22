@@ -45,6 +45,7 @@
           <button id="reveal-btn" class="primary">Reveal answer</button>
           <button id="reset-buzzers-btn">Reset buzzers</button>
           <button id="close-round-btn">Close round</button>
+          <button id="reveal-hint-btn" hidden>💡 Reveal a letter</button>
         </div>
         <p class="muted small shortcuts-hint">Keyboard: <kbd>Space</kbd> reveal · <kbd>R</kbd> reset buzzers · <kbd>C</kbd> close round</p>
         <div class="timer-row">
@@ -126,8 +127,8 @@
             <span><strong>Session stats</strong><br><span class="muted small">Fastest buzz, biggest single round — all-time records shown on the results screen.</span></span>
           </label>
           <label class="option-row">
-            <input type="checkbox" data-setting="karaokeHint" disabled>
-            <span><strong>Karaoke hint</strong> <span class="muted small">(coming soon)</span><br><span class="muted small">Blank-per-word hint (no real lyrics) as a guessing aid.</span></span>
+            <input type="checkbox" data-setting="karaokeHint">
+            <span><strong>Karaoke hint</strong><br><span class="muted small">Blank-per-letter title hint on TV, revealed one letter at a time by the host (no real lyrics — built from the song title only).</span></span>
           </label>
           <label class="option-row">
             <input type="checkbox" data-setting="autoCategories" disabled>
