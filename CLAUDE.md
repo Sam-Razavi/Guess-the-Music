@@ -31,8 +31,15 @@ Phase 5 (shipped):
 
 Note for next time: on tv.html, anything that needs to be visible during the 'revealed' state must live outside `.overlay` (see the `#auto-advance-hint` element, moved there after first placing it inside `#panel-revealed` and finding it never rendered) — `.overlay` intentionally fades to invisible during 'revealed' to show the real video underneath.
 
+Phase 6 (shipped):
+
+- Playlist search: text box on the host page, filters by title/artist (case-insensitive substring), combined with the category filter rather than replacing it. Directly useful once the playlist has dozens of songs.
+- Keyboard shortcuts for hosting from a laptop: Space = reveal, R = reset buzzers, C = close round. Reuses the existing button click handlers; guarded against firing while typing in an input; hint text hidden on touch devices.
+- Home-screen app icon (PWA manifest) for host.html and player.html — "Add to Home Screen" installs a real app icon, opens full-screen, no re-typing the URL. Icon is a simple vinyl-record mark generated via an offscreen canvas (matches the TV screen's existing record animation), at public/icons/. Separate manifest per page (own name/start_url) sharing the same icon set.
+
 Next ideas, not yet started:
 
 - Resuming round progress after a restart (currently only scores persist — round state intentionally resets to idle).
 - More languages — i18n.js's translations object is keyed by language code, so adding a third is mostly copying the 'en'/'fa' block and adding a toggle button in host.html.
 - Remote play (join from outside the home WiFi) — would need a tunnel (Cloudflare Tunnel recommended) or Tailscale, plus a join PIN since the app currently has zero authentication (anyone with the link can join/control).
+- A proper custom logo (currently just the 🎵 emoji in headers/tab titles) — the vinyl-record PWA icon at public/icons/ could be the starting point for one.
