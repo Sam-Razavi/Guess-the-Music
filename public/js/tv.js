@@ -67,6 +67,24 @@ function ensurePlaybackStarted(attempt = 0) {
   }, 700);
 }
 
+// Lets the host see whether a song is *actually* playing, not just that
+// the round's game-state is 'playing' — the two can disagree (silently
+// stuck loading, or a video that flat-out can't play here).
+function reportPlayerStatus(status, message) {
+  socket.emit('tv:playerStatus', { status, message: message || null });
+}
+
+const YT_STATE_NAMES = { '-1': 'unstarted', 0: 'ended', 1: 'playing', 2: 'paused', 3: 'buffering', 5: 'cued' };
+
+// YouTube error codes: https://developers.google.com/youtube/iframe_api_reference#onError
+const YT_ERROR_MESSAGES = {
+  2: "Invalid video ID",
+  5: "This video can't be played here (HTML5 player error)",
+  100: 'Video not found — it may have been removed or made private',
+  101: 'Embedding disabled by the video owner — pick a different upload',
+  150: 'Embedding disabled by the video owner — pick a different upload',
+};
+
 function createPlayer() {
   if (player) return;
   player = new YT.Player('yt-player', {
@@ -84,6 +102,8 @@ function createPlayer() {
     },
     events: {
       onReady: () => syncVideo(latestState),
+      onStateChange: (e) => reportPlayerStatus(YT_STATE_NAMES[e.data] || 'unknown'),
+      onError: (e) => reportPlayerStatus('error', YT_ERROR_MESSAGES[e.data] || `Playback error (code ${e.data})`),
     },
   });
 }
@@ -107,15 +127,26 @@ function showPanel(name) {
   overlay.classList.toggle('hide', name === 'revealed');
 }
 
+const prevScores = new Map();
+
 function renderScoreboard(players) {
   const sorted = [...players].sort((a, b) => b.score - a.score);
   const top = sorted.length ? sorted[0].score : -1;
   scoreboardEl.innerHTML = sorted.map(p => `
     <div class="pill ${p.score === top && top > 0 ? 'lead' : ''}">
       <span>${escapeHtml(p.name)}</span>
-      <span class="score">${p.score}</span>
+      <span class="score" data-score-id="${p.id}">${p.score}</span>
     </div>
   `).join('');
+
+  sorted.forEach(p => {
+    const prev = prevScores.get(p.id);
+    if (prev !== undefined && prev !== p.score) {
+      const el = scoreboardEl.querySelector(`[data-score-id="${p.id}"]`);
+      if (el) el.classList.add('score-pulse');
+    }
+    prevScores.set(p.id, p.score);
+  });
 }
 
 function escapeHtml(s) {

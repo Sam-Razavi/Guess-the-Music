@@ -63,11 +63,19 @@
 .panel h1 { font-size: 3.2rem; max-width: 18ch; }
 .panel p { font-size: 1.3rem; }
 
+#reveal-title, #reveal-artist { font-family: var(--font-fun); }
+#reveal-title { color: var(--gold); }
+
 .record {
   width: 220px;
   height: 220px;
   border-radius: 50%;
-  background: repeating-radial-gradient(circle at center, #100c18 0px, #100c18 2px, #1c1628 2px, #1c1628 5px);
+  /* The groove pattern alone is perfectly rotationally symmetric, so
+     spinning it shows no visible motion — the diagonal shine streak is
+     what actually sells the rotation as it sweeps around. */
+  background:
+    linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.16) 49%, transparent 58%),
+    repeating-radial-gradient(circle at center, #100c18 0px, #100c18 2px, #1c1628 2px, #1c1628 5px);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
   position: relative;
   margin-bottom: 0.5rem;
@@ -90,13 +98,17 @@
 }
 
 #panel-buzzed h1 { color: var(--gold); font-size: 4rem; }
-#panel-buzzed { animation: buzz-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
-@keyframes buzz-pop {
-  0% { transform: scale(0.7); opacity: 0; }
+
+/* Every panel switch gets the same entrance treatment — CSS animations
+   restart automatically whenever an element goes from display:none (via
+   the `hidden` attribute) to visible, so this needs no JS re-triggering. */
+.panel { animation: panel-enter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes panel-enter {
+  0% { transform: scale(0.92); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #panel-buzzed { animation: none; }
+  .panel { animation: none; }
 }
 
 #qr { border-radius: 12px; background: var(--text); padding: 10px; }
@@ -165,4 +177,13 @@
 }
 .scoreboard .pill { font-size: 1.05rem; }
 .scoreboard .pill.lead { box-shadow: 0 0 0 2px var(--gold) inset; }
-.scoreboard .score { color: var(--gold); font-weight: 700; }
+.scoreboard .score { color: var(--gold); font-weight: 700; display: inline-block; }
+.scoreboard .score.score-pulse { animation: score-pulse 0.5s ease; }
+@keyframes score-pulse {
+  0% { transform: scale(1); color: var(--gold); }
+  40% { transform: scale(1.6); color: var(--good); }
+  100% { transform: scale(1); color: var(--gold); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scoreboard .score.score-pulse { animation: none; }
+}
