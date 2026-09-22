@@ -221,7 +221,10 @@ socket.on('state', (state) => {
   showPanel(state.roundStatus);
 
   if (state.roundStatus === 'buzzed' && state.buzzOrder.length) {
-    buzzedNameEl.textContent = state.buzzOrder[0].name;
+    // The *current* buzzer is whoever buzzed most recently, not the first
+    // person to buzz this round — those differ after a reset + a second,
+    // different buzzer.
+    buzzedNameEl.textContent = state.buzzOrder[state.buzzOrder.length - 1].name;
   }
 
   if (state.roundStatus === 'revealed' && state.currentSong) {

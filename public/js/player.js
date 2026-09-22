@@ -119,7 +119,10 @@ socket.on('state', (state) => {
   if (me) myScoreEl.textContent = me.score;
 
   const buzzed = state.buzzOrder.some(b => b.id === myId);
-  const first = state.buzzOrder[0];
+  // The *current* buzzer is whoever buzzed most recently, not the first
+  // person to buzz this round — those differ after a reset + a second,
+  // different buzzer.
+  const current = state.buzzOrder[state.buzzOrder.length - 1];
 
   buzzBtn.classList.remove('locked', 'beaten');
 
@@ -144,13 +147,13 @@ socket.on('state', (state) => {
     }
   } else if (state.roundStatus === 'buzzed') {
     buzzBtn.disabled = true;
-    if (first && first.id === myId) {
+    if (current && current.id === myId) {
       buzzBtn.classList.add('locked');
       buzzLabel.textContent = t('lockedIn', lang);
       statusText.textContent = t('sayAnswerHostChecking', lang);
     } else {
       buzzBtn.classList.add('beaten');
-      const name = first ? first.name : t('someone', lang);
+      const name = current ? current.name : t('someone', lang);
       buzzLabel.textContent = t('buzzedFirst', lang).replace('{name}', name);
       statusText.textContent = t('betterLuck', lang);
     }
