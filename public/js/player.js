@@ -51,7 +51,31 @@ nameChip.addEventListener('click', () => {
   buzzerScreen.hidden = true;
 });
 
+// ---- buzz feedback: sound + vibration ----
+// Created lazily inside the click handler (a real user gesture) so the
+// browser doesn't block audio autoplay, and reused across buzzes.
+let audioCtx = null;
+
+function playBuzzSound() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.15);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
+  } catch (e) { /* Web Audio unavailable — silently skip the sound */ }
+}
+
 buzzBtn.addEventListener('click', () => {
+  playBuzzSound();
+  if (navigator.vibrate) navigator.vibrate(80); // no-op on iOS Safari, which doesn't support it
   socket.emit('player:buzz');
 });
 
