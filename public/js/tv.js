@@ -44,7 +44,8 @@ function syncVideo(state) {
   }
 }
 
-window.onYouTubeIframeAPIReady = function () {
+function createPlayer() {
+  if (player) return;
   player = new YT.Player('yt-player', {
     height: '100%',
     width: '100%',
@@ -62,7 +63,21 @@ window.onYouTubeIframeAPIReady = function () {
       onReady: () => syncVideo(latestState),
     },
   });
-};
+}
+
+window.onYouTubeIframeAPIReady = createPlayer;
+
+// The API script doesn't always invoke onYouTubeIframeAPIReady even once
+// window.YT is fully loaded (observed in testing: YT.loaded === 1 but the
+// callback silently never fires, leaving the player permanently
+// uninitialized with no error) — poll briefly as a backstop.
+const ytReadyPoll = setInterval(() => {
+  if (player) { clearInterval(ytReadyPoll); return; }
+  if (window.YT && typeof window.YT.Player === 'function') {
+    clearInterval(ytReadyPoll);
+    createPlayer();
+  }
+}, 300);
 
 function showPanel(name) {
   Object.entries(panels).forEach(([key, el]) => { el.hidden = key !== name; });
