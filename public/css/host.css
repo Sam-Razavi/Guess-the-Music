@@ -208,6 +208,14 @@
 .score-row .name { display: flex; align-items: center; gap: 0.5em; }
 .score-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
 .score-row .dot.connected { background: var(--good); }
+.team-tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--gold);
+  background: rgba(245, 185, 66, 0.12);
+  border-radius: 999px;
+  padding: 0.05em 0.6em;
+}
 .score-row .actions { display: flex; align-items: center; gap: 1.1rem; }
 .score-adjust { display: flex; align-items: center; gap: 0.5rem; }
 .score-row .actions button {

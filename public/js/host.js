@@ -437,9 +437,13 @@ function renderScoreboard(state) {
   // several points fast) could land on whichever player's row had just
   // slid into that screen position, awarding THEM the point instead.
   const players = state.players;
+  const teamModeOn = state.settings && state.settings.teamMode;
   hostScoreboard.innerHTML = players.map(p => `
     <div class="score-row">
-      <div class="name"><span class="dot ${p.connected ? 'connected' : ''}"></span>${escapeHtml(p.name)}</div>
+      <div class="name">
+        <span class="dot ${p.connected ? 'connected' : ''}"></span>${escapeHtml(p.name)}
+        ${teamModeOn && p.team ? `<span class="team-tag">${escapeHtml(p.team)}</span>` : ''}
+      </div>
       <div class="actions">
         <div class="score-adjust">
           <button data-adjust="${p.id}:-1">−</button>

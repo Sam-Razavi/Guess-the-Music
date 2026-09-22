@@ -11,8 +11,9 @@ const myId = getPlayerId();
 const socket = io();
 
 let currentName = null;
+let currentTeam = '';
 function sendRegister() {
-  if (currentName) socket.emit('register', { role: 'player', id: myId, name: currentName });
+  if (currentName) socket.emit('register', { role: 'player', id: myId, name: currentName, team: currentTeam });
 }
 // See host.js for why this re-registers on every 'connect' rather than once
 // — otherwise a phone that locks/drops WiFi mid-game stops getting updates
@@ -22,15 +23,18 @@ socket.on('connect', sendRegister);
 const nameScreen = document.getElementById('name-screen');
 const buzzerScreen = document.getElementById('buzzer-screen');
 const nameInput = document.getElementById('name-input');
+const teamInput = document.getElementById('team-input');
 const nameChip = document.getElementById('name-chip');
 const myScoreEl = document.getElementById('my-score');
 const buzzBtn = document.getElementById('buzz-btn');
 const buzzLabel = document.getElementById('buzz-label');
 const statusText = document.getElementById('status-text');
 
-function join(name) {
+function join(name, team) {
   currentName = name;
+  currentTeam = (team || '').trim();
   localStorage.setItem('gtm_player_name', name);
+  localStorage.setItem('gtm_player_team', currentTeam);
   nameChip.textContent = name;
   nameScreen.hidden = true;
   buzzerScreen.hidden = false;
@@ -39,14 +43,18 @@ function join(name) {
 
 document.getElementById('name-submit').addEventListener('click', () => {
   const name = nameInput.value.trim();
-  if (name) join(name);
+  if (name) join(name, teamInput.value);
 });
 nameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('name-submit').click();
+});
+teamInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('name-submit').click();
 });
 
 nameChip.addEventListener('click', () => {
   nameInput.value = localStorage.getItem('gtm_player_name') || '';
+  teamInput.value = localStorage.getItem('gtm_player_team') || '';
   nameScreen.hidden = false;
   buzzerScreen.hidden = true;
 });
@@ -112,7 +120,7 @@ myScoreEl.addEventListener('animationend', () => myScoreEl.classList.remove('sco
 
 const savedName = localStorage.getItem('gtm_player_name');
 if (savedName) {
-  join(savedName);
+  join(savedName, localStorage.getItem('gtm_player_team') || '');
 } else {
   nameInput.focus();
 }

@@ -339,6 +339,7 @@
 }
 .scoreboard .pill { font-size: 1.05rem; }
 .scoreboard .pill.lead { box-shadow: 0 0 0 2px var(--gold) inset; }
+.team-tag { font-size: 0.8em; color: var(--gold); opacity: 0.85; }
 .scoreboard .score { color: var(--gold); font-weight: 700; display: inline-block; }
 .scoreboard .score.score-pulse { animation: score-pulse 0.5s ease; }
 @keyframes score-pulse {

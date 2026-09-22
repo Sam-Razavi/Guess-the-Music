@@ -216,8 +216,16 @@ function makeSong(youtubeId, title, artist, category) {
 
 function publicPlayers() {
   return Object.entries(state.players).map(([id, p]) => ({
-    id, name: p.name, score: p.score, connected: p.connected,
+    id, name: p.name, score: p.score, connected: p.connected, team: p.team || '',
   }));
+}
+
+// Team mode: an empty/blank team means "no team" (solo), never grouped
+// with other blank-team players — so team checks always compare non-empty,
+// trimmed team names.
+function teamOf(playerId) {
+  const p = state.players[playerId];
+  return p ? (p.team || '').trim() : '';
 }
 
 // Three payload shapes, because the TV and players must NOT see the
@@ -424,18 +432,20 @@ io.on('connection', (socket) => {
   let role = null;
   let playerId = null;
 
-  socket.on('register', ({ role: r, id, name }) => {
+  socket.on('register', ({ role: r, id, name, team }) => {
     role = r;
     socket.join(role);
 
     if (role === 'player') {
       playerId = id;
+      const cleanTeam = (team || '').trim().slice(0, 24);
       if (!state.players[playerId]) {
-        state.players[playerId] = { name: name || 'Player', score: 0, connected: true, socketId: socket.id };
+        state.players[playerId] = { name: name || 'Player', score: 0, connected: true, socketId: socket.id, team: cleanTeam };
       } else {
         state.players[playerId].connected = true;
         state.players[playerId].socketId = socket.id;
         if (name) state.players[playerId].name = name;
+        if (team !== undefined) state.players[playerId].team = cleanTeam;
       }
       savePlayers();
       broadcast();
@@ -455,6 +465,12 @@ io.on('connection', (socket) => {
   socket.on('player:buzz', () => {
     if (!playerId || state.roundStatus !== 'playing' || state.buzzingLocked) return;
     if (state.buzzOrder.find(b => b.id === playerId)) return;
+    // Team mode: a buzz locks out the whole team, not just the one player —
+    // teammates share the buzz-in the same way an individual player does.
+    if (state.settings.teamMode) {
+      const myTeam = teamOf(playerId);
+      if (myTeam && state.buzzOrder.some(b => teamOf(b.id) === myTeam)) return;
+    }
     // Reaching this point means the round was open ('playing') and this
     // player hadn't buzzed yet — so this is always the buzz that takes
     // the floor, whether it's the round's 1st buzz or a later one after
@@ -629,7 +645,12 @@ io.on('connection', (socket) => {
         && state.roundStartedAt && (currentBuzzer.time - state.roundStartedAt) <= SPEED_BONUS_WINDOW_MS;
 
       const totalAwarded = delta + (isSteal ? 1 : 0) + (isSpeedBonus ? 1 : 0);
-      state.players[id].score += totalAwarded;
+      // Team mode: the award goes to every teammate too, not just whoever's
+      // buzzer this was — steal/speed bonus eligibility above is still based
+      // on the actual buzzer's own timing, only the resulting points fan out.
+      const team = state.settings.teamMode ? teamOf(id) : '';
+      const recipients = team ? Object.keys(state.players).filter(pid => teamOf(pid) === team) : [id];
+      recipients.forEach(pid => { state.players[pid].score += totalAwarded; });
       savePlayers();
 
       if (isSpeedBonus) state.speedBonusPaid = true;

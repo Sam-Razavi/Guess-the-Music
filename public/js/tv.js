@@ -138,9 +138,10 @@ let currentSoleLeaderId = null;
 function renderScoreboard(players) {
   const sorted = [...players].sort((a, b) => b.score - a.score);
   const top = sorted.length ? sorted[0].score : -1;
+  const teamModeOn = latestState && latestState.settings && latestState.settings.teamMode;
   scoreboardEl.innerHTML = sorted.map(p => `
     <div class="pill ${p.score === top && top > 0 ? 'lead' : ''}">
-      <span>${escapeHtml(p.name)}</span>
+      <span>${escapeHtml(p.name)}${teamModeOn && p.team ? ` <span class="team-tag">${escapeHtml(p.team)}</span>` : ''}</span>
       <span class="score" data-score-id="${p.id}">${p.score === null ? '🔒' : p.score}</span>
     </div>
   `).join('');
