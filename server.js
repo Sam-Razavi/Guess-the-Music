@@ -31,12 +31,24 @@ function savePlaylist() {
 
 function getLanIp() {
   const nets = os.networkInterfaces();
+  const candidates = [];
   for (const name of Object.keys(nets)) {
     for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) return net.address;
+      if (net.family === 'IPv4' && !net.internal) candidates.push({ name, address: net.address });
     }
   }
-  return 'localhost';
+  if (!candidates.length) return 'localhost';
+
+  // VirtualBox's default host-only network (used by e.g. BlueStacks) —
+  // phones can never reach this, so never pick it if anything else exists.
+  const isVirtualboxDefault = (ip) => ip.startsWith('192.168.56.');
+  const isWifi = (name) => /wi-?fi|wlan/i.test(name);
+
+  return (
+    candidates.find(c => isWifi(c.name) && !isVirtualboxDefault(c.address)) ||
+    candidates.find(c => !isVirtualboxDefault(c.address)) ||
+    candidates[0]
+  ).address;
 }
 
 // ---------- game state ----------

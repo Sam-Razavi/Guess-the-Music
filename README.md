@@ -4,6 +4,8 @@ A local party game: the TV shows the stage, everyone's phone is a buzzer, songs 
 
 It runs from a laptop on your WiFi — nothing to install on the Android TV itself besides its normal browser.
 
+> **Running on the always-on TV PC?** The server and kiosk screen already start themselves — see [Windows always-on setup](#windows-always-on-setup) below. You don't need `npm start`; just check `pm2 status`.
+
 ## 1. Install & start
 
 ```bash
@@ -57,6 +59,18 @@ Scores update live on every screen. **Reset entire game** on the host page wipes
 ## Windows always-on setup
 
 This is how the game is deployed on the always-on PC that's HDMI'd into the TV. The server runs under [pm2](https://pm2.keymetrics.io/) so it survives reboots and restarts itself if it crashes, and the TV screen launches automatically in Chrome kiosk mode at logon.
+
+**Already set up — nothing to install.** The commands below (`npm install -g pm2 ...`, `install-kiosk-startup.ps1`) were the one-time setup and don't need to be re-run. Day to day, all you need is:
+
+| I want to... | Run this |
+|---|---|
+| Check the game is running | `pm2 status` |
+| See the server's console output | `pm2 logs guess-the-music` |
+| Restart the server (e.g. after a config change) | `pm2 restart guess-the-music` |
+| Re-open the TV kiosk screen (e.g. you closed it) | `powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Project\guess-the-music\guess-the-music\scripts\launch-kiosk.ps1` |
+| Add songs / run the game | Open `host.html` on your phone — see [Set it up](#2-set-it-up) above |
+
+`npm start` will fail with `EADDRINUSE` if you try it here — that's expected, it just means pm2 already has the server running on port 3000. You don't need it.
 
 ### Server: pm2
 
