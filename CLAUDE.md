@@ -22,7 +22,7 @@ Phase 4 (shipped):
 - End-of-game results screen: new 'results' roundStatus, 'Show results' button on host, ranked scores + one-shot confetti on TV, game-over message on player. 'Reset entire game' is the way back to idle.
 - Wrong-answer feedback: resetBuzzers now targets a 'wrong' event (distinct tone + vibration pattern) at only the specific player's socket, not a broadcast.
 
-Note found while building the above, not fixed (out of scope for what was asked): tv.js's buzzed-panel and the correct-answer confetti gating both key off `buzzOrder[0]` (the first buzzer of the round) rather than the current one. Harmless for the common one-buzz-per-round case; after a reset + a different second buzzer, the TV would still show/credit the original name. Worth a look if it's ever seen to actually misbehave in play.
+Also fixed: tv.js's buzzed-panel, the correct-answer confetti gating, and player.js's "locked in"/"buzzed first" logic all used to key off `buzzOrder[0]` (the first buzzer of the round) instead of the current one — stale after a reset + a different second buzzer. All three now use `buzzOrder[buzzOrder.length - 1]`. Verified directly with a two-player buzz/reset/rebuzz sequence.
 
 Next ideas, not yet started:
 
@@ -30,4 +30,3 @@ Next ideas, not yet started:
 - Round auto-advance to the next unplayed song after reveal, if the host wants a fully hands-off mode.
 - Resuming round progress after a restart (currently only scores persist — round state intentionally resets to idle).
 - More languages — i18n.js's translations object is keyed by language code, so adding a third is mostly copying the 'en'/'fa' block and adding a toggle button in host.html.
-- Fix the buzzOrder[0]-vs-current-buzzer inconsistency noted above, if it turns out to matter in practice.
