@@ -113,6 +113,40 @@ powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Proje
 
 To exit kiosk mode, `Alt+F4` the Chrome window (or kill it from Task Manager).
 
+### YouTube playlist import (optional)
+
+The host page can bulk-import a whole YouTube playlist by link, using the official YouTube Data API v3. This needs your own free API key:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/), create a project (or use an existing one).
+2. Enable the **YouTube Data API v3** for that project.
+3. Create an API key under **Credentials**.
+4. Copy `.env.example` to `.env` in the project folder and paste the key in:
+   ```
+   YOUTUBE_API_KEY=your-key-here
+   ```
+5. `pm2 restart guess-the-music` so the server picks it up.
+
+Everything else works fine without this — the host page just shows a clear error on the import button if it's not configured.
+
+### Friendly hostname (mDNS)
+
+The server also advertises itself as `guess-the-music.local` on the network, shown as a secondary hint under the QR code on the host page. It's a convenience only, not the primary path — the QR code and printed IP-based links stay the reliable way to join, since Android Chrome's support for `.local` addresses is inconsistent. The first time the server starts, Windows may prompt a one-time Firewall dialog for Node.js (multicast UDP) — allow it on **Private networks**.
+
+### Log rotation
+
+`pm2-logrotate` (the usual way to bound pm2's log file sizes) can't install on this machine — its installer breaks on the space in the Windows profile path (`C:\Users\Min Dator`), a known PM2-on-Windows issue. Instead, a small scheduled task handles it directly:
+
+```powershell
+cd C:\Project\guess-the-music\guess-the-music\scripts
+powershell -ExecutionPolicy Bypass -File .\install-log-rotation.ps1
+```
+
+This registers a daily task (`GuessTheMusic-LogRotate`, runs at 4am) that rotates any pm2 log file over 10MB, keeping 3 old generations, and asks pm2 to reopen fresh log files. To run it manually / test it:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Project\guess-the-music\guess-the-music\scripts\rotate-logs.ps1
+```
+
 ### Updating the app later
 
 ```powershell
