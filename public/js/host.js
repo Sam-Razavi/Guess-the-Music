@@ -8,6 +8,7 @@ socket.on('connect', () => socket.emit('register', { role: 'host' }));
 const connPill = document.getElementById('conn-pill');
 const roundStatusPill = document.getElementById('round-status-pill');
 const playbackPill = document.getElementById('playback-pill');
+const openYoutubeFallbackBtn = document.getElementById('open-youtube-fallback-btn');
 const timerPill = document.getElementById('timer-pill');
 const autoAdvancePill = document.getElementById('auto-advance-pill');
 const autoAdvanceInput = document.getElementById('auto-advance-input');
@@ -23,6 +24,9 @@ const importStatus = document.getElementById('import-status');
 const timerInput = document.getElementById('timer-input');
 const categoryFilterEl = document.getElementById('category-filter');
 const playlistSearchInput = document.getElementById('playlist-search');
+const checkPlaylistBtn = document.getElementById('check-playlist-btn');
+const checkPlaylistStatus = document.getElementById('check-playlist-status');
+const brokenVideosList = document.getElementById('broken-videos-list');
 const addSongCard = document.getElementById('add-song-card');
 const addSongCollapsedHint = document.getElementById('add-song-collapsed-hint');
 
@@ -38,6 +42,7 @@ playlistSearchInput.addEventListener('input', () => {
 // ---------- connection status ----------
 socket.on('connect', () => { connPill.textContent = 'connected'; connPill.className = 'pill online'; });
 socket.on('disconnect', () => { connPill.textContent = 'disconnected'; connPill.className = 'pill offline'; });
+roundStatusPill.addEventListener('animationend', () => roundStatusPill.classList.remove('status-flash'));
 
 // ---------- playback status (what the TV's player is *actually* doing) ----------
 function setPlaybackPill(text, cls) {
@@ -52,6 +57,7 @@ socket.on('addSongWarning', ({ message }) => {
 });
 
 socket.on('playerStatus', ({ status, message }) => {
+  openYoutubeFallbackBtn.hidden = status !== 'error';
   if (status === 'error') setPlaybackPill('❌ ' + (message || 'Playback error'), 'error');
   else if (status === 'playing') setPlaybackPill('🔊 Playing', 'ok');
   else if (status === 'buffering') setPlaybackPill('⏳ Buffering…', 'pending');
@@ -59,6 +65,8 @@ socket.on('playerStatus', ({ status, message }) => {
   else if (status === 'unstarted' || status === 'cued') setPlaybackPill('⏳ Loading…', 'pending');
   else playbackPill.hidden = true;
 });
+
+openYoutubeFallbackBtn.addEventListener('click', () => socket.emit('host:openOnYoutube'));
 
 // ---------- language toggle ----------
 document.querySelectorAll('#lang-toggle [data-lang]').forEach(btn => {
@@ -151,6 +159,66 @@ importBtn.addEventListener('click', async () => {
   }
 });
 
+// ---------- check playlist for broken (non-embeddable) videos ----------
+checkPlaylistBtn.addEventListener('click', async () => {
+  checkPlaylistBtn.disabled = true;
+  checkPlaylistStatus.textContent = 'Checking…';
+  brokenVideosList.innerHTML = '';
+  try {
+    const r = await fetch('/api/check-playlist', { method: 'POST' });
+    const data = await r.json();
+    if (!r.ok) {
+      checkPlaylistStatus.textContent = data.error || 'Check failed.';
+      return;
+    }
+    renderBrokenVideos(data.broken);
+    checkPlaylistStatus.textContent = data.broken.length
+      ? `Found ${data.broken.length} that won't play.`
+      : 'All songs check out.';
+  } catch (e) {
+    checkPlaylistStatus.textContent = 'Could not reach the server — try again.';
+  } finally {
+    checkPlaylistBtn.disabled = false;
+  }
+});
+
+function renderBrokenVideos(broken) {
+  if (!broken || !broken.length) {
+    brokenVideosList.innerHTML = '';
+    return;
+  }
+  brokenVideosList.innerHTML = `
+    <div class="broken-videos">
+      <div class="broken-header">
+        <strong>❌ ${broken.length} won't play (embedding disabled)</strong>
+        <button class="danger" id="remove-all-broken-btn">Remove all</button>
+      </div>
+      ${broken.map(s => `
+        <div class="broken-row" data-id="${s.id}">
+          <span class="info">${escapeHtml(s.title)}${s.artist ? ` — ${escapeHtml(s.artist)}` : ''}</span>
+          <button class="danger" data-remove-broken="${s.id}">✕</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  brokenVideosList.querySelectorAll('[data-remove-broken]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      socket.emit('host:removeSong', { id: btn.dataset.removeBroken });
+      btn.closest('.broken-row').remove();
+      if (!brokenVideosList.querySelector('.broken-row')) brokenVideosList.innerHTML = '';
+    });
+  });
+  const removeAllBtn = document.getElementById('remove-all-broken-btn');
+  if (removeAllBtn) {
+    removeAllBtn.addEventListener('click', () => {
+      if (!confirm(`Remove all ${broken.length} broken videos from the playlist?`)) return;
+      broken.forEach(s => socket.emit('host:removeSong', { id: s.id }));
+      brokenVideosList.innerHTML = '';
+      checkPlaylistStatus.textContent = 'Removed.';
+    });
+  }
+}
+
 // ---------- round controls ----------
 document.getElementById('reveal-btn').addEventListener('click', () => {
   const autoAdvanceSeconds = Number(autoAdvanceInput.value) || 0;
@@ -212,8 +280,14 @@ function updateAutoAdvancePill(state) {
   autoAdvancePill.textContent = `⏭ Next song in ${remaining}s`;
 }
 
+let prevRoundStatus = null;
+
 function renderRound(state) {
   roundStatusPill.textContent = state.roundStatus;
+  if (prevRoundStatus !== null && prevRoundStatus !== state.roundStatus) {
+    roundStatusPill.classList.add('status-flash');
+  }
+  prevRoundStatus = state.roundStatus;
 
   clearInterval(timerInterval);
   updateTimerPill(state);

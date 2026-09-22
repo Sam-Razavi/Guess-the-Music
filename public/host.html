@@ -36,6 +36,7 @@
         <h2>Current round</h2>
         <div class="pill" id="round-status-pill">idle</div>
         <span class="pill" id="playback-pill" hidden></span>
+        <button id="open-youtube-fallback-btn" hidden>▶ Open on YouTube</button>
         <span class="pill" id="timer-pill" hidden></span>
         <span class="pill" id="auto-advance-pill" hidden></span>
         <div id="current-song-info" class="song-info muted">No round started.</div>
@@ -80,6 +81,11 @@
         </div>
         <input id="playlist-search" type="text" class="playlist-search" placeholder="🔍 Search songs or artists…">
         <div id="category-filter" class="category-filter"></div>
+        <div class="check-playlist-row">
+          <button id="check-playlist-btn">🔍 Check for broken videos</button>
+          <span class="muted small" id="check-playlist-status"></span>
+        </div>
+        <div id="broken-videos-list"></div>
         <div id="playlist-list" class="playlist"></div>
       </section>
 

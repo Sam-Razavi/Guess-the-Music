@@ -8,6 +8,7 @@ const os = require('os');
 const { Server } = require('socket.io');
 const QRCode = require('qrcode');
 const { Bonjour } = require('bonjour-service');
+const { exec } = require('child_process');
 
 const MDNS_HOST = 'guess-the-music.local';
 
@@ -312,6 +313,28 @@ app.post('/api/import-playlist', async (req, res) => {
   }
 });
 
+// Read-only: scans the songs already in the playlist (added before the
+// import/add-time checks below existed, or added back when no API key was
+// configured) and reports which ones can't actually play embedded. Doesn't
+// touch state — removal is a separate, explicit host action.
+app.post('/api/check-playlist', async (req, res) => {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) {
+    return res.status(400).json({
+      error: "YouTube checks aren't configured — add YOUTUBE_API_KEY to your .env file (see README).",
+    });
+  }
+  try {
+    const embeddable = await checkEmbeddable(apiKey, state.playlist.map(s => s.youtubeId));
+    const broken = state.playlist
+      .filter(s => !embeddable.has(s.youtubeId))
+      .map(s => ({ id: s.id, title: s.title, artist: s.artist }));
+    res.json({ broken });
+  } catch (e) {
+    res.status(502).json({ error: 'Could not reach the YouTube API — check your connection and try again.' });
+  }
+});
+
 // ---------- sockets ----------
 
 io.on('connection', (socket) => {
@@ -497,6 +520,21 @@ io.on('connection', (socket) => {
   // shared game state, so it deliberately bypasses state/broadcast().
   socket.on('tv:playerStatus', (payload) => {
     io.to('host').emit('playerStatus', payload);
+  });
+
+  // Manual fallback for videos with embedding disabled (no client fix exists
+  // for that): pops the real youtube.com page in an ordinary browser window
+  // on THIS machine — the same PC that's HDMI'd to the TV — so the host can
+  // still play the song, just without the custom TV overlay for that one
+  // song. Reads the video ID from server state rather than trusting the
+  // client, and validates it against YouTube's own ID shape before it ever
+  // reaches a shell command.
+  socket.on('host:openOnYoutube', () => {
+    const song = currentSong();
+    if (!song || !/^[\w-]{11}$/.test(song.youtubeId)) return;
+    exec(`start "" "https://www.youtube.com/watch?v=${song.youtubeId}"`, (err) => {
+      if (err) console.error('Failed to open YouTube fallback window:', err.message);
+    });
   });
 
   socket.on('host:removePlayer', ({ id }) => {

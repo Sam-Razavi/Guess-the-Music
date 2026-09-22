@@ -77,4 +77,32 @@ body { min-height: 100vh; }
   50% { transform: scale(1.04); }
 }
 
+.buzz-btn.armed { animation: buzz-armed 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes buzz-armed {
+  0% { transform: scale(0.8); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.buzz-btn.shake { animation: buzz-shake 0.4s ease; }
+@keyframes buzz-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
 #status-text { text-align: center; max-width: 28ch; }
+
+#my-score { display: inline-block; }
+#my-score.score-pulse { animation: score-pulse 0.5s ease; }
+@keyframes score-pulse {
+  0% { transform: scale(1); color: var(--gold); }
+  40% { transform: scale(1.6); color: var(--good); }
+  100% { transform: scale(1); color: var(--gold); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buzz-btn.armed, .buzz-btn.shake, #my-score.score-pulse { animation: none; }
+}

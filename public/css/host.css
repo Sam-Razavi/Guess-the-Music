@@ -15,6 +15,15 @@
 #conn-pill.online { background: rgba(116, 198, 157, 0.18); color: var(--good); }
 #conn-pill.offline { background: rgba(229, 72, 77, 0.18); color: var(--bad); }
 
+#round-status-pill.status-flash { animation: status-flash 0.5s ease; }
+@keyframes status-flash {
+  0% { background: var(--gold); color: #21170a; }
+  100% { background: var(--surface-2); color: var(--text); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .buzz-row, #round-status-pill.status-flash { animation: none; }
+}
+
 .lang-toggle { display: flex; background: var(--surface-2); border-radius: 999px; padding: 3px; gap: 2px; }
 .lang-toggle button {
   background: transparent;
@@ -58,6 +67,11 @@
   border-radius: 10px;
   padding: 0.5em 0.7em;
 }
+.buzz-row { animation: buzz-row-in 0.3s ease; }
+@keyframes buzz-row-in {
+  0% { transform: translateX(-12px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
 .buzz-row .order { color: var(--gold); font-weight: 700; margin-right: 0.5em; }
 .buzz-row .actions { display: flex; gap: 0.4rem; }
 .buzz-row button { padding: 0.35em 0.7em; font-size: 0.9rem; }
@@ -99,7 +113,28 @@
 #playback-pill.pending { background: var(--surface-2); color: var(--text-muted); }
 #playback-pill.error { background: rgba(229, 72, 77, 0.18); color: var(--bad); }
 
+#open-youtube-fallback-btn { margin-left: 0.5rem; padding: 0.35em 0.9em; font-size: 0.85rem; }
+
 .playlist-search { width: 100%; margin-bottom: 0.7rem; }
+
+.check-playlist-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem; }
+#check-playlist-btn { font-size: 0.9rem; padding: 0.5em 0.9em; }
+
+.broken-videos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: rgba(229, 72, 77, 0.08);
+  border: 1px solid rgba(229, 72, 77, 0.25);
+  border-radius: 10px;
+  padding: 0.7em 0.8em;
+  margin-bottom: 0.7rem;
+}
+.broken-videos .broken-header { display: flex; align-items: center; justify-content: space-between; }
+.broken-videos .broken-header strong { color: var(--bad); }
+.broken-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.broken-row .info { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.broken-row button { padding: 0.3em 0.7em; font-size: 0.85rem; }
 
 .category-filter { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem; }
 .category-filter button {

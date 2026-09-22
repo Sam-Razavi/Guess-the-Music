@@ -102,7 +102,13 @@ function playWrongSound() {
 socket.on('wrong', () => {
   playWrongSound();
   if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+  buzzBtn.classList.add('shake');
 });
+buzzBtn.addEventListener('animationend', (e) => {
+  if (e.animationName === 'buzz-shake') buzzBtn.classList.remove('shake');
+  if (e.animationName === 'buzz-armed') buzzBtn.classList.remove('armed');
+});
+myScoreEl.addEventListener('animationend', () => myScoreEl.classList.remove('score-pulse'));
 
 const savedName = localStorage.getItem('gtm_player_name');
 if (savedName) {
@@ -111,12 +117,19 @@ if (savedName) {
   nameInput.focus();
 }
 
+let prevMyScore = null;
+let wasArmed = false;
+
 socket.on('state', (state) => {
   const lang = state.language || 'en';
   applyTranslations(lang);
 
   const me = state.players.find(p => p.id === myId);
-  if (me) myScoreEl.textContent = me.score;
+  if (me) {
+    myScoreEl.textContent = me.score;
+    if (prevMyScore !== null && prevMyScore !== me.score) myScoreEl.classList.add('score-pulse');
+    prevMyScore = me.score;
+  }
 
   const buzzed = state.buzzOrder.some(b => b.id === myId);
   // The *current* buzzer is whoever buzzed most recently, not the first
@@ -125,6 +138,14 @@ socket.on('state', (state) => {
   const current = state.buzzOrder[state.buzzOrder.length - 1];
 
   buzzBtn.classList.remove('locked', 'beaten');
+
+  // "Armed" = this player can buzz right now — pop the button so the exact
+  // moment buzzing opens up is obvious, not just an instant disabled->enabled
+  // flip. Only fires on the actual transition into that state, not every
+  // re-render while it's already armed.
+  const armed = state.roundStatus === 'playing' && !buzzed && !state.buzzingLocked;
+  if (armed && !wasArmed) buzzBtn.classList.add('armed');
+  wasArmed = armed;
 
   if (state.roundStatus === 'idle') {
     buzzBtn.disabled = true;

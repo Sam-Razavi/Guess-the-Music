@@ -17,6 +17,9 @@ const revealArtistEl = document.getElementById('reveal-artist');
 const playingSubtext = document.getElementById('playing-subtext');
 const resultsListEl = document.getElementById('results-list');
 const autoAdvanceHintEl = document.getElementById('auto-advance-hint');
+const revealCaptionEl = document.getElementById('reveal-caption');
+const captionTitleEl = document.getElementById('caption-title');
+const captionArtistEl = document.getElementById('caption-artist');
 
 // ---- join QR ----
 fetch('/join-info').then(r => r.json()).then(({ url }) => {
@@ -172,6 +175,30 @@ idleHintEl.textContent = t('idleHints', currentLang)[0];
 // ---- confetti + chime on a correct answer ----
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// ---- buzz-in screen flash (the shockwave ring around the name is pure CSS,
+// restarting automatically like every other panel — this is the one part
+// that needs a fresh element each time, same as confetti below) ----
+function spawnBuzzFlash() {
+  if (reduceMotion) return;
+  const flash = document.createElement('div');
+  flash.className = 'buzz-flash';
+  document.getElementById('stage').appendChild(flash);
+  flash.addEventListener('animationend', () => flash.remove());
+}
+
+// ---- idle screen: gently floating notes for ambient life between rounds ----
+function spawnIdleNote() {
+  if (reduceMotion || panels.idle.hidden) return;
+  const note = document.createElement('div');
+  note.className = 'idle-note';
+  note.textContent = ['♪', '♫', '♬'][Math.floor(Math.random() * 3)];
+  note.style.left = (10 + Math.random() * 80) + '%';
+  note.style.animationDuration = (4 + Math.random() * 2) + 's';
+  document.getElementById('stage').appendChild(note);
+  note.addEventListener('animationend', () => note.remove());
+}
+setInterval(spawnIdleNote, 2200);
+
 function spawnConfetti() {
   if (reduceMotion) return;
   const colors = ['#f5b942', '#ff6b5b', '#74c69d', '#f4efe6'];
@@ -238,6 +265,7 @@ function updateAutoAdvanceHint(state) {
   autoAdvanceHintEl.textContent = t('nextSongIn', currentLang).replace('{s}', remaining);
 }
 
+let wasBuzzed = false;
 let resultsShown = false;
 
 function renderResults(players) {
@@ -268,11 +296,26 @@ socket.on('state', (state) => {
     // person to buzz this round — those differ after a reset + a second,
     // different buzzer.
     buzzedNameEl.textContent = state.buzzOrder[state.buzzOrder.length - 1].name;
+    if (!wasBuzzed) spawnBuzzFlash();
+    wasBuzzed = true;
+  } else {
+    wasBuzzed = false;
   }
 
   if (state.roundStatus === 'revealed' && state.currentSong) {
-    revealTitleEl.textContent = state.currentSong.title || t('unknown', currentLang);
-    revealArtistEl.textContent = state.currentSong.artist || '';
+    const title = state.currentSong.title || t('unknown', currentLang);
+    const artist = state.currentSong.artist || '';
+    revealTitleEl.textContent = title;
+    revealArtistEl.textContent = artist;
+    // The big center reveal (above) fades out with .overlay almost right
+    // away so the real video shows through — too quick to actually read.
+    // This persistent caption lives outside .overlay and stays up for the
+    // whole 'revealed' state instead.
+    captionTitleEl.textContent = title;
+    captionArtistEl.textContent = artist;
+    revealCaptionEl.hidden = false;
+  } else {
+    revealCaptionEl.hidden = true;
   }
 
   if (state.roundStatus === 'results') {

@@ -45,6 +45,31 @@
 }
 .auto-advance-hint:empty { display: none; }
 
+.reveal-caption {
+  position: absolute;
+  left: 50%;
+  top: 4%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(22, 18, 31, 0.85);
+  padding: 0.5em 1.4em;
+  border-radius: 999px;
+  font-family: var(--font-fun);
+  font-size: 1.4rem;
+  white-space: nowrap;
+  animation: caption-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#caption-title { color: var(--gold); font-weight: 600; }
+#caption-artist { color: var(--text-muted); font-size: 0.85em; }
+#caption-artist:not(:empty)::before { content: " — "; }
+@keyframes caption-pop {
+  0% { transform: translateX(-50%) scale(0.85); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-caption { animation: none; }
+}
+
 .overlay {
   position: absolute;
   inset: 0;
@@ -97,7 +122,38 @@
   z-index: 1;
 }
 
-#panel-buzzed h1 { color: var(--gold); font-size: 4rem; }
+#panel-buzzed h1 { color: var(--gold); font-size: 4rem; position: relative; }
+#panel-buzzed h1::after {
+  content: "";
+  position: absolute;
+  inset: -25% -12%;
+  border: 3px solid var(--gold);
+  border-radius: 999px;
+  opacity: 0;
+  animation: buzz-shockwave 0.6s ease-out;
+}
+@keyframes buzz-shockwave {
+  0% { transform: scale(0.7); opacity: 0.8; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.buzz-flash {
+  position: absolute;
+  inset: 0;
+  background: var(--gold);
+  opacity: 0;
+  z-index: 40;
+  pointer-events: none;
+  animation: buzz-flash 0.4s ease-out;
+}
+@keyframes buzz-flash {
+  0% { opacity: 0.35; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #panel-buzzed h1::after { animation: none; }
+  .buzz-flash { display: none; }
+}
 
 /* Every panel switch gets the same entrance treatment — CSS animations
    restart automatically whenever an element goes from display:none (via
@@ -131,6 +187,21 @@
 }
 @media (prefers-reduced-motion: reduce) {
   #overlay::before { animation: none; }
+}
+
+.idle-note {
+  position: absolute;
+  bottom: 8%;
+  font-size: 1.6rem;
+  color: rgba(245, 185, 66, 0.5);
+  pointer-events: none;
+  z-index: 5;
+  animation: idle-note-float linear forwards;
+}
+@keyframes idle-note-float {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  15% { opacity: 0.8; }
+  100% { transform: translateY(-65vh) rotate(20deg); opacity: 0; }
 }
 
 .confetti-piece {

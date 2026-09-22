@@ -66,6 +66,14 @@
            'revealed' state to show the real video, but this hint needs to
            stay visible then. -->
       <p class="muted auto-advance-hint" id="auto-advance-hint"></p>
+
+      <!-- Also outside .overlay, for the same reason: the big reveal panel
+           fades away with the overlay almost immediately, which was too
+           quick to actually read — this stays up for the whole 'revealed'
+           state as a persistent caption. -->
+      <div class="reveal-caption" id="reveal-caption" hidden>
+        <span id="caption-title"></span><span id="caption-artist"></span>
+      </div>
     </main>
 
     <footer class="scoreboard" id="scoreboard"></footer>
