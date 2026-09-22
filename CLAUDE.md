@@ -52,6 +52,17 @@ Phase 8 (shipped):
 - Host layout: "Add a song" card (manual add + import) collapses during a live round (playing/buzzed) to keep focus on the Current Round card and Scoreboard, reopens on idle/revealed/results.
 - Explicitly out of scope: displaying song lyrics on screen was requested but refused — reproducing copyrighted lyrics to the audience isn't something to build regardless of source or implementation.
 
+Phase 9 (shipped):
+
+- The reveal panel's title/artist was fading with `.overlay` almost immediately (intentional, to show the real video underneath — see the Phase 5 note) — too quick to actually read. Added a persistent caption outside `.overlay` that stays up for the whole 'revealed' state.
+- Broken-video cleanup: host can now scan the *existing* playlist (not just new imports) for videos that won't embed, and remove them one at a time or in bulk — `/api/check-playlist` reuses the same `checkEmbeddable()` helper from import-time filtering.
+- Manual YouTube fallback for a playback error: a button pops the real youtube.com page in an ordinary Chrome window on the kiosk PC itself (the machine that's both running the server and HDMI'd to the TV), so a non-embeddable song can still be played manually. Server reads the video ID from its own state (never trusts the client) and validates it against YouTube's 11-char ID shape before it reaches `exec()`.
+- More animations: buzz-in flashes the screen gold + a shockwave rings out from the buzzer's name on TV; idle screen has musical notes gently floating up; player's buzz button pops when it becomes pressable and shakes on a wrong answer, own score pulses on change; host's round-status pill flashes on any transition, new buzz-in rows slide in.
+- Confirmed (again) that YouTube Premium has no effect on "embedding disabled" — that's a checkbox the video's owner sets, unrelated to the viewer's subscription. No legitimate workaround exists beyond avoiding/removing those videos or the manual fallback above.
+- Confirmed no player-count cap exists anywhere in the code — join is a plain open dictionary keyed by generated player id.
+- Lyrics-on-screen was requested again (reasoning: YouTube Music shows lyrics for most songs) and refused again — a lyric being *displayed* somewhere doesn't mean it's *licensed for redistribution*; YouTube Music licenses those specifically, this app doesn't. Not going to change.
+- Incident: while cleaning up a test browser window opened by the YouTube-fallback feature, killed the wrong Chrome process via `Stop-Process -Force`, which disconnected the Claude Code browser automation extension (Chrome itself and the real kiosk TV window survived undamaged — confirmed via `Get-Process`). Lesson: don't `Stop-Process -Force` on a Chrome PID to close one window — closing a specific automation-opened window should go through the automation tooling itself, not raw OS process kill, since Chrome's PID-to-window mapping isn't reliably 1:1.
+
 Next ideas, not yet started:
 
 - Resuming round progress after a restart (currently only scores persist — round state intentionally resets to idle).
