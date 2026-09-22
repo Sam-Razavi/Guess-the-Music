@@ -7,6 +7,7 @@ socket.on('connect', () => socket.emit('register', { role: 'host' }));
 
 const connPill = document.getElementById('conn-pill');
 const roundStatusPill = document.getElementById('round-status-pill');
+const playbackPill = document.getElementById('playback-pill');
 const timerPill = document.getElementById('timer-pill');
 const autoAdvancePill = document.getElementById('auto-advance-pill');
 const autoAdvanceInput = document.getElementById('auto-advance-input');
@@ -22,6 +23,8 @@ const importStatus = document.getElementById('import-status');
 const timerInput = document.getElementById('timer-input');
 const categoryFilterEl = document.getElementById('category-filter');
 const playlistSearchInput = document.getElementById('playlist-search');
+const addSongCard = document.getElementById('add-song-card');
+const addSongCollapsedHint = document.getElementById('add-song-collapsed-hint');
 
 let latestState = null;
 let categoryFilter = 'All';
@@ -35,6 +38,27 @@ playlistSearchInput.addEventListener('input', () => {
 // ---------- connection status ----------
 socket.on('connect', () => { connPill.textContent = 'connected'; connPill.className = 'pill online'; });
 socket.on('disconnect', () => { connPill.textContent = 'disconnected'; connPill.className = 'pill offline'; });
+
+// ---------- playback status (what the TV's player is *actually* doing) ----------
+function setPlaybackPill(text, cls) {
+  playbackPill.hidden = false;
+  playbackPill.textContent = text;
+  playbackPill.className = 'pill ' + cls;
+}
+
+socket.on('addSongWarning', ({ message }) => {
+  addError.textContent = message;
+  addError.classList.add('warn');
+});
+
+socket.on('playerStatus', ({ status, message }) => {
+  if (status === 'error') setPlaybackPill('❌ ' + (message || 'Playback error'), 'error');
+  else if (status === 'playing') setPlaybackPill('🔊 Playing', 'ok');
+  else if (status === 'buffering') setPlaybackPill('⏳ Buffering…', 'pending');
+  else if (status === 'paused') setPlaybackPill('⏸ Paused', 'pending');
+  else if (status === 'unstarted' || status === 'cued') setPlaybackPill('⏳ Loading…', 'pending');
+  else playbackPill.hidden = true;
+});
 
 // ---------- language toggle ----------
 document.querySelectorAll('#lang-toggle [data-lang]').forEach(btn => {
@@ -85,6 +109,7 @@ document.getElementById('add-song-btn').addEventListener('click', () => {
     return;
   }
   addError.textContent = '';
+  addError.classList.remove('warn');
   socket.emit('host:addSong', { youtubeId, title, artist, category });
   document.getElementById('yt-input').value = '';
   document.getElementById('title-input').value = '';
@@ -115,7 +140,8 @@ importBtn.addEventListener('click', async () => {
     const dupeCount = songs.length - newCount;
     socket.emit('host:addSongs', songs);
     importStatus.textContent = `Added ${newCount} song${newCount === 1 ? '' : 's'}` +
-      (dupeCount ? ` (${dupeCount} already in the playlist)` : '') + '.';
+      (dupeCount ? ` (${dupeCount} already in the playlist)` : '') +
+      (data.skipped ? ` (${data.skipped} skipped — not embeddable)` : '') + '.';
     importInput.value = '';
     importCategoryInput.value = '';
   } catch (e) {
@@ -312,6 +338,8 @@ Sortable.create(playlistList, {
   },
 });
 
+const prevScores = new Map();
+
 function renderScoreboard(state) {
   const sorted = [...state.players].sort((a, b) => b.score - a.score);
   hostScoreboard.innerHTML = sorted.map(p => `
@@ -319,12 +347,21 @@ function renderScoreboard(state) {
       <div class="name"><span class="dot ${p.connected ? 'connected' : ''}"></span>${escapeHtml(p.name)}</div>
       <div class="actions">
         <button data-adjust="${p.id}:-1">−</button>
-        <span class="pts">${p.score}</span>
+        <span class="pts" data-score-id="${p.id}">${p.score}</span>
         <button data-adjust="${p.id}:1">+</button>
         <button class="danger" data-remove-player="${p.id}" title="Remove player">✕</button>
       </div>
     </div>
   `).join('') || '<p class="muted">No one has joined yet.</p>';
+
+  sorted.forEach(p => {
+    const prev = prevScores.get(p.id);
+    if (prev !== undefined && prev !== p.score) {
+      const el = hostScoreboard.querySelector(`[data-score-id="${p.id}"]`);
+      if (el) el.classList.add('score-pulse');
+    }
+    prevScores.set(p.id, p.score);
+  });
 
   hostScoreboard.querySelectorAll('[data-adjust]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -342,6 +379,14 @@ function renderScoreboard(state) {
   });
 }
 
+function renderAddSongCollapse(state) {
+  // Nothing to do in "Add a song" while a round is actively live — free
+  // up visual priority for the Current Round card and Scoreboard.
+  const collapsed = state.roundStatus === 'playing' || state.roundStatus === 'buzzed';
+  addSongCard.classList.toggle('collapsed', collapsed);
+  addSongCollapsedHint.hidden = !collapsed;
+}
+
 socket.on('state', (state) => {
   latestState = state;
   renderRound(state);
@@ -349,4 +394,5 @@ socket.on('state', (state) => {
   renderPlaylist(state);
   renderScoreboard(state);
   renderLangToggle(state);
+  renderAddSongCollapse(state);
 });

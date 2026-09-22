@@ -230,6 +230,37 @@ function extractPlaylistId(input) {
   return null;
 }
 
+// Checks which of the given video IDs can actually play in an embedded
+// player — many official-label uploads have this disabled by the
+// publisher, which is exactly what shows up as "Video unavailable" once
+// a round is already live. Batches in groups of 50 (the API's max per
+// call). Returns a Set of the IDs that ARE embeddable.
+async function checkEmbeddable(apiKey, videoIds) {
+  const embeddable = new Set();
+  for (let i = 0; i < videoIds.length; i += 50) {
+    const batch = videoIds.slice(i, i + 50);
+    try {
+      const apiUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
+      apiUrl.searchParams.set('part', 'status');
+      apiUrl.searchParams.set('id', batch.join(','));
+      apiUrl.searchParams.set('key', apiKey);
+      const r = await fetch(apiUrl);
+      if (!r.ok) { batch.forEach(id => embeddable.add(id)); continue; } // fail open — never block an import over a failed check
+      const data = await r.json();
+      const seen = new Set();
+      for (const item of data.items || []) {
+        seen.add(item.id);
+        if (item.status && item.status.embeddable !== false) embeddable.add(item.id);
+      }
+      // An id the API didn't return at all (rare) — fail open rather than silently dropping it.
+      batch.forEach(id => { if (!seen.has(id)) embeddable.add(id); });
+    } catch (e) {
+      batch.forEach(id => embeddable.add(id));
+    }
+  }
+  return embeddable;
+}
+
 app.post('/api/import-playlist', async (req, res) => {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
@@ -272,7 +303,10 @@ app.post('/api/import-playlist', async (req, res) => {
       pageToken = data.nextPageToken || '';
     } while (pageToken && songs.length < 200);
 
-    res.json({ songs });
+    const embeddable = await checkEmbeddable(apiKey, songs.map(s => s.youtubeId));
+    const playable = songs.filter(s => embeddable.has(s.youtubeId));
+
+    res.json({ songs: playable, skipped: songs.length - playable.length });
   } catch (e) {
     res.status(502).json({ error: 'Could not reach the YouTube API — check your connection and try again.' });
   }
@@ -324,11 +358,27 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  socket.on('host:addSong', ({ youtubeId, title, artist, category }) => {
+  socket.on('host:addSong', async ({ youtubeId, title, artist, category }) => {
     if (!youtubeId) return;
     state.playlist.push(makeSong(youtubeId, title, artist, category));
     savePlaylist();
     broadcast();
+
+    // Best-effort only — manual add works with zero YouTube API setup
+    // today, and should keep working the same way with none configured.
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    if (apiKey) {
+      const id = youtubeId.trim();
+      try {
+        const embeddable = await checkEmbeddable(apiKey, [id]);
+        if (!embeddable.has(id)) {
+          socket.emit('addSongWarning', {
+            youtubeId: id,
+            message: "Heads up: this video has embedding disabled by its owner and likely won't play on the TV.",
+          });
+        }
+      } catch (e) { /* non-blocking — the song's already added either way */ }
+    }
   });
 
   socket.on('host:addSongs', (songs) => {
@@ -441,6 +491,12 @@ io.on('connection', (socket) => {
     if (lang !== 'en' && lang !== 'fa') return;
     state.language = lang;
     broadcast();
+  });
+
+  // Relay only — TV-local playback monitoring for the host's benefit, not
+  // shared game state, so it deliberately bypasses state/broadcast().
+  socket.on('tv:playerStatus', (payload) => {
+    io.to('host').emit('playerStatus', payload);
   });
 
   socket.on('host:removePlayer', ({ id }) => {

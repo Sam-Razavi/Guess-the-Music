@@ -35,6 +35,7 @@
       <section class="card">
         <h2>Current round</h2>
         <div class="pill" id="round-status-pill">idle</div>
+        <span class="pill" id="playback-pill" hidden></span>
         <span class="pill" id="timer-pill" hidden></span>
         <span class="pill" id="auto-advance-pill" hidden></span>
         <div id="current-song-info" class="song-info muted">No round started.</div>
@@ -51,21 +52,23 @@
         </div>
       </section>
 
-      <section class="card">
-        <h2>Add a song</h2>
-        <div class="stack">
-          <input id="yt-input" type="url" placeholder="Paste a YouTube link or video ID">
-          <input id="title-input" type="text" placeholder="Song title (only you see this)">
-          <input id="artist-input" type="text" placeholder="Artist (optional)">
-          <input id="category-input" type="text" placeholder="Category (optional, e.g. 80s)">
-          <button id="add-song-btn" class="primary">Add to playlist</button>
-          <p class="muted small" id="add-error"></p>
-        </div>
-        <div class="stack import-row">
-          <input id="import-input" type="url" placeholder="Or paste a YouTube playlist link">
-          <input id="import-category-input" type="text" placeholder="Tag these as… (optional)">
-          <button id="import-btn">Import playlist</button>
-          <p class="muted small" id="import-status"></p>
+      <section class="card" id="add-song-card">
+        <h2>Add a song <span class="muted small" id="add-song-collapsed-hint" hidden>(collapsed while a round is live)</span></h2>
+        <div id="add-song-body">
+          <div class="stack">
+            <input id="yt-input" type="url" placeholder="Paste a YouTube link or video ID">
+            <input id="title-input" type="text" placeholder="Song title (only you see this)">
+            <input id="artist-input" type="text" placeholder="Artist (optional)">
+            <input id="category-input" type="text" placeholder="Category (optional, e.g. 80s)">
+            <button id="add-song-btn" class="primary">Add to playlist</button>
+            <p class="muted small" id="add-error"></p>
+          </div>
+          <div class="stack import-row">
+            <input id="import-input" type="url" placeholder="Or paste a YouTube playlist link">
+            <input id="import-category-input" type="text" placeholder="Tag these as… (optional)">
+            <button id="import-btn">Import playlist</button>
+            <p class="muted small" id="import-status"></p>
+          </div>
         </div>
       </section>
 
