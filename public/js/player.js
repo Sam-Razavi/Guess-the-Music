@@ -79,6 +79,31 @@ buzzBtn.addEventListener('click', () => {
   socket.emit('player:buzz');
 });
 
+// Targeted at this player specifically (server emits it only to whoever's
+// socket just got the wrong-answer reset) — a distinct double-pulse and a
+// descending tone so it reads as clearly different from the buzz-in sound.
+function playWrongSound() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.35);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.4);
+  } catch (e) { /* Web Audio unavailable — silently skip the sound */ }
+}
+
+socket.on('wrong', () => {
+  playWrongSound();
+  if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+});
+
 const savedName = localStorage.getItem('gtm_player_name');
 if (savedName) {
   join(savedName);
@@ -133,5 +158,9 @@ socket.on('state', (state) => {
     buzzBtn.disabled = true;
     buzzLabel.textContent = t('roundOver', lang);
     statusText.textContent = t('waitingRound', lang);
+  } else if (state.roundStatus === 'results') {
+    buzzBtn.disabled = true;
+    buzzLabel.textContent = t('gameOver', lang);
+    statusText.textContent = t('yourFinalScore', lang).replace('{n}', me ? me.score : 0);
   }
 });

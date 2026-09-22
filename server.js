@@ -113,12 +113,13 @@ function currentSong() {
   return state.currentIndex >= 0 ? state.playlist[state.currentIndex] : null;
 }
 
-function makeSong(youtubeId, title, artist) {
+function makeSong(youtubeId, title, artist, category) {
   return {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     youtubeId: youtubeId.trim(),
     title: (title || '').trim() || 'Untitled',
     artist: (artist || '').trim(),
+    category: (category || '').trim(),
     played: false,
   };
 }
@@ -302,9 +303,9 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  socket.on('host:addSong', ({ youtubeId, title, artist }) => {
+  socket.on('host:addSong', ({ youtubeId, title, artist, category }) => {
     if (!youtubeId) return;
-    state.playlist.push(makeSong(youtubeId, title, artist));
+    state.playlist.push(makeSong(youtubeId, title, artist, category));
     savePlaylist();
     broadcast();
   });
@@ -312,9 +313,9 @@ io.on('connection', (socket) => {
   socket.on('host:addSongs', (songs) => {
     if (!Array.isArray(songs) || !songs.length) return;
     const existingIds = new Set(state.playlist.map(s => s.youtubeId));
-    for (const { youtubeId, title, artist } of songs) {
+    for (const { youtubeId, title, artist, category } of songs) {
       if (!youtubeId || existingIds.has(youtubeId.trim())) continue;
-      const song = makeSong(youtubeId, title, artist);
+      const song = makeSong(youtubeId, title, artist, category);
       state.playlist.push(song);
       existingIds.add(song.youtubeId);
     }
@@ -358,6 +359,14 @@ io.on('connection', (socket) => {
 
   socket.on('host:resetBuzzers', () => {
     if (state.currentIndex === -1) return;
+    // Resetting buzzers after someone's had a turn means their answer was
+    // wrong — give that specific player (not everyone) a distinct sound/
+    // vibration on their own phone. Targeted at their actual socket, not
+    // broadcast to the whole 'player' room.
+    const current = state.buzzOrder[state.buzzOrder.length - 1];
+    if (current && state.players[current.id] && state.players[current.id].socketId) {
+      io.to(state.players[current.id].socketId).emit('wrong');
+    }
     const priorTimerSeconds = state.roundTimer ? state.roundTimer.seconds : 0;
     state.roundStatus = 'playing';
     clearRoundTimer();
@@ -407,6 +416,14 @@ io.on('connection', (socket) => {
       state.roundStatus = 'playing';
     }
     savePlayers();
+    broadcast();
+  });
+
+  socket.on('host:showResults', () => {
+    state.roundStatus = 'results';
+    state.currentIndex = -1;
+    state.buzzOrder = [];
+    clearRoundTimer();
     broadcast();
   });
 

@@ -34,6 +34,11 @@ const translations = {
     someone: 'Someone',
     betterLuck: 'Better luck next round!',
     roundOver: 'Round over',
+
+    finalScores: '🏆 Final Scores',
+    noOnePlayed: 'No one played 🎵',
+    gameOver: '🏆 Game over!',
+    yourFinalScore: 'Your final score: {n}',
   },
   fa: {
     brand: 'حدس آهنگ',
@@ -70,6 +75,11 @@ const translations = {
     someone: 'یکی',
     betterLuck: 'دور بعد شانس بیشتری داری!',
     roundOver: 'دور تمام شد',
+
+    finalScores: '🏆 نتایج نهایی',
+    noOnePlayed: 'کسی بازی نکرد 🎵',
+    gameOver: '🏆 بازی تمام شد!',
+    yourFinalScore: 'امتیاز نهایی‌ات: {n}',
   },
 };
 

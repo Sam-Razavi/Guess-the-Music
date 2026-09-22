@@ -74,6 +74,15 @@
 
 #timer-pill { margin-left: 0.5rem; background: rgba(245, 185, 66, 0.18); color: var(--gold); }
 
+.category-filter { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem; }
+.category-filter button {
+  background: var(--surface-2);
+  padding: 0.3em 0.8em;
+  font-size: 0.82rem;
+  border-radius: 999px;
+}
+.category-filter button.active { background: var(--gold); color: #21170a; }
+
 .playlist { display: flex; flex-direction: column; gap: 0.5rem; max-height: 340px; overflow-y: auto; }
 .playlist-row {
   display: flex;
@@ -89,6 +98,15 @@
 .playlist-row .info { min-width: 0; flex: 1; }
 .playlist-row .info .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .playlist-row .info .a { color: var(--text-muted); font-size: 0.9rem; }
+.playlist-row .info .cat {
+  display: inline-block;
+  color: var(--gold);
+  font-size: 0.78rem;
+  background: rgba(245, 185, 66, 0.12);
+  border-radius: 999px;
+  padding: 0.05em 0.6em;
+  margin-top: 0.25em;
+}
 .playlist-row.played { opacity: 0.55; }
 .playlist-row .actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
 .playlist-row button { padding: 0.4em 0.8em; font-size: 0.9rem; }
@@ -111,3 +129,4 @@
 
 .join-card { text-align: center; }
 .join-card img { border-radius: 10px; background: var(--text); padding: 8px; margin: 0.6rem 0 1rem; }
+.join-actions { display: flex; justify-content: center; gap: 0.6rem; flex-wrap: wrap; }

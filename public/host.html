@@ -42,11 +42,13 @@
           <input id="yt-input" type="url" placeholder="Paste a YouTube link or video ID">
           <input id="title-input" type="text" placeholder="Song title (only you see this)">
           <input id="artist-input" type="text" placeholder="Artist (optional)">
+          <input id="category-input" type="text" placeholder="Category (optional, e.g. 80s)">
           <button id="add-song-btn" class="primary">Add to playlist</button>
           <p class="muted small" id="add-error"></p>
         </div>
         <div class="stack import-row">
           <input id="import-input" type="url" placeholder="Or paste a YouTube playlist link">
+          <input id="import-category-input" type="text" placeholder="Tag these as… (optional)">
           <button id="import-btn">Import playlist</button>
           <p class="muted small" id="import-status"></p>
         </div>
@@ -58,6 +60,7 @@
           <label for="timer-input">Round timer (sec, 0 = off)</label>
           <input id="timer-input" type="number" min="0" step="5" value="0">
         </div>
+        <div id="category-filter" class="category-filter"></div>
         <div id="playlist-list" class="playlist"></div>
       </section>
 
@@ -71,7 +74,10 @@
         <p class="muted" id="join-url"></p>
         <img id="qr" width="140" height="140" alt="QR code to join">
         <p class="muted small" id="mdns-url"></p>
-        <button id="reset-game-btn" class="danger">Reset entire game</button>
+        <div class="join-actions">
+          <button id="show-results-btn" class="primary">🏆 Show results</button>
+          <button id="reset-game-btn" class="danger">Reset entire game</button>
+        </div>
       </section>
     </div>
   </div>

@@ -14,11 +14,14 @@ const playlistList = document.getElementById('playlist-list');
 const hostScoreboard = document.getElementById('host-scoreboard');
 const addError = document.getElementById('add-error');
 const importInput = document.getElementById('import-input');
+const importCategoryInput = document.getElementById('import-category-input');
 const importBtn = document.getElementById('import-btn');
 const importStatus = document.getElementById('import-status');
 const timerInput = document.getElementById('timer-input');
+const categoryFilterEl = document.getElementById('category-filter');
 
 let latestState = null;
+let categoryFilter = 'All';
 
 // ---------- connection status ----------
 socket.on('connect', () => { connPill.textContent = 'connected'; connPill.className = 'pill online'; });
@@ -61,6 +64,7 @@ document.getElementById('add-song-btn').addEventListener('click', () => {
   const ytRaw = document.getElementById('yt-input').value;
   const title = document.getElementById('title-input').value.trim();
   const artist = document.getElementById('artist-input').value.trim();
+  const category = document.getElementById('category-input').value.trim();
   const youtubeId = parseYoutubeId(ytRaw);
 
   if (!youtubeId) {
@@ -72,10 +76,11 @@ document.getElementById('add-song-btn').addEventListener('click', () => {
     return;
   }
   addError.textContent = '';
-  socket.emit('host:addSong', { youtubeId, title, artist });
+  socket.emit('host:addSong', { youtubeId, title, artist, category });
   document.getElementById('yt-input').value = '';
   document.getElementById('title-input').value = '';
   document.getElementById('artist-input').value = '';
+  document.getElementById('category-input').value = '';
 });
 
 importBtn.addEventListener('click', async () => {
@@ -94,13 +99,16 @@ importBtn.addEventListener('click', async () => {
       importStatus.textContent = data.error || 'Import failed.';
       return;
     }
+    const category = importCategoryInput.value.trim();
+    const songs = category ? data.songs.map(s => ({ ...s, category })) : data.songs;
     const existingIds = new Set((latestState ? latestState.playlist : []).map(s => s.youtubeId));
-    const newCount = data.songs.filter(s => !existingIds.has(s.youtubeId)).length;
-    const dupeCount = data.songs.length - newCount;
-    socket.emit('host:addSongs', data.songs);
+    const newCount = songs.filter(s => !existingIds.has(s.youtubeId)).length;
+    const dupeCount = songs.length - newCount;
+    socket.emit('host:addSongs', songs);
     importStatus.textContent = `Added ${newCount} song${newCount === 1 ? '' : 's'}` +
       (dupeCount ? ` (${dupeCount} already in the playlist)` : '') + '.';
     importInput.value = '';
+    importCategoryInput.value = '';
   } catch (e) {
     importStatus.textContent = 'Could not reach the server — try again.';
   } finally {
@@ -117,6 +125,7 @@ document.getElementById('reset-game-btn').addEventListener('click', () => {
     socket.emit('host:resetGame');
   }
 });
+document.getElementById('show-results-btn').addEventListener('click', () => socket.emit('host:showResults'));
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -176,13 +185,35 @@ function renderRound(state) {
   });
 }
 
+function renderCategoryFilter(state) {
+  const categories = [...new Set(state.playlist.map(s => s.category).filter(Boolean))].sort();
+  if (categoryFilter !== 'All' && !categories.includes(categoryFilter)) categoryFilter = 'All';
+  if (!categories.length) {
+    categoryFilterEl.innerHTML = '';
+    return;
+  }
+  const chips = ['All', ...categories];
+  categoryFilterEl.innerHTML = chips.map(c => `
+    <button class="${c === categoryFilter ? 'active' : ''}" data-category="${escapeHtml(c)}">${escapeHtml(c)}</button>
+  `).join('');
+  categoryFilterEl.querySelectorAll('[data-category]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      categoryFilter = btn.dataset.category;
+      renderPlaylist(latestState);
+      renderCategoryFilter(latestState);
+    });
+  });
+}
+
 function renderPlaylist(state) {
-  playlistList.innerHTML = state.playlist.map(song => `
+  const songs = categoryFilter === 'All' ? state.playlist : state.playlist.filter(s => s.category === categoryFilter);
+  playlistList.innerHTML = songs.map(song => `
     <div class="playlist-row ${song.played ? 'played' : ''}" draggable="true" data-id="${song.id}">
       <span class="grip" title="Drag to reorder">⠿</span>
       <div class="info">
         <div class="t">${escapeHtml(song.title)}</div>
         <div class="a">${escapeHtml(song.artist || '')}</div>
+        ${song.category ? `<span class="cat">${escapeHtml(song.category)}</span>` : ''}
       </div>
       <div class="actions">
         <button class="primary" data-play="${song.id}" ${state.currentIndex >= 0 && state.playlist[state.currentIndex].id === song.id ? 'disabled' : ''}>
@@ -259,6 +290,7 @@ function renderScoreboard(state) {
 socket.on('state', (state) => {
   latestState = state;
   renderRound(state);
+  renderCategoryFilter(state);
   renderPlaylist(state);
   renderScoreboard(state);
   renderLangToggle(state);

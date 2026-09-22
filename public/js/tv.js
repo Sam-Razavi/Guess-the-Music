@@ -8,12 +8,14 @@ const panels = {
   playing: document.getElementById('panel-playing'),
   buzzed: document.getElementById('panel-buzzed'),
   revealed: document.getElementById('panel-revealed'),
+  results: document.getElementById('panel-results'),
 };
 const scoreboardEl = document.getElementById('scoreboard');
 const buzzedNameEl = document.getElementById('buzzed-name');
 const revealTitleEl = document.getElementById('reveal-title');
 const revealArtistEl = document.getElementById('reveal-artist');
 const playingSubtext = document.getElementById('playing-subtext');
+const resultsListEl = document.getElementById('results-list');
 
 // ---- join QR ----
 fetch('/join-info').then(r => r.json()).then(({ url }) => {
@@ -193,6 +195,24 @@ function updatePlayingSubtext(state) {
   playingSubtext.textContent = t('buzzInPhoneTimer', currentLang).replace('{s}', remaining);
 }
 
+let resultsShown = false;
+
+function renderResults(players) {
+  const sorted = [...players].sort((a, b) => b.score - a.score);
+  if (!sorted.length) {
+    resultsListEl.innerHTML = `<p class="muted">${t('noOnePlayed', currentLang)}</p>`;
+    return;
+  }
+  const topScore = sorted[0].score;
+  resultsListEl.innerHTML = sorted.map((p, i) => `
+    <div class="results-row ${p.score === topScore ? 'first' : ''}">
+      <span class="rank">${p.score === topScore ? '🏆' : i + 1}</span>
+      <span class="rname">${escapeHtml(p.name)}</span>
+      <span class="rscore">${p.score}</span>
+    </div>
+  `).join('');
+}
+
 socket.on('state', (state) => {
   latestState = state;
   currentLang = state.language || 'en';
@@ -207,6 +227,16 @@ socket.on('state', (state) => {
   if (state.roundStatus === 'revealed' && state.currentSong) {
     revealTitleEl.textContent = state.currentSong.title || t('unknown', currentLang);
     revealArtistEl.textContent = state.currentSong.artist || '';
+  }
+
+  if (state.roundStatus === 'results') {
+    renderResults(state.players);
+    if (!resultsShown) {
+      resultsShown = true;
+      spawnConfetti();
+    }
+  } else {
+    resultsShown = false;
   }
 
   clearInterval(timerInterval);

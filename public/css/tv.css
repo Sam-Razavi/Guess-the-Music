@@ -121,6 +121,28 @@
   to { transform: translateY(110vh) rotate(540deg); opacity: 0.3; }
 }
 
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 320px;
+  max-width: 90vw;
+}
+.results-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 0.7em 1.2em;
+  font-size: 1.3rem;
+}
+.results-row.first { box-shadow: 0 0 0 2px var(--gold) inset; }
+.results-row .rank { color: var(--text-muted); width: 2ch; }
+.results-row .rname { flex: 1; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results-row .rscore { color: var(--gold); font-weight: 700; }
+
 .scoreboard {
   display: flex;
   gap: 0.6rem;
