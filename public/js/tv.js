@@ -119,6 +119,67 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// ---- idle screen hints ----
+const idleHints = [
+  'Tip: pick songs that don’t show the title on screen.',
+  'First to buzz gets first crack at the answer.',
+  'Hosts can adjust scores by hand if a call was close.',
+  'Scores are saved — a restart won’t wipe the board.',
+];
+const idleHintEl = document.getElementById('idle-hint');
+let idleHintIndex = 0;
+setInterval(() => {
+  if (panels.idle.hidden) return;
+  idleHintEl.style.opacity = 0;
+  setTimeout(() => {
+    idleHintIndex = (idleHintIndex + 1) % idleHints.length;
+    idleHintEl.textContent = idleHints[idleHintIndex];
+    idleHintEl.style.opacity = 1;
+  }, 400);
+}, 5000);
+idleHintEl.textContent = idleHints[0];
+
+// ---- confetti + chime on a correct answer ----
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function spawnConfetti() {
+  if (reduceMotion) return;
+  const colors = ['#f5b942', '#ff6b5b', '#74c69d', '#f4efe6'];
+  for (let i = 0; i < 40; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = Math.random() * 100 + 'vw';
+    piece.style.background = colors[i % colors.length];
+    piece.style.animationDuration = (1.5 + Math.random() * 1.2) + 's';
+    piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+    document.body.appendChild(piece);
+    piece.addEventListener('animationend', () => piece.remove());
+  }
+}
+
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [523.25, 783.99].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + i * 0.12 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.12 + 0.4);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.4);
+    });
+  } catch (e) { /* Web Audio unavailable — silently skip the chime */ }
+}
+
+socket.on('correct', () => {
+  spawnConfetti();
+  playChime();
+});
+
 // ---- round timer countdown (soft cutoff — purely a display, the server
 // enforces the actual buzz lockout) ----
 let timerInterval = null;

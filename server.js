@@ -368,6 +368,12 @@ io.on('connection', (socket) => {
     if (state.players[id]) {
       state.players[id].score += delta;
       savePlayers();
+      // Confetti/chime on the TV only for the natural "they got it right"
+      // case — the current buzz-in leader getting a point — not just any
+      // manual scoreboard tweak elsewhere on the host page.
+      if (delta > 0 && state.roundStatus === 'buzzed' && state.buzzOrder[0] && state.buzzOrder[0].id === id) {
+        io.to('tv').emit('correct', { name: state.players[id].name });
+      }
       broadcast();
     }
   });
