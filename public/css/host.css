@@ -55,6 +55,16 @@
 
 .round-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
 
+.shortcuts-hint { margin-top: 0.6rem; }
+.shortcuts-hint kbd {
+  background: var(--surface-2);
+  border-radius: 5px;
+  padding: 0.1em 0.5em;
+  font-family: var(--font-body);
+  font-size: 0.85em;
+}
+@media (hover: none) { .shortcuts-hint { display: none; } }
+
 .stack { display: flex; flex-direction: column; gap: 0.6rem; }
 .stack input { width: 100%; }
 .small { font-size: 0.85rem; }

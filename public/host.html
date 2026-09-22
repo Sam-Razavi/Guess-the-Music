@@ -8,6 +8,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/host.css">
+<link rel="manifest" href="/manifest-host.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/icons/icon-192.png">
+<meta name="theme-color" content="#16121f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GTM Host">
 </head>
 <body>
   <div class="host-wrap">
@@ -35,6 +43,7 @@
           <button id="reset-buzzers-btn">Reset buzzers</button>
           <button id="close-round-btn">Close round</button>
         </div>
+        <p class="muted small shortcuts-hint">Keyboard: <kbd>Space</kbd> reveal · <kbd>R</kbd> reset buzzers · <kbd>C</kbd> close round</p>
         <div class="timer-row">
           <label for="auto-advance-input">Auto-advance after reveal (sec, 0 = off)</label>
           <input id="auto-advance-input" type="number" min="0" step="5" value="0">

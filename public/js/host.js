@@ -139,6 +139,20 @@ document.getElementById('reset-game-btn').addEventListener('click', () => {
 });
 document.getElementById('show-results-btn').addEventListener('click', () => socket.emit('host:showResults'));
 
+// ---------- keyboard shortcuts (desktop hosting) ----------
+document.addEventListener('keydown', (e) => {
+  const tag = document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return; // don't hijack typing in search/add-song fields
+  if (e.key === ' ') {
+    e.preventDefault(); // avoid scrolling the page
+    document.getElementById('reveal-btn').click();
+  } else if (e.key.toLowerCase() === 'r') {
+    document.getElementById('reset-buzzers-btn').click();
+  } else if (e.key.toLowerCase() === 'c') {
+    document.getElementById('close-round-btn').click();
+  }
+});
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
