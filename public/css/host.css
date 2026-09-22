@@ -1,0 +1,85 @@
+.host-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.6rem 1.2rem 3rem;
+}
+
+.host-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.2rem;
+}
+.host-header h1 { font-size: 1.6rem; }
+#conn-pill.online { background: rgba(116, 198, 157, 0.18); color: var(--good); }
+#conn-pill.offline { background: rgba(229, 72, 77, 0.18); color: var(--bad); }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+@media (min-width: 860px) {
+  .grid { grid-template-columns: 1fr 1fr; }
+  .join-card { grid-column: span 2; }
+}
+
+.card h2 { font-size: 1.1rem; margin-bottom: 0.8rem; }
+
+.song-info { margin: 0.6rem 0; font-size: 1.05rem; }
+.song-info strong { color: var(--text); }
+
+.buzz-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.8rem; }
+.buzz-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 0.5em 0.7em;
+}
+.buzz-row .order { color: var(--gold); font-weight: 700; margin-right: 0.5em; }
+.buzz-row .actions { display: flex; gap: 0.4rem; }
+.buzz-row button { padding: 0.35em 0.7em; font-size: 0.9rem; }
+
+.round-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+
+.stack { display: flex; flex-direction: column; gap: 0.6rem; }
+.stack input { width: 100%; }
+.small { font-size: 0.85rem; }
+
+.playlist { display: flex; flex-direction: column; gap: 0.5rem; max-height: 340px; overflow-y: auto; }
+.playlist-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 0.6em 0.8em;
+}
+.playlist-row .info { min-width: 0; }
+.playlist-row .info .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.playlist-row .info .a { color: var(--text-muted); font-size: 0.9rem; }
+.playlist-row.played { opacity: 0.55; }
+.playlist-row .actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.playlist-row button { padding: 0.4em 0.8em; font-size: 0.9rem; }
+
+.host-scoreboard { display: flex; flex-direction: column; gap: 0.5rem; }
+.score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 0.5em 0.8em;
+}
+.score-row .name { display: flex; align-items: center; gap: 0.5em; }
+.score-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+.score-row .dot.connected { background: var(--good); }
+.score-row .actions { display: flex; align-items: center; gap: 0.5rem; }
+.score-row .actions button { padding: 0.3em 0.7em; font-size: 0.9rem; }
+.score-row .pts { color: var(--gold); font-weight: 700; min-width: 2ch; text-align: center; }
+
+.join-card { text-align: center; }
+.join-card img { border-radius: 10px; background: var(--text); padding: 8px; margin: 0.6rem 0 1rem; }

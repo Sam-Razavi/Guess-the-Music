@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guess the Music</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .wrap { text-align: center; max-width: 420px; padding: 2rem; }
+  h1 { font-size: 2.4rem; margin-bottom: 0.3em; }
+  .subtitle { margin-bottom: 2rem; }
+  .choices { display: flex; flex-direction: column; gap: 0.8rem; }
+  .choices a {
+    display: block; text-decoration: none;
+    background: var(--surface); color: var(--text);
+    padding: 1rem; border-radius: var(--radius); font-weight: 600;
+  }
+  .choices a.tv { background: var(--gold); color: #21170a; }
+  .choices small { display: block; font-weight: 400; color: var(--text-muted); margin-top: 0.2em; }
+  .choices a.tv small { color: #4a3410; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🎵 Guess the Music</h1>
+    <p class="subtitle">Pick how this device is joining the game.</p>
+    <div class="choices">
+      <a class="tv" href="/tv.html">Put this on the TV<small>Big screen &amp; scoreboard</small></a>
+      <a href="/host.html">I'm hosting<small>Pick songs, judge answers</small></a>
+      <a href="/player.html">I'm playing<small>Buzz in from your phone</small></a>
+    </div>
+  </div>
+</body>
+</html>

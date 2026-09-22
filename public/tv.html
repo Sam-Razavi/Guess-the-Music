@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guess the Music — TV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/tv.css">
+</head>
+<body>
+  <div class="tv-wrap">
+    <header class="tv-header">
+      <div class="brand">🎵 Guess the Music</div>
+    </header>
+
+    <main class="stage" id="stage">
+      <div class="video-box">
+        <div id="yt-player"></div>
+      </div>
+
+      <div class="overlay" id="overlay">
+        <!-- idle state -->
+        <div class="panel" id="panel-idle">
+          <div class="record spin" aria-hidden="true"></div>
+          <h1>Waiting for the next round…</h1>
+          <p>Scan to grab a buzzer:</p>
+          <img id="qr" alt="QR code to join as a player" width="180" height="180">
+          <p class="muted" id="join-url"></p>
+          <button id="unlock-btn" class="primary">▶ Tap once to enable sound</button>
+        </div>
+
+        <!-- playing state -->
+        <div class="panel" id="panel-playing" hidden>
+          <div class="record spin" aria-hidden="true"></div>
+          <h1>Now playing…</h1>
+          <p>Buzz in on your phone!</p>
+        </div>
+
+        <!-- buzzed state -->
+        <div class="panel" id="panel-buzzed" hidden>
+          <div class="record" aria-hidden="true"></div>
+          <h1 id="buzzed-name">—</h1>
+          <p>buzzed in first!</p>
+        </div>
+
+        <!-- revealed state -->
+        <div class="panel" id="panel-revealed" hidden>
+          <p class="muted">The song was</p>
+          <h1 id="reveal-title">—</h1>
+          <p id="reveal-artist"></p>
+        </div>
+      </div>
+    </main>
+
+    <footer class="scoreboard" id="scoreboard"></footer>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/tv.js"></script>
+</body>
+</html>

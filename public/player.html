@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guess the Music — Buzzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/player.css">
+</head>
+<body>
+
+  <!-- name entry (shown once, or when editing) -->
+  <div class="name-screen" id="name-screen">
+    <h1>🎵 Guess the Music</h1>
+    <p>What should the TV call you?</p>
+    <input type="text" id="name-input" maxlength="24" placeholder="Your name" autocomplete="off">
+    <button class="primary" id="name-submit">Join the game</button>
+  </div>
+
+  <!-- main buzzer screen -->
+  <div class="buzzer-screen" id="buzzer-screen" hidden>
+    <header>
+      <button class="pill" id="name-chip">Player</button>
+      <div class="pill score-pill"><span id="my-score">0</span> pts</div>
+    </header>
+
+    <main>
+      <button id="buzz-btn" class="buzz-btn" disabled>
+        <span id="buzz-label">Get ready…</span>
+      </button>
+      <p class="muted" id="status-text">Waiting for the host to start a round…</p>
+    </main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/player.js"></script>
+</body>
+</html>

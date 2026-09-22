@@ -1,0 +1,15 @@
+{
+  "name": "guess-the-music",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local party game: TV + phone buzzers, real YouTube song rounds",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode": "^1.5.3",
+    "socket.io": "^4.7.5"
+  }
+}

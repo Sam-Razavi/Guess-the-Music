@@ -1,0 +1,5 @@
+node_modules/
+npm-debug.log
+
+# Runtime game data (song playlist, scores) — not source, changes every game night
+playlist.json
