@@ -120,24 +120,20 @@ function escapeHtml(s) {
 }
 
 // ---- idle screen hints ----
-const idleHints = [
-  'Tip: pick songs that don’t show the title on screen.',
-  'First to buzz gets first crack at the answer.',
-  'Hosts can adjust scores by hand if a call was close.',
-  'Scores are saved — a restart won’t wipe the board.',
-];
+let currentLang = 'en';
 const idleHintEl = document.getElementById('idle-hint');
 let idleHintIndex = 0;
 setInterval(() => {
   if (panels.idle.hidden) return;
   idleHintEl.style.opacity = 0;
   setTimeout(() => {
-    idleHintIndex = (idleHintIndex + 1) % idleHints.length;
-    idleHintEl.textContent = idleHints[idleHintIndex];
+    const hints = t('idleHints', currentLang);
+    idleHintIndex = (idleHintIndex + 1) % hints.length;
+    idleHintEl.textContent = hints[idleHintIndex];
     idleHintEl.style.opacity = 1;
   }, 400);
 }, 5000);
-idleHintEl.textContent = idleHints[0];
+idleHintEl.textContent = t('idleHints', currentLang)[0];
 
 // ---- confetti + chime on a correct answer ----
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -186,19 +182,21 @@ let timerInterval = null;
 
 function updatePlayingSubtext(state) {
   if (state.buzzingLocked) {
-    playingSubtext.textContent = "⏰ Time's up!";
+    playingSubtext.textContent = t('timesUp', currentLang);
     return;
   }
   if (!state.roundTimer) {
-    playingSubtext.textContent = 'Buzz in on your phone!';
+    playingSubtext.textContent = t('buzzInPhone', currentLang);
     return;
   }
   const remaining = Math.max(0, Math.ceil((state.roundTimer.endsAt - Date.now()) / 1000));
-  playingSubtext.textContent = `Buzz in on your phone! (${remaining}s)`;
+  playingSubtext.textContent = t('buzzInPhoneTimer', currentLang).replace('{s}', remaining);
 }
 
 socket.on('state', (state) => {
   latestState = state;
+  currentLang = state.language || 'en';
+  applyTranslations(currentLang);
   renderScoreboard(state.players);
   showPanel(state.roundStatus);
 
@@ -207,7 +205,7 @@ socket.on('state', (state) => {
   }
 
   if (state.roundStatus === 'revealed' && state.currentSong) {
-    revealTitleEl.textContent = state.currentSong.title || 'Unknown';
+    revealTitleEl.textContent = state.currentSong.title || t('unknown', currentLang);
     revealArtistEl.textContent = state.currentSong.artist || '';
   }
 

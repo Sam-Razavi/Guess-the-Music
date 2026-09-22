@@ -83,6 +83,7 @@ const state = {
   players: loadPlayers(),         // playerId -> {name, score, connected, socketId}
   roundTimer: null,               // {seconds, endsAt} | null — a soft cutoff, doesn't change roundStatus
   buzzingLocked: false,           // true once the timer expires with no buzz — host still controls reveal/close
+  language: 'en',                 // 'en' | 'fa' — TV/player display language, set by the host
 };
 
 let roundTimerHandle = null;
@@ -139,6 +140,7 @@ function payloadFor(role) {
     players: publicPlayers(),
     roundTimer: state.roundTimer,
     buzzingLocked: state.buzzingLocked,
+    language: state.language,
   };
 
   if (role === 'host') {
@@ -385,6 +387,27 @@ io.on('connection', (socket) => {
       }
       broadcast();
     }
+  });
+
+  socket.on('host:setLanguage', (lang) => {
+    if (lang !== 'en' && lang !== 'fa') return;
+    state.language = lang;
+    broadcast();
+  });
+
+  socket.on('host:removePlayer', ({ id }) => {
+    if (!state.players[id]) return;
+    delete state.players[id];
+    const hadBuzzed = state.buzzOrder.some(b => b.id === id);
+    state.buzzOrder = state.buzzOrder.filter(b => b.id !== id);
+    // If the player we removed was the one currently holding the floor,
+    // reopen buzzing for whoever's left rather than leaving the round
+    // stuck on a buzz-in that no longer has anyone behind it.
+    if (hadBuzzed && state.roundStatus === 'buzzed' && state.buzzOrder.length === 0) {
+      state.roundStatus = 'playing';
+    }
+    savePlayers();
+    broadcast();
   });
 
   socket.on('host:closeRound', () => {

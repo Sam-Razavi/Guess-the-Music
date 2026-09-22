@@ -24,6 +24,17 @@ let latestState = null;
 socket.on('connect', () => { connPill.textContent = 'connected'; connPill.className = 'pill online'; });
 socket.on('disconnect', () => { connPill.textContent = 'disconnected'; connPill.className = 'pill offline'; });
 
+// ---------- language toggle ----------
+document.querySelectorAll('#lang-toggle [data-lang]').forEach(btn => {
+  btn.addEventListener('click', () => socket.emit('host:setLanguage', btn.dataset.lang));
+});
+
+function renderLangToggle(state) {
+  document.querySelectorAll('#lang-toggle [data-lang]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === state.language);
+  });
+}
+
 // ---------- join info ----------
 fetch('/join-info').then(r => r.json()).then(({ url, mdnsUrl }) => {
   document.getElementById('join-url').textContent = url;
@@ -224,6 +235,7 @@ function renderScoreboard(state) {
         <button data-adjust="${p.id}:-1">−</button>
         <span class="pts">${p.score}</span>
         <button data-adjust="${p.id}:1">+</button>
+        <button class="danger" data-remove-player="${p.id}" title="Remove player">✕</button>
       </div>
     </div>
   `).join('') || '<p class="muted">No one has joined yet.</p>';
@@ -234,6 +246,14 @@ function renderScoreboard(state) {
       socket.emit('host:awardPoint', { id, delta: Number(delta) });
     });
   });
+  hostScoreboard.querySelectorAll('[data-remove-player]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const player = state.players.find(p => p.id === btn.dataset.removePlayer);
+      if (confirm(`Remove ${player ? player.name : 'this player'} from the game?`)) {
+        socket.emit('host:removePlayer', { id: btn.dataset.removePlayer });
+      }
+    });
+  });
 }
 
 socket.on('state', (state) => {
@@ -241,4 +261,5 @@ socket.on('state', (state) => {
   renderRound(state);
   renderPlaylist(state);
   renderScoreboard(state);
+  renderLangToggle(state);
 });

@@ -16,6 +16,16 @@
   --radius: 18px;
 }
 
+/* Vazirmatn covers Farsi glyphs that Fraunces/Space Grotesk don't — swap
+   the font tokens under it when the page is set to RTL (Farsi). Targeting
+   `html[dir="rtl"]` rather than `:root` gives this higher specificity than
+   the :root definitions above, so it cleanly overrides them everywhere
+   they're used via var(). */
+html[dir="rtl"] {
+  --font-display: "Vazirmatn", var(--font-body);
+  --font-body: "Vazirmatn", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
 * { box-sizing: border-box; }
 
 /* Any element using the `hidden` attribute must actually hide, regardless

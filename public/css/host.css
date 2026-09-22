@@ -11,8 +11,19 @@
   margin-bottom: 1.2rem;
 }
 .host-header h1 { font-size: 1.6rem; }
+.header-right { display: flex; align-items: center; gap: 0.7rem; }
 #conn-pill.online { background: rgba(116, 198, 157, 0.18); color: var(--good); }
 #conn-pill.offline { background: rgba(229, 72, 77, 0.18); color: var(--bad); }
+
+.lang-toggle { display: flex; background: var(--surface-2); border-radius: 999px; padding: 3px; gap: 2px; }
+.lang-toggle button {
+  background: transparent;
+  padding: 0.35em 0.9em;
+  font-size: 0.85rem;
+  border-radius: 999px;
+}
+.lang-toggle button:hover { background: rgba(255, 255, 255, 0.06); }
+.lang-toggle button.active { background: var(--gold); color: #21170a; }
 
 .grid {
   display: grid;

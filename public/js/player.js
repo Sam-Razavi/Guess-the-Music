@@ -63,6 +63,9 @@ if (savedName) {
 }
 
 socket.on('state', (state) => {
+  const lang = state.language || 'en';
+  applyTranslations(lang);
+
   const me = state.players.find(p => p.id === myId);
   if (me) myScoreEl.textContent = me.score;
 
@@ -73,37 +76,38 @@ socket.on('state', (state) => {
 
   if (state.roundStatus === 'idle') {
     buzzBtn.disabled = true;
-    buzzLabel.textContent = 'Get ready…';
-    statusText.textContent = 'Waiting for the host to start a round…';
+    buzzLabel.textContent = t('getReady', lang);
+    statusText.textContent = t('waitingHostStart', lang);
   } else if (state.roundStatus === 'playing') {
     if (buzzed) {
       buzzBtn.disabled = true;
       buzzBtn.classList.add('beaten');
-      buzzLabel.textContent = 'Already buzzed';
-      statusText.textContent = "It's someone else's turn now.";
+      buzzLabel.textContent = t('alreadyBuzzed', lang);
+      statusText.textContent = t('someoneElsesTurn', lang);
     } else if (state.buzzingLocked) {
       buzzBtn.disabled = true;
-      buzzLabel.textContent = "⏰ Time's up";
-      statusText.textContent = 'Waiting for the host…';
+      buzzLabel.textContent = t('timesUp', lang);
+      statusText.textContent = t('waitingHost', lang);
     } else {
       buzzBtn.disabled = false;
-      buzzLabel.textContent = 'BUZZ';
-      statusText.textContent = 'Buzz in as soon as you know it!';
+      buzzLabel.textContent = t('buzzBtnLabel', lang);
+      statusText.textContent = t('buzzInAsap', lang);
     }
   } else if (state.roundStatus === 'buzzed') {
     buzzBtn.disabled = true;
     if (first && first.id === myId) {
       buzzBtn.classList.add('locked');
-      buzzLabel.textContent = '🔒 Locked in!';
-      statusText.textContent = 'Say your answer out loud — the host is checking.';
+      buzzLabel.textContent = t('lockedIn', lang);
+      statusText.textContent = t('sayAnswerHostChecking', lang);
     } else {
       buzzBtn.classList.add('beaten');
-      buzzLabel.textContent = (first ? first.name : 'Someone') + ' buzzed first';
-      statusText.textContent = 'Better luck next round!';
+      const name = first ? first.name : t('someone', lang);
+      buzzLabel.textContent = t('buzzedFirst', lang).replace('{name}', name);
+      statusText.textContent = t('betterLuck', lang);
     }
   } else if (state.roundStatus === 'revealed') {
     buzzBtn.disabled = true;
-    buzzLabel.textContent = 'Round over';
-    statusText.textContent = 'Waiting for the next round…';
+    buzzLabel.textContent = t('roundOver', lang);
+    statusText.textContent = t('waitingRound', lang);
   }
 });
