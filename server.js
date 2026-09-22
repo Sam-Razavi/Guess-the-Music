@@ -286,6 +286,63 @@ function broadcast() {
   io.to('player').emit('state', payloadFor('player'));
 }
 
+// ---------- Spotify auto-categories (optional, like YOUTUBE_API_KEY) ----------
+
+let spotifyTokenCache = { token: null, expiresAt: 0 };
+
+async function getSpotifyToken() {
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+  if (spotifyTokenCache.token && Date.now() < spotifyTokenCache.expiresAt) return spotifyTokenCache.token;
+  try {
+    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const r = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=client_credentials',
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    spotifyTokenCache = { token: data.access_token, expiresAt: Date.now() + (data.expires_in - 60) * 1000 };
+    return spotifyTokenCache.token;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Best-effort category suggestion from the matched track's artist genre.
+// Fails silently (returns null) on missing config, no match, or any error —
+// this is a convenience only and must never block adding a song or an
+// import. Spotify's genre tagging is inconsistent (sparse for many
+// non-Western artists), so this is "suggested category, host can override",
+// never a guarantee.
+async function suggestCategory(title, artist) {
+  const token = await getSpotifyToken();
+  if (!token) return null;
+  try {
+    const q = encodeURIComponent(`track:${title}${artist ? ' artist:' + artist : ''}`);
+    const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${q}&type=track&limit=1`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!searchRes.ok) return null;
+    const searchData = await searchRes.json();
+    const track = searchData.tracks && searchData.tracks.items && searchData.tracks.items[0];
+    const artistId = track && track.artists && track.artists[0] && track.artists[0].id;
+    if (!artistId) return null;
+    const artistRes = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!artistRes.ok) return null;
+    const artistData = await artistRes.json();
+    const genre = artistData.genres && artistData.genres[0];
+    if (!genre) return null;
+    return genre.replace(/\b\w/g, (c) => c.toUpperCase()); // "art pop" -> "Art Pop"
+  } catch (e) {
+    return null;
+  }
+}
+
 // ---------- routes ----------
 
 app.get('/join-info', (req, res) => {
@@ -398,6 +455,23 @@ app.post('/api/import-playlist', async (req, res) => {
     const embeddable = await checkEmbeddable(apiKey, songs.map(s => s.youtubeId));
     const playable = songs.filter(s => embeddable.has(s.youtubeId));
 
+    // Auto-category suggestion per song — a small concurrency limit keeps a
+    // big playlist from taking forever while not hammering Spotify's rate
+    // limit. The host's own blanket "Tag these as..." (applied client-side,
+    // if they used it) still wins over these per-song suggestions.
+    if (state.settings.autoCategories) {
+      const CONCURRENCY = 5;
+      for (let i = 0; i < playable.length; i += CONCURRENCY) {
+        const batch = playable.slice(i, i + CONCURRENCY);
+        await Promise.all(batch.map(async (s) => {
+          try {
+            const suggested = await suggestCategory(s.title, s.artist);
+            if (suggested) s.category = suggested;
+          } catch (e) { /* non-blocking */ }
+        }));
+      }
+    }
+
     res.json({ songs: playable, skipped: songs.length - playable.length });
   } catch (e) {
     res.status(502).json({ error: 'Could not reach the YouTube API — check your connection and try again.' });
@@ -496,7 +570,8 @@ io.on('connection', (socket) => {
 
   socket.on('host:addSong', async ({ youtubeId, title, artist, category }) => {
     if (!youtubeId) return;
-    state.playlist.push(makeSong(youtubeId, title, artist, category));
+    const song = makeSong(youtubeId, title, artist, category);
+    state.playlist.push(song);
     savePlaylist();
     broadcast();
 
@@ -514,6 +589,19 @@ io.on('connection', (socket) => {
           });
         }
       } catch (e) { /* non-blocking — the song's already added either way */ }
+    }
+
+    // Auto-category suggestion — only when the host didn't already type
+    // one themselves; never overwrites a manual choice.
+    if (state.settings.autoCategories && !song.category) {
+      try {
+        const suggested = await suggestCategory(song.title, song.artist);
+        if (suggested && !song.category) {
+          song.category = suggested;
+          savePlaylist();
+          broadcast();
+        }
+      } catch (e) { /* non-blocking */ }
     }
   });
 

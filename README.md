@@ -130,6 +130,26 @@ The host page can bulk-import a whole YouTube playlist by link, using the offici
 
 Everything else works fine without this — the host page just shows a clear error on the import button if it's not configured.
 
+### Spotify auto-categories (optional)
+
+With the "Auto-categories" game option turned on, the host page can suggest
+a category per song (manual add or playlist import) from its artist's genre
+on Spotify. This needs its own free API credentials, separate from YouTube:
+
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), log in, and create an app (any name/redirect URI — this only uses the app's client credentials, not a user login).
+2. From the app's Settings page, copy the **Client ID** and **Client Secret**.
+3. Add both to `.env`:
+   ```
+   SPOTIFY_CLIENT_ID=your-client-id-here
+   SPOTIFY_CLIENT_SECRET=your-client-secret-here
+   ```
+4. `pm2 restart guess-the-music` so the server picks it up.
+
+Spotify's genre tagging is inconsistent (sparse for many non-Western
+artists), so this is a suggestion the host can always override, not a
+guarantee — and it never overwrites a category you typed yourself. Works
+fine with nothing configured — the setting just won't find any suggestions.
+
 ### Friendly hostname (mDNS)
 
 The server also advertises itself as `guess-the-music.local` on the network, shown as a secondary hint under the QR code on the host page. It's a convenience only, not the primary path — the QR code and printed IP-based links stay the reliable way to join, since Android Chrome's support for `.local` addresses is inconsistent. The first time the server starts, Windows may prompt a one-time Firewall dialog for Node.js (multicast UDP) — allow it on **Private networks**.
