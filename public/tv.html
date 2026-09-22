@@ -58,6 +58,11 @@
           <div id="results-list" class="results-list"></div>
         </div>
       </div>
+
+      <!-- Lives outside .overlay: the overlay fades out entirely during the
+           'revealed' state to show the real video, but this hint needs to
+           stay visible then. -->
+      <p class="muted auto-advance-hint" id="auto-advance-hint"></p>
     </main>
 
     <footer class="scoreboard" id="scoreboard"></footer>

@@ -39,6 +39,7 @@ const translations = {
     noOnePlayed: 'No one played 🎵',
     gameOver: '🏆 Game over!',
     yourFinalScore: 'Your final score: {n}',
+    nextSongIn: '⏭ Next song in {s}s…',
   },
   fa: {
     brand: 'حدس آهنگ',
@@ -80,6 +81,7 @@ const translations = {
     noOnePlayed: 'کسی بازی نکرد 🎵',
     gameOver: '🏆 بازی تمام شد!',
     yourFinalScore: 'امتیاز نهایی‌ات: {n}',
+    nextSongIn: '⏭ آهنگ بعدی تا {s} ثانیه دیگر…',
   },
 };
 

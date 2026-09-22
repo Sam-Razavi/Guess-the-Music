@@ -84,15 +84,23 @@ const state = {
   roundTimer: null,               // {seconds, endsAt} | null — a soft cutoff, doesn't change roundStatus
   buzzingLocked: false,           // true once the timer expires with no buzz — host still controls reveal/close
   language: 'en',                 // 'en' | 'fa' — TV/player display language, set by the host
+  autoAdvance: null,               // {endsAt} | null — pending auto-start of the next unplayed song after a reveal
 };
 
 let roundTimerHandle = null;
+let autoAdvanceHandle = null;
 
 function clearRoundTimer() {
   clearTimeout(roundTimerHandle);
   roundTimerHandle = null;
   state.roundTimer = null;
   state.buzzingLocked = false;
+}
+
+function clearAutoAdvance() {
+  clearTimeout(autoAdvanceHandle);
+  autoAdvanceHandle = null;
+  state.autoAdvance = null;
 }
 
 function startRoundTimer(seconds) {
@@ -107,6 +115,18 @@ function startRoundTimer(seconds) {
       broadcast();
     }
   }, seconds * 1000);
+}
+
+function startRound(id, timerSeconds) {
+  const idx = state.playlist.findIndex(s => s.id === id);
+  if (idx === -1) return false;
+  state.currentIndex = idx;
+  state.roundStatus = 'playing';
+  state.buzzOrder = [];
+  clearRoundTimer();
+  clearAutoAdvance();
+  if (timerSeconds > 0) startRoundTimer(timerSeconds);
+  return true;
 }
 
 function currentSong() {
@@ -142,6 +162,7 @@ function payloadFor(role) {
     roundTimer: state.roundTimer,
     buzzingLocked: state.buzzingLocked,
     language: state.language,
+    autoAdvance: state.autoAdvance,
   };
 
   if (role === 'host') {
@@ -347,14 +368,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('host:startRound', ({ id, timerSeconds }) => {
-    const idx = state.playlist.findIndex(s => s.id === id);
-    if (idx === -1) return;
-    state.currentIndex = idx;
-    state.roundStatus = 'playing';
-    state.buzzOrder = [];
-    clearRoundTimer();
-    if (timerSeconds > 0) startRoundTimer(timerSeconds);
-    broadcast();
+    if (startRound(id, timerSeconds)) broadcast();
   });
 
   socket.on('host:resetBuzzers', () => {
@@ -374,13 +388,35 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  socket.on('host:revealAnswer', () => {
+  socket.on('host:revealAnswer', ({ autoAdvanceSeconds } = {}) => {
+    // Snapshot the round timer that was active for the song just revealed,
+    // so an auto-started next round can reuse the same duration — not
+    // read back from a persisted field, since the host's timer input may
+    // change before auto-advance actually fires.
+    const priorTimerSeconds = state.roundTimer ? state.roundTimer.seconds : 0;
+    clearAutoAdvance();
     if (state.currentIndex >= 0) {
       state.playlist[state.currentIndex].played = true;
       savePlaylist();
     }
     state.roundStatus = 'revealed';
     clearRoundTimer();
+
+    if (autoAdvanceSeconds > 0) {
+      state.autoAdvance = { endsAt: Date.now() + autoAdvanceSeconds * 1000 };
+      autoAdvanceHandle = setTimeout(() => {
+        state.autoAdvance = null;
+        // Only proceed if the host hasn't already moved on manually —
+        // any of resetBuzzers/startRound/closeRound/showResults/resetGame
+        // would have changed roundStatus away from 'revealed' by now.
+        if (state.roundStatus === 'revealed') {
+          const next = state.playlist.find(s => !s.played);
+          if (next) startRound(next.id, priorTimerSeconds);
+        }
+        broadcast();
+      }, autoAdvanceSeconds * 1000);
+    }
+
     broadcast();
   });
 
@@ -427,6 +463,7 @@ io.on('connection', (socket) => {
     state.currentIndex = -1;
     state.buzzOrder = [];
     clearRoundTimer();
+    clearAutoAdvance();
     broadcast();
   });
 
@@ -435,6 +472,7 @@ io.on('connection', (socket) => {
     state.currentIndex = -1;
     state.buzzOrder = [];
     clearRoundTimer();
+    clearAutoAdvance();
     broadcast();
   });
 
@@ -447,6 +485,7 @@ io.on('connection', (socket) => {
     state.roundStatus = 'idle';
     state.buzzOrder = [];
     clearRoundTimer();
+    clearAutoAdvance();
     broadcast();
   });
 

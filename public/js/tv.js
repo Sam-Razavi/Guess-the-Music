@@ -16,6 +16,7 @@ const revealTitleEl = document.getElementById('reveal-title');
 const revealArtistEl = document.getElementById('reveal-artist');
 const playingSubtext = document.getElementById('playing-subtext');
 const resultsListEl = document.getElementById('results-list');
+const autoAdvanceHintEl = document.getElementById('auto-advance-hint');
 
 // ---- join QR ----
 fetch('/join-info').then(r => r.json()).then(({ url }) => {
@@ -195,6 +196,17 @@ function updatePlayingSubtext(state) {
   playingSubtext.textContent = t('buzzInPhoneTimer', currentLang).replace('{s}', remaining);
 }
 
+let autoAdvanceInterval = null;
+
+function updateAutoAdvanceHint(state) {
+  if (!state.autoAdvance) {
+    autoAdvanceHintEl.textContent = '';
+    return;
+  }
+  const remaining = Math.max(0, Math.ceil((state.autoAdvance.endsAt - Date.now()) / 1000));
+  autoAdvanceHintEl.textContent = t('nextSongIn', currentLang).replace('{s}', remaining);
+}
+
 let resultsShown = false;
 
 function renderResults(players) {
@@ -246,6 +258,12 @@ socket.on('state', (state) => {
   updatePlayingSubtext(state);
   if (state.roundStatus === 'playing' && state.roundTimer && !state.buzzingLocked) {
     timerInterval = setInterval(() => updatePlayingSubtext(state), 500);
+  }
+
+  clearInterval(autoAdvanceInterval);
+  updateAutoAdvanceHint(state);
+  if (state.roundStatus === 'revealed' && state.autoAdvance) {
+    autoAdvanceInterval = setInterval(() => updateAutoAdvanceHint(state), 500);
   }
 
   syncVideo(state);
