@@ -7,6 +7,9 @@ const fs = require('fs');
 const os = require('os');
 const { Server } = require('socket.io');
 const QRCode = require('qrcode');
+const { Bonjour } = require('bonjour-service');
+
+const MDNS_HOST = 'guess-the-music.local';
 
 const app = express();
 const server = http.createServer(app);
@@ -171,7 +174,13 @@ function broadcast() {
 
 app.get('/join-info', (req, res) => {
   const ip = getLanIp();
-  res.json({ url: `http://${ip}:${PORT}/player.html` });
+  res.json({
+    url: `http://${ip}:${PORT}/player.html`,
+    // Secondary convenience only — Android Chrome's mDNS support is
+    // inconsistent, so the IP-based URL above (and the QR code) stays
+    // the reliable one.
+    mdnsUrl: `http://${MDNS_HOST}:${PORT}/player.html`,
+  });
 });
 
 app.get('/qr.png', async (req, res) => {
@@ -413,4 +422,17 @@ server.listen(PORT, () => {
   console.log(`  Host control (your phone/laptop): http://${ip}:${PORT}/host.html`);
   console.log(`  Players join:              http://${ip}:${PORT}/player.html`);
   console.log(`\n  (All devices must be on the same WiFi network.)\n`);
+
+  // Best-effort convenience only — mDNS relies on UDP multicast, which some
+  // networks/firewalls block. Never let a failure here affect the game.
+  try {
+    const bonjour = new Bonjour();
+    bonjour.publish({ name: 'Guess the Music', type: 'http', port: PORT, host: MDNS_HOST });
+    console.log(`  Also reachable at: http://${MDNS_HOST}:${PORT}/ (if your network allows mDNS)\n`);
+    const shutdown = () => bonjour.unpublishAll(() => bonjour.destroy());
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+  } catch (e) {
+    console.log('  (mDNS advertising unavailable — the IP-based links above still work.)\n');
+  }
 });

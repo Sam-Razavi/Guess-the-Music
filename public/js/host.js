@@ -25,9 +25,10 @@ socket.on('connect', () => { connPill.textContent = 'connected'; connPill.classN
 socket.on('disconnect', () => { connPill.textContent = 'disconnected'; connPill.className = 'pill offline'; });
 
 // ---------- join info ----------
-fetch('/join-info').then(r => r.json()).then(({ url }) => {
+fetch('/join-info').then(r => r.json()).then(({ url, mdnsUrl }) => {
   document.getElementById('join-url').textContent = url;
   document.getElementById('qr').src = '/qr.png';
+  if (mdnsUrl) document.getElementById('mdns-url').textContent = `or try: ${mdnsUrl}`;
 });
 
 // ---------- youtube id parsing ----------
