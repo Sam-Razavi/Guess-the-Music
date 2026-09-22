@@ -28,7 +28,7 @@ Keep this terminal running for the whole game night — closing it stops the gam
 ## 2. Set it up
 
 - **TV:** open the Android TV's browser and go to the `tv.html` link above. Tap the **"Tap once to enable sound"** button once so the browser is allowed to autoplay audio for the rest of the session.
-- **You (the host):** open `host.html` on your own phone or laptop — this is your control panel, so keep the song titles secret from the TV screen.
+- **You (the host):** open `host.html` on your own phone or laptop — this is your control panel, so keep the song titles secret from the TV screen. Hosting from your phone? Tip: open `host.html`, then use your browser's **"Add to Home Screen"** option — it installs as a proper app icon and opens full-screen next time, no browser address bar or re-typing the URL. Players can do the same with `player.html`.
 - **Players:** scan the QR code shown on the TV (or open the `player.html` link) on their own phones, type a name, and they're in.
 
 ## 3. Add songs
@@ -47,6 +47,8 @@ Tip: pick videos that don't show the song title on screen (plain "official audio
    - **Wrong:** hit **Reset buzzers** so everyone else can jump in again (the player who already went can't buzz twice on the same song).
 5. Hit **Reveal answer** to show the real title/artist and video on the TV.
 6. Hit **Close round** and pick the next song.
+
+Hosting from a laptop/desktop with a keyboard: `Space` = reveal, `R` = reset buzzers, `C` = close round (shown on the host page itself; hidden on touch devices where it doesn't apply).
 
 Scores update live on every screen. **Reset entire game** on the host page wipes scores and marks every song unplayed again for a rematch.
 
