@@ -36,12 +36,30 @@ function syncVideo(state) {
     loadedYoutubeId = state.currentSong.youtubeId;
     player.loadVideoById(state.currentSong.youtubeId);
     player.playVideo();
+    ensurePlaybackStarted();
   }
 
   if (state.roundStatus === 'idle') {
     loadedYoutubeId = null;
     if (typeof player.stopVideo === 'function') player.stopVideo();
   }
+}
+
+// The YouTube IFrame API is flaky about actually starting playback on the
+// first call — even with autoplay explicitly allowed, playVideo() sometimes
+// silently leaves the player in an unstarted/cued state with no error
+// (observed in testing: intermittent, not tied to a specific video). Retry
+// a few times if it hasn't actually started shortly after we asked it to.
+function ensurePlaybackStarted(attempt = 0) {
+  setTimeout(() => {
+    if (!player || typeof player.getPlayerState !== 'function') return;
+    const PLAYING = 1, BUFFERING = 3;
+    const state = player.getPlayerState();
+    if (state === PLAYING || state === BUFFERING) return;
+    if (attempt >= 5) return;
+    player.playVideo();
+    ensurePlaybackStarted(attempt + 1);
+  }, 700);
 }
 
 function createPlayer() {
