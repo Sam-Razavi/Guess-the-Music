@@ -81,6 +81,10 @@ socket.on('state', (state) => {
       buzzBtn.classList.add('beaten');
       buzzLabel.textContent = 'Already buzzed';
       statusText.textContent = "It's someone else's turn now.";
+    } else if (state.buzzingLocked) {
+      buzzBtn.disabled = true;
+      buzzLabel.textContent = "⏰ Time's up";
+      statusText.textContent = 'Waiting for the host…';
     } else {
       buzzBtn.disabled = false;
       buzzLabel.textContent = 'BUZZ';

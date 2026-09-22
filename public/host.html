@@ -20,6 +20,7 @@
       <section class="card">
         <h2>Current round</h2>
         <div class="pill" id="round-status-pill">idle</div>
+        <span class="pill" id="timer-pill" hidden></span>
         <div id="current-song-info" class="song-info muted">No round started.</div>
         <div id="buzz-order-list" class="buzz-list"></div>
         <div class="round-actions">
@@ -38,10 +39,19 @@
           <button id="add-song-btn" class="primary">Add to playlist</button>
           <p class="muted small" id="add-error"></p>
         </div>
+        <div class="stack import-row">
+          <input id="import-input" type="url" placeholder="Or paste a YouTube playlist link">
+          <button id="import-btn">Import playlist</button>
+          <p class="muted small" id="import-status"></p>
+        </div>
       </section>
 
       <section class="card">
         <h2>Playlist</h2>
+        <div class="timer-row">
+          <label for="timer-input">Round timer (sec, 0 = off)</label>
+          <input id="timer-input" type="number" min="0" step="5" value="0">
+        </div>
         <div id="playlist-list" class="playlist"></div>
       </section>
 

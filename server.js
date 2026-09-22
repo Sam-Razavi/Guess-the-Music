@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -15,6 +17,7 @@ const PLAYLIST_FILE = path.join(__dirname, 'playlist.json');
 const PLAYERS_FILE = path.join(__dirname, 'players.json');
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
 // ---------- persistence ----------
 
@@ -75,10 +78,45 @@ const state = {
   roundStatus: 'idle',            // idle | playing | buzzed | revealed
   buzzOrder: [],                  // [{id, name, time}]
   players: loadPlayers(),         // playerId -> {name, score, connected, socketId}
+  roundTimer: null,               // {seconds, endsAt} | null — a soft cutoff, doesn't change roundStatus
+  buzzingLocked: false,           // true once the timer expires with no buzz — host still controls reveal/close
 };
+
+let roundTimerHandle = null;
+
+function clearRoundTimer() {
+  clearTimeout(roundTimerHandle);
+  roundTimerHandle = null;
+  state.roundTimer = null;
+  state.buzzingLocked = false;
+}
+
+function startRoundTimer(seconds) {
+  clearTimeout(roundTimerHandle);
+  state.roundTimer = { seconds, endsAt: Date.now() + seconds * 1000 };
+  state.buzzingLocked = false;
+  const idx = state.currentIndex;
+  roundTimerHandle = setTimeout(() => {
+    // Only lock if we're still on the same round and nobody's buzzed in.
+    if (state.currentIndex === idx && state.roundStatus === 'playing') {
+      state.buzzingLocked = true;
+      broadcast();
+    }
+  }, seconds * 1000);
+}
 
 function currentSong() {
   return state.currentIndex >= 0 ? state.playlist[state.currentIndex] : null;
+}
+
+function makeSong(youtubeId, title, artist) {
+  return {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    youtubeId: youtubeId.trim(),
+    title: (title || '').trim() || 'Untitled',
+    artist: (artist || '').trim(),
+    played: false,
+  };
 }
 
 function publicPlayers() {
@@ -96,6 +134,8 @@ function payloadFor(role) {
     roundStatus: state.roundStatus,
     buzzOrder: state.buzzOrder.map(b => ({ id: b.id, name: b.name })),
     players: publicPlayers(),
+    roundTimer: state.roundTimer,
+    buzzingLocked: state.buzzingLocked,
   };
 
   if (role === 'host') {
@@ -145,6 +185,66 @@ app.get('/qr.png', async (req, res) => {
   }
 });
 
+function extractPlaylistId(input) {
+  const raw = (input || '').trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    const list = url.searchParams.get('list');
+    if (list) return list;
+  } catch { /* not a URL — maybe a bare playlist ID */ }
+  if (/^[\w-]+$/.test(raw)) return raw;
+  return null;
+}
+
+app.post('/api/import-playlist', async (req, res) => {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) {
+    return res.status(400).json({
+      error: "YouTube import isn't configured — add YOUTUBE_API_KEY to your .env file (see README).",
+    });
+  }
+
+  const playlistId = extractPlaylistId(req.body && req.body.url);
+  if (!playlistId) {
+    return res.status(400).json({ error: "Couldn't find a playlist ID in that link." });
+  }
+
+  try {
+    const songs = [];
+    let pageToken = '';
+    do {
+      const apiUrl = new URL('https://www.googleapis.com/youtube/v3/playlistItems');
+      apiUrl.searchParams.set('part', 'snippet');
+      apiUrl.searchParams.set('playlistId', playlistId);
+      apiUrl.searchParams.set('maxResults', '50');
+      apiUrl.searchParams.set('key', apiKey);
+      if (pageToken) apiUrl.searchParams.set('pageToken', pageToken);
+
+      const r = await fetch(apiUrl);
+      const data = await r.json();
+      if (!r.ok) {
+        const message = (data.error && data.error.message) || `YouTube API error (${r.status})`;
+        return res.status(502).json({ error: message });
+      }
+
+      for (const item of data.items || []) {
+        const s = item.snippet;
+        if (!s || s.title === 'Private video' || s.title === 'Deleted video') continue;
+        const videoId = s.resourceId && s.resourceId.videoId;
+        if (!videoId) continue;
+        songs.push({ youtubeId: videoId, title: s.title, artist: s.videoOwnerChannelTitle || '' });
+      }
+
+      pageToken = data.nextPageToken || '';
+    } while (pageToken && songs.length < 200);
+
+    res.json({ songs });
+  } catch (e) {
+    res.status(502).json({ error: 'Could not reach the YouTube API — check your connection and try again.' });
+  }
+});
+
 // ---------- sockets ----------
 
 io.on('connection', (socket) => {
@@ -180,7 +280,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('player:buzz', () => {
-    if (!playerId || state.roundStatus !== 'playing') return;
+    if (!playerId || state.roundStatus !== 'playing' || state.buzzingLocked) return;
     if (state.buzzOrder.find(b => b.id === playerId)) return;
     // Reaching this point means the round was open ('playing') and this
     // player hadn't buzzed yet — so this is always the buzz that takes
@@ -193,13 +293,20 @@ io.on('connection', (socket) => {
 
   socket.on('host:addSong', ({ youtubeId, title, artist }) => {
     if (!youtubeId) return;
-    state.playlist.push({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      youtubeId: youtubeId.trim(),
-      title: (title || '').trim() || 'Untitled',
-      artist: (artist || '').trim(),
-      played: false,
-    });
+    state.playlist.push(makeSong(youtubeId, title, artist));
+    savePlaylist();
+    broadcast();
+  });
+
+  socket.on('host:addSongs', (songs) => {
+    if (!Array.isArray(songs) || !songs.length) return;
+    const existingIds = new Set(state.playlist.map(s => s.youtubeId));
+    for (const { youtubeId, title, artist } of songs) {
+      if (!youtubeId || existingIds.has(youtubeId.trim())) continue;
+      const song = makeSong(youtubeId, title, artist);
+      state.playlist.push(song);
+      existingIds.add(song.youtubeId);
+    }
     savePlaylist();
     broadcast();
   });
@@ -209,23 +316,41 @@ io.on('connection', (socket) => {
     if (currentSong() && currentSong().id === id) {
       state.currentIndex = -1;
       state.roundStatus = 'idle';
+      clearRoundTimer();
     }
     savePlaylist();
     broadcast();
   });
 
-  socket.on('host:startRound', ({ id }) => {
+  socket.on('host:reorderPlaylist', ({ ids }) => {
+    if (!Array.isArray(ids)) return;
+    const byId = new Map(state.playlist.map(s => [s.id, s]));
+    const reordered = ids.map(id => byId.get(id)).filter(Boolean);
+    // Only accept it if it's a true reordering (same songs, new order) —
+    // a stale/partial list from a slow client shouldn't drop songs.
+    if (reordered.length !== state.playlist.length) return;
+    state.playlist = reordered;
+    savePlaylist();
+    broadcast();
+  });
+
+  socket.on('host:startRound', ({ id, timerSeconds }) => {
     const idx = state.playlist.findIndex(s => s.id === id);
     if (idx === -1) return;
     state.currentIndex = idx;
     state.roundStatus = 'playing';
     state.buzzOrder = [];
+    clearRoundTimer();
+    if (timerSeconds > 0) startRoundTimer(timerSeconds);
     broadcast();
   });
 
   socket.on('host:resetBuzzers', () => {
     if (state.currentIndex === -1) return;
+    const priorTimerSeconds = state.roundTimer ? state.roundTimer.seconds : 0;
     state.roundStatus = 'playing';
+    clearRoundTimer();
+    if (priorTimerSeconds > 0) startRoundTimer(priorTimerSeconds);
     broadcast();
   });
 
@@ -235,6 +360,7 @@ io.on('connection', (socket) => {
       savePlaylist();
     }
     state.roundStatus = 'revealed';
+    clearRoundTimer();
     broadcast();
   });
 
@@ -250,6 +376,7 @@ io.on('connection', (socket) => {
     state.roundStatus = 'idle';
     state.currentIndex = -1;
     state.buzzOrder = [];
+    clearRoundTimer();
     broadcast();
   });
 
@@ -261,6 +388,7 @@ io.on('connection', (socket) => {
     state.currentIndex = -1;
     state.roundStatus = 'idle';
     state.buzzOrder = [];
+    clearRoundTimer();
     broadcast();
   });
 

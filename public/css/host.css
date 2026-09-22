@@ -48,6 +48,21 @@
 .stack input { width: 100%; }
 .small { font-size: 0.85rem; }
 
+.import-row { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--surface-2); }
+
+.timer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.timer-row input { width: 5rem; }
+
+#timer-pill { margin-left: 0.5rem; background: rgba(245, 185, 66, 0.18); color: var(--gold); }
+
 .playlist { display: flex; flex-direction: column; gap: 0.5rem; max-height: 340px; overflow-y: auto; }
 .playlist-row {
   display: flex;
@@ -58,7 +73,9 @@
   border-radius: 10px;
   padding: 0.6em 0.8em;
 }
-.playlist-row .info { min-width: 0; }
+.playlist-row.drag-over { outline: 2px dashed var(--gold); outline-offset: -2px; }
+.playlist-row .grip { cursor: grab; color: var(--text-muted); flex-shrink: 0; }
+.playlist-row .info { min-width: 0; flex: 1; }
 .playlist-row .info .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .playlist-row .info .a { color: var(--text-muted); font-size: 0.9rem; }
 .playlist-row.played { opacity: 0.55; }

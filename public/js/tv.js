@@ -13,6 +13,7 @@ const scoreboardEl = document.getElementById('scoreboard');
 const buzzedNameEl = document.getElementById('buzzed-name');
 const revealTitleEl = document.getElementById('reveal-title');
 const revealArtistEl = document.getElementById('reveal-artist');
+const playingSubtext = document.getElementById('playing-subtext');
 
 // ---- join QR ----
 fetch('/join-info').then(r => r.json()).then(({ url }) => {
@@ -118,6 +119,23 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// ---- round timer countdown (soft cutoff — purely a display, the server
+// enforces the actual buzz lockout) ----
+let timerInterval = null;
+
+function updatePlayingSubtext(state) {
+  if (state.buzzingLocked) {
+    playingSubtext.textContent = "⏰ Time's up!";
+    return;
+  }
+  if (!state.roundTimer) {
+    playingSubtext.textContent = 'Buzz in on your phone!';
+    return;
+  }
+  const remaining = Math.max(0, Math.ceil((state.roundTimer.endsAt - Date.now()) / 1000));
+  playingSubtext.textContent = `Buzz in on your phone! (${remaining}s)`;
+}
+
 socket.on('state', (state) => {
   latestState = state;
   renderScoreboard(state.players);
@@ -130,6 +148,12 @@ socket.on('state', (state) => {
   if (state.roundStatus === 'revealed' && state.currentSong) {
     revealTitleEl.textContent = state.currentSong.title || 'Unknown';
     revealArtistEl.textContent = state.currentSong.artist || '';
+  }
+
+  clearInterval(timerInterval);
+  updatePlayingSubtext(state);
+  if (state.roundStatus === 'playing' && state.roundTimer && !state.buzzingLocked) {
+    timerInterval = setInterval(() => updatePlayingSubtext(state), 500);
   }
 
   syncVideo(state);

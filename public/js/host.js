@@ -7,11 +7,16 @@ socket.on('connect', () => socket.emit('register', { role: 'host' }));
 
 const connPill = document.getElementById('conn-pill');
 const roundStatusPill = document.getElementById('round-status-pill');
+const timerPill = document.getElementById('timer-pill');
 const currentSongInfo = document.getElementById('current-song-info');
 const buzzOrderList = document.getElementById('buzz-order-list');
 const playlistList = document.getElementById('playlist-list');
 const hostScoreboard = document.getElementById('host-scoreboard');
 const addError = document.getElementById('add-error');
+const importInput = document.getElementById('import-input');
+const importBtn = document.getElementById('import-btn');
+const importStatus = document.getElementById('import-status');
+const timerInput = document.getElementById('timer-input');
 
 let latestState = null;
 
@@ -61,6 +66,36 @@ document.getElementById('add-song-btn').addEventListener('click', () => {
   document.getElementById('artist-input').value = '';
 });
 
+importBtn.addEventListener('click', async () => {
+  const url = importInput.value.trim();
+  if (!url) return;
+  importStatus.textContent = 'Importing…';
+  importBtn.disabled = true;
+  try {
+    const r = await fetch('/api/import-playlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      importStatus.textContent = data.error || 'Import failed.';
+      return;
+    }
+    const existingIds = new Set((latestState ? latestState.playlist : []).map(s => s.youtubeId));
+    const newCount = data.songs.filter(s => !existingIds.has(s.youtubeId)).length;
+    const dupeCount = data.songs.length - newCount;
+    socket.emit('host:addSongs', data.songs);
+    importStatus.textContent = `Added ${newCount} song${newCount === 1 ? '' : 's'}` +
+      (dupeCount ? ` (${dupeCount} already in the playlist)` : '') + '.';
+    importInput.value = '';
+  } catch (e) {
+    importStatus.textContent = 'Could not reach the server — try again.';
+  } finally {
+    importBtn.disabled = false;
+  }
+});
+
 // ---------- round controls ----------
 document.getElementById('reveal-btn').addEventListener('click', () => socket.emit('host:revealAnswer'));
 document.getElementById('reset-buzzers-btn').addEventListener('click', () => socket.emit('host:resetBuzzers'));
@@ -76,8 +111,31 @@ function escapeHtml(s) {
 }
 
 // ---------- rendering ----------
+let timerInterval = null;
+
+function updateTimerPill(state) {
+  if (state.buzzingLocked) {
+    timerPill.hidden = false;
+    timerPill.textContent = "⏰ Time's up";
+    return;
+  }
+  if (!state.roundTimer) {
+    timerPill.hidden = true;
+    return;
+  }
+  const remaining = Math.max(0, Math.ceil((state.roundTimer.endsAt - Date.now()) / 1000));
+  timerPill.hidden = false;
+  timerPill.textContent = `⏱ ${remaining}s`;
+}
+
 function renderRound(state) {
   roundStatusPill.textContent = state.roundStatus;
+
+  clearInterval(timerInterval);
+  updateTimerPill(state);
+  if (state.roundTimer && !state.buzzingLocked) {
+    timerInterval = setInterval(() => updateTimerPill(state), 500);
+  }
 
   if (state.currentSong) {
     currentSongInfo.innerHTML = `<strong>${escapeHtml(state.currentSong.title)}</strong>` +
@@ -108,7 +166,8 @@ function renderRound(state) {
 
 function renderPlaylist(state) {
   playlistList.innerHTML = state.playlist.map(song => `
-    <div class="playlist-row ${song.played ? 'played' : ''}">
+    <div class="playlist-row ${song.played ? 'played' : ''}" draggable="true" data-id="${song.id}">
+      <span class="grip" title="Drag to reorder">⠿</span>
       <div class="info">
         <div class="t">${escapeHtml(song.title)}</div>
         <div class="a">${escapeHtml(song.artist || '')}</div>
@@ -123,11 +182,34 @@ function renderPlaylist(state) {
   `).join('') || '<p class="muted">No songs yet — add one above.</p>';
 
   playlistList.querySelectorAll('[data-play]').forEach(btn => {
-    btn.addEventListener('click', () => socket.emit('host:startRound', { id: btn.dataset.play }));
+    btn.addEventListener('click', () => {
+      const timerSeconds = Number(timerInput.value) || 0;
+      socket.emit('host:startRound', { id: btn.dataset.play, timerSeconds });
+    });
   });
   playlistList.querySelectorAll('[data-remove]').forEach(btn => {
     btn.addEventListener('click', () => {
       if (confirm('Remove this song from the playlist?')) socket.emit('host:removeSong', { id: btn.dataset.remove });
+    });
+  });
+
+  // ---- drag-to-reorder ----
+  let dragSrcId = null;
+  playlistList.querySelectorAll('.playlist-row').forEach(row => {
+    row.addEventListener('dragstart', () => { dragSrcId = row.dataset.id; });
+    row.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('drag-over'); });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop', (e) => {
+      e.preventDefault();
+      row.classList.remove('drag-over');
+      const targetId = row.dataset.id;
+      if (!dragSrcId || dragSrcId === targetId || !latestState) return;
+      const ids = latestState.playlist.map(s => s.id);
+      const from = ids.indexOf(dragSrcId);
+      const to = ids.indexOf(targetId);
+      if (from === -1 || to === -1) return;
+      ids.splice(to, 0, ids.splice(from, 1)[0]);
+      socket.emit('host:reorderPlaylist', { ids });
     });
   });
 }
