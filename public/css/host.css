@@ -1,17 +1,26 @@
 .host-wrap {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 1.6rem 1.2rem 3rem;
+  /* Installed as a standalone PWA (see manifest-host.json), so a notch or
+     home-indicator can otherwise sit right on top of the header/buttons —
+     env() only resolves once the viewport meta has viewport-fit=cover. */
+  padding: max(1.6rem, env(safe-area-inset-top, 0px)) max(1.2rem, env(safe-area-inset-right, 0px)) max(3rem, env(safe-area-inset-bottom, 0px)) max(1.2rem, env(safe-area-inset-left, 0px));
 }
 
 .host-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 0.6rem;
   margin-bottom: 1.2rem;
 }
 .host-header h1 { font-size: 1.6rem; }
-.header-right { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; justify-content: flex-end; }
+.header-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 480px) {
+  .host-header h1 { font-size: 1.35rem; }
+  .header-right { width: 100%; justify-content: flex-start; }
+}
 #conn-pill.online { background: rgba(116, 198, 157, 0.18); color: var(--good); }
 #conn-pill.offline { background: rgba(229, 72, 77, 0.18); color: var(--bad); }
 
@@ -63,6 +72,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 0.4rem;
   background: var(--surface-2);
   border-radius: 10px;
   padding: 0.5em 0.7em;
@@ -120,7 +131,7 @@
 
 .playlist-search { width: 100%; margin-bottom: 0.7rem; }
 
-.check-playlist-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem; }
+.check-playlist-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.6rem; margin-bottom: 0.7rem; }
 #check-playlist-btn { font-size: 0.9rem; padding: 0.5em 0.9em; }
 
 .broken-videos {
@@ -133,7 +144,7 @@
   padding: 0.7em 0.8em;
   margin-bottom: 0.7rem;
 }
-.broken-videos .broken-header { display: flex; align-items: center; justify-content: space-between; }
+.broken-videos .broken-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem; }
 .broken-videos .broken-header strong { color: var(--bad); }
 .broken-row { display: flex; flex-direction: column; gap: 0.4rem; }
 .broken-row-main { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
@@ -168,7 +179,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.6rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.6rem;
   background: var(--surface-2);
   border-radius: 10px;
   padding: 0.6em 0.8em;
@@ -176,7 +188,13 @@
 .playlist-row.sortable-ghost { outline: 2px dashed var(--gold); outline-offset: -2px; opacity: 0.4; }
 .playlist-row.sortable-chosen { background: #372a54; }
 .playlist-row .grip { cursor: grab; color: var(--text-muted); flex-shrink: 0; touch-action: none; }
-.playlist-row .info { min-width: 0; flex: 1; }
+/* flex-basis 140px (not the default 0% from flex:1) so info never gets
+   squeezed to nothing when actions has a lot in it (points input, wager
+   toggle, play button or the wager player-picker, remove) — with wager mode
+   + point values both on that can add up to more than a phone-width row has
+   room for, so actions wraps onto its own full-width line under it instead
+   of overflowing sideways. */
+.playlist-row .info { min-width: 0; flex: 1 1 140px; }
 .playlist-row .info .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mystery-badge { display: inline-block; }
 .playlist-row .info .a { color: var(--text-muted); font-size: 0.9rem; }
@@ -190,7 +208,7 @@
   margin-top: 0.25em;
 }
 .playlist-row.played { opacity: 0.55; }
-.playlist-row .actions { display: flex; gap: 0.4rem; flex-shrink: 0; align-items: center; }
+.playlist-row .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; flex-shrink: 0; align-items: center; justify-content: flex-end; }
 .playlist-row button { padding: 0.4em 0.8em; font-size: 0.9rem; min-height: 2.4rem; }
 .wager-toggle { background: var(--surface); font-size: 0.95rem; padding: 0.3em 0.6em; }
 .wager-toggle.active { background: var(--gold); }
@@ -202,21 +220,24 @@
   color: var(--text);
   border-radius: 8px;
   padding: 0.4em 0.6em;
-  font-size: 0.85rem;
+  font-size: 16px; /* below 16px, iOS Safari auto-zooms the page on focus */
+  flex: 1 1 auto;
+  min-width: 0;
   max-width: 10rem;
 }
 .wager-picker button { font-size: 0.85rem; padding: 0.4em 0.8em; white-space: nowrap; }
 
 .playlist-row .points-input {
-  width: 3.2rem;
+  width: 3.6rem;
   padding: 0.3em;
-  font-size: 0.9rem;
+  font-size: 16px; /* below 16px, iOS Safari auto-zooms the page on focus */
   text-align: center;
   background: var(--surface);
   border: 1px solid var(--surface-2);
   color: var(--gold);
   font-weight: 700;
   border-radius: 8px;
+  flex-shrink: 0;
 }
 
 /* Bigger touch targets on a phone-sized host screen — this control panel is
@@ -235,11 +256,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 0.4rem;
   background: var(--surface-2);
   border-radius: 10px;
   padding: 0.5em 0.8em;
 }
-.score-row .name { display: flex; align-items: center; gap: 0.5em; }
+.score-row .name { display: flex; align-items: center; gap: 0.5em; min-width: 0; overflow-wrap: anywhere; }
 .score-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
 .score-row .dot.connected { background: var(--good); }
 .team-tag {

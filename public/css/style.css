@@ -85,14 +85,19 @@ button.danger { background: var(--bad); color: #2a0d0e; }
 button.danger:hover { background: #ff6a6d; }
 button.good { background: var(--good); color: #0d2417; }
 
-input[type="text"], input[type="url"] {
+/* type="number" was missing here entirely — every number field (round
+   timer, snippet length, auto-advance, vote duration, per-song points, the
+   player's wager amount) fell back to the browser's raw unstyled control:
+   no dark background, no border-radius, a tiny default font. 16px is also
+   the minimum to stop iOS Safari auto-zooming the page in on focus. */
+input[type="text"], input[type="url"], input[type="number"] {
   font-family: var(--font-body);
   background: var(--surface);
   border: 1px solid var(--surface-2);
   color: var(--text);
   border-radius: 10px;
   padding: 0.65em 0.9em;
-  font-size: 1rem;
+  font-size: 16px;
 }
 input::placeholder { color: var(--text-muted); }
 
