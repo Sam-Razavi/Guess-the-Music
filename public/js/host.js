@@ -43,6 +43,9 @@ const voteCountdownEl = document.getElementById('vote-countdown');
 const voteTallyEl = document.getElementById('vote-tally');
 const voteResultEl = document.getElementById('vote-result');
 const voteWinnerTextEl = document.getElementById('vote-winner-text');
+const preflightCard = document.getElementById('preflight-card');
+const preflightBtn = document.getElementById('preflight-btn');
+const preflightResults = document.getElementById('preflight-results');
 
 let latestState = null;
 let categoryFilter = 'All';
@@ -294,6 +297,31 @@ function renderBrokenVideos(broken) {
     });
   }
 }
+
+// ---------- pre-flight check ----------
+preflightBtn.addEventListener('click', async () => {
+  preflightBtn.disabled = true;
+  preflightResults.innerHTML = '<p class="muted small">Checking…</p>';
+  try {
+    const r = await fetch('/api/preflight', { method: 'POST' });
+    const data = await r.json();
+    preflightResults.innerHTML = `
+      <p class="preflight-verdict ${data.ready ? 'ok' : 'bad'}">${data.ready ? '✅ Ready to go!' : '⚠️ Not quite ready'}</p>
+      <ul class="preflight-checks">
+        ${data.checks.map(c => `
+          <li class="${c.ok === true ? 'ok' : c.ok === false ? 'bad' : 'skip'}">
+            <span class="icon">${c.ok === true ? '✅' : c.ok === false ? '❌' : '➖'}</span>
+            <span>${escapeHtml(c.label)} — <span class="muted small">${escapeHtml(c.detail)}</span></span>
+          </li>
+        `).join('')}
+      </ul>
+    `;
+  } catch (e) {
+    preflightResults.innerHTML = '<p class="muted small">Could not reach the server — try again.</p>';
+  } finally {
+    preflightBtn.disabled = false;
+  }
+});
 
 // ---------- round controls ----------
 document.getElementById('reveal-btn').addEventListener('click', () => {
@@ -661,6 +689,10 @@ function renderCategoryVote(state) {
   }
 }
 
+function renderPreflightCard(state) {
+  preflightCard.hidden = !(state.settings && state.settings.preflightCheck);
+}
+
 function renderAddSongCollapse(state) {
   // Nothing to do in "Add a song" while a round is actively live — free
   // up visual priority for the Current Round card and Scoreboard.
@@ -679,4 +711,5 @@ socket.on('state', (state) => {
   renderAddSongCollapse(state);
   renderSettings(state);
   renderCategoryVote(state);
+  renderPreflightCard(state);
 });

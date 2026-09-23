@@ -145,6 +145,10 @@
             <input type="checkbox" data-setting="categoryVoting">
             <span><strong>Category voting</strong><br><span class="muted small">Let players vote on which category the next song comes from. Start a vote from the new card below while the round is idle.</span></span>
           </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="preflightCheck">
+            <span><strong>Pre-flight check</strong><br><span class="muted small">A "ready to go?" button that scans the whole playlist for broken videos and confirms players have joined, before the party starts.</span></span>
+          </label>
         </div>
       </section>
 
@@ -168,6 +172,12 @@
           <p>🏆 Winner: <strong id="vote-winner-text"></strong></p>
           <button id="apply-vote-filter-btn">Filter playlist to this category</button>
         </div>
+      </section>
+
+      <section class="card" id="preflight-card" hidden>
+        <h2>Ready to go?</h2>
+        <button id="preflight-btn" class="primary">🚦 Run pre-flight check</button>
+        <div id="preflight-results"></div>
       </section>
 
       <section class="card join-card">

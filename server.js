@@ -39,6 +39,7 @@ const DEFAULT_SETTINGS = {
   extraAnimations: true,
   mysteryRound: false,
   categoryVoting: false,
+  preflightCheck: false,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -647,6 +648,53 @@ app.post('/api/check-playlist', async (req, res) => {
   } catch (e) {
     res.status(502).json({ error: 'Could not reach the YouTube API — check your connection and try again.' });
   }
+});
+
+// Read-only "ready to go?" gate the host can run right before the party
+// starts — bundles a few checks that would otherwise only surface one at a
+// time, mid-party, as separate surprises (an empty playlist, a broken video
+// discovered live, nobody's joined yet). Reuses checkEmbeddable() exactly
+// like /api/check-playlist; degrades gracefully (a skipped check, not an
+// error) when YOUTUBE_API_KEY isn't configured, same as everywhere else this
+// app treats that key as optional.
+app.post('/api/preflight', async (req, res) => {
+  const checks = [];
+  checks.push({
+    label: 'Playlist has songs',
+    ok: state.playlist.length > 0,
+    detail: `${state.playlist.length} song${state.playlist.length === 1 ? '' : 's'}`,
+  });
+
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) {
+    checks.push({ label: 'No broken videos', ok: null, detail: 'YOUTUBE_API_KEY not set — skipped' });
+  } else if (!state.playlist.length) {
+    checks.push({ label: 'No broken videos', ok: null, detail: 'No songs to check' });
+  } else {
+    try {
+      const embeddable = await checkEmbeddable(apiKey, state.playlist.map(s => s.youtubeId));
+      const brokenCount = state.playlist.filter(s => !embeddable.has(s.youtubeId)).length;
+      checks.push({
+        label: 'No broken videos',
+        ok: brokenCount === 0,
+        detail: brokenCount ? `${brokenCount} won't play` : 'All songs check out',
+      });
+    } catch (e) {
+      checks.push({ label: 'No broken videos', ok: null, detail: 'Could not reach YouTube — try again' });
+    }
+  }
+
+  const playerCount = Object.keys(state.players).length;
+  checks.push({
+    label: 'At least one player joined',
+    ok: playerCount > 0,
+    detail: `${playerCount} player${playerCount === 1 ? '' : 's'}`,
+  });
+
+  // Only an explicit false blocks readiness — a skipped (null) check (no API
+  // key configured) shouldn't stop the host from starting.
+  const ready = checks.every(c => c.ok !== false);
+  res.json({ ready, checks });
 });
 
 // ---------- sockets ----------
