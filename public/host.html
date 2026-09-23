@@ -42,6 +42,7 @@
         <span class="pill" id="auto-advance-pill" hidden></span>
         <span class="pill gold" id="mystery-pill" hidden></span>
         <span class="pill" id="snippet-pill" hidden></span>
+        <span class="pill gold" id="wager-pill" hidden></span>
         <button id="pause-btn" hidden>⏸ Pause game</button>
         <span class="pill" id="paused-pill" hidden>⏸ Paused</span>
         <div id="find-replacement-live-result"></div>
@@ -159,6 +160,10 @@
           <label class="option-row">
             <input type="checkbox" data-setting="actionLog">
             <span><strong>Action log</strong><br><span class="muted small">A running list of every point awarded, wrong answer, and player removal — settles "wait, who got that point?" disputes.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="wagerRound">
+            <span><strong>Wager round (Daily Double)</strong><br><span class="muted small">Flag a song as wager-eligible in the playlist, then pick a player to risk some of their own score on it — exclusive buzz, no race.</span></span>
           </label>
           <label class="option-row">
             <input type="checkbox" data-setting="snippetMode">

@@ -30,6 +30,12 @@ const buzzBtn = document.getElementById('buzz-btn');
 const buzzLabel = document.getElementById('buzz-label');
 const statusText = document.getElementById('status-text');
 const mysteryNoteEl = document.getElementById('mystery-note');
+const wagerBlockEl = document.getElementById('wager-block');
+const wagerWaitingBlockEl = document.getElementById('wager-waiting-block');
+const wagerInputEl = document.getElementById('wager-input');
+const wagerMaxHintEl = document.getElementById('wager-max-hint');
+const wagerSubmitBtn = document.getElementById('wager-submit-btn');
+const wagerPlayerNameEl = document.getElementById('wager-player-name');
 const voteBlockEl = document.getElementById('vote-block');
 const voteHeadingEl = document.getElementById('vote-heading');
 const voteOptionsPlayerEl = document.getElementById('vote-options-player');
@@ -169,6 +175,38 @@ function renderCategoryVote(state) {
   }
 }
 
+// ---- wager round (Daily Double) ----
+wagerSubmitBtn.addEventListener('click', () => {
+  const amount = Math.round(Number(wagerInputEl.value));
+  if (!Number.isFinite(amount) || amount < 0) return;
+  socket.emit('player:submitWager', { amount });
+});
+
+function renderWager(state) {
+  const wager = state.wager;
+  const choosing = !!wager && wager.amount === null;
+  const isMe = wager && wager.playerId === myId;
+  wagerBlockEl.hidden = !(choosing && isMe);
+  wagerWaitingBlockEl.hidden = !(choosing && !isMe);
+  if (choosing) {
+    // No racing for the buzzer during this phase — hide the normal buzz UI
+    // entirely rather than just disabling it.
+    buzzBtn.hidden = true;
+    statusText.hidden = true;
+    if (isMe) {
+      const me = state.players.find(p => p.id === myId);
+      const max = me ? me.score : 0;
+      wagerMaxHintEl.textContent = `You have ${max} point${max === 1 ? '' : 's'} to risk.`;
+      wagerInputEl.max = max;
+    } else {
+      wagerPlayerNameEl.textContent = wager.playerName || 'Someone';
+    }
+  } else {
+    buzzBtn.hidden = false;
+    statusText.hidden = false;
+  }
+}
+
 let prevMyScore = null;
 let wasArmed = false;
 
@@ -177,6 +215,7 @@ socket.on('state', (state) => {
   applyTranslations(lang);
   renderMysteryNote(state);
   renderCategoryVote(state);
+  renderWager(state);
 
   const me = state.players.find(p => p.id === myId);
   if (me) {
@@ -213,7 +252,12 @@ socket.on('state', (state) => {
     buzzLabel.textContent = t('getReady', lang);
     statusText.textContent = t('waitingHostStart', lang);
   } else if (state.roundStatus === 'playing') {
-    if (buzzed) {
+    const wagerLockout = state.wager && state.wager.playerId !== myId;
+    if (wagerLockout) {
+      buzzBtn.disabled = true;
+      buzzLabel.textContent = '💰 Daily Double';
+      statusText.textContent = `Only ${state.wager.playerName || 'they'} can buzz on this one.`;
+    } else if (buzzed) {
       buzzBtn.disabled = true;
       buzzBtn.classList.add('beaten');
       buzzLabel.textContent = t('alreadyBuzzed', lang);

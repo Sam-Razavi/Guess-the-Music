@@ -6,6 +6,7 @@ const overlay = document.getElementById('overlay');
 const panels = {
   idle: document.getElementById('panel-idle'),
   playing: document.getElementById('panel-playing'),
+  wagering: document.getElementById('panel-wagering'),
   buzzed: document.getElementById('panel-buzzed'),
   revealed: document.getElementById('panel-revealed'),
   results: document.getElementById('panel-results'),
@@ -25,6 +26,8 @@ const revealCaptionEl = document.getElementById('reveal-caption');
 const captionTitleEl = document.getElementById('caption-title');
 const captionArtistEl = document.getElementById('caption-artist');
 const mysteryBannerEl = document.getElementById('mystery-banner');
+const wagerBannerEl = document.getElementById('wager-banner');
+const wageringSubtextEl = document.getElementById('wagering-subtext');
 const mascotEl = document.getElementById('mascot');
 const categoryVotePanelEl = document.getElementById('category-vote-panel');
 const idleWaitingBlockEl = document.getElementById('idle-waiting-block');
@@ -342,6 +345,16 @@ function updateMysteryBanner(state) {
   if (active) mysteryBannerEl.textContent = `🎭 Mystery Round: ${state.mysteryRound.label}`;
 }
 
+// ---- wager round (Daily Double) ----
+function updateWagerBanner(state) {
+  const active = !!state.wager && state.wager.amount !== null && state.roundStatus !== 'idle';
+  wagerBannerEl.hidden = !active;
+  if (active) wagerBannerEl.textContent = `💰 ${state.wager.playerName || 'They'} wagered ${state.wager.amount}!`;
+  if (state.roundStatus === 'wagering' && state.wager) {
+    wageringSubtextEl.textContent = `${state.wager.playerName || 'Someone'} is deciding how much to risk…`;
+  }
+}
+
 // ---- cartoon mascot companion (extraAnimations) ----
 // A face on the record (see tv.css), reacting to the game rather than just
 // decorating it. Expression is driven by roundStatus transitions, plus the
@@ -507,6 +520,7 @@ socket.on('state', (state) => {
   renderScoreboard(state.players);
   showPanel(state.roundStatus);
   updateMysteryBanner(state);
+  updateWagerBanner(state);
   updateMascot(state);
   renderCategoryVoteTV(state);
 

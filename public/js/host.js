@@ -35,6 +35,7 @@ const brokenVideosList = document.getElementById('broken-videos-list');
 const addSongCard = document.getElementById('add-song-card');
 const addSongCollapsedHint = document.getElementById('add-song-collapsed-hint');
 const mysteryPill = document.getElementById('mystery-pill');
+const wagerPill = document.getElementById('wager-pill');
 const pauseBtn = document.getElementById('pause-btn');
 const pausedPill = document.getElementById('paused-pill');
 const categoryVoteCard = document.getElementById('category-vote-card');
@@ -441,6 +442,15 @@ function renderRound(state) {
   revealHintBtn.hidden = !(state.settings && state.settings.karaokeHint && state.roundStatus === 'playing')
     || (state.mysteryRound && state.mysteryRound.modifier === 'noHint');
 
+  if (state.wager) {
+    wagerPill.hidden = false;
+    wagerPill.textContent = state.wager.amount == null
+      ? `💰 Waiting for ${state.wager.playerName || 'them'} to wager…`
+      : `💰 ${state.wager.playerName || 'They'} wagered ${state.wager.amount}`;
+  } else {
+    wagerPill.hidden = true;
+  }
+
   if (state.snippetSeconds > 0 && (state.roundStatus === 'playing' || state.roundStatus === 'buzzed')) {
     snippetPill.hidden = false;
     snippetPill.textContent = `✂️ Snippet: ${state.snippetSeconds}s`;
@@ -459,8 +469,11 @@ function renderRound(state) {
 
   // With "Point values per song" on, awarding a correct buzz gives that
   // song's assigned value instead of a flat point — defaults to 1, so this
-  // is a no-op when the setting's off or a song has no value set.
-  const songPoints = (state.currentSong && state.currentSong.points) || 1;
+  // is a no-op when the setting's off or a song has no value set. A wager
+  // round overrides this entirely: the award is whatever was risked.
+  const songPoints = state.wager && state.wager.amount != null
+    ? state.wager.amount
+    : (state.currentSong && state.currentSong.points) || 1;
   buzzOrderList.innerHTML = state.buzzOrder.map((b, i) => `
     <div class="buzz-row">
       <div><span class="order">#${i + 1}</span>${escapeHtml(b.name)}</div>
@@ -507,29 +520,61 @@ function renderPlaylist(state) {
       s.title.toLowerCase().includes(searchQuery) || (s.artist || '').toLowerCase().includes(searchQuery));
   }
   const pointValuesOn = state.settings && state.settings.pointValues;
-  playlistList.innerHTML = songs.map(song => `
+  const wagerRoundOn = state.settings && state.settings.wagerRound;
+  playlistList.innerHTML = songs.map(song => {
+    const isCurrent = state.currentIndex >= 0 && state.playlist[state.currentIndex].id === song.id;
+    // A wager-eligible song (with the toggle on) swaps the normal Play
+    // button for a "pick who wagers" chooser right in the row — starting it
+    // needs a player picked first, there's no plain "just play it" path.
+    const showWagerPicker = wagerRoundOn && song.wagerEligible && !isCurrent;
+    const playOrWagerControl = showWagerPicker
+      ? `<div class="wager-picker" data-wager-picker="${song.id}">
+          ${state.players.length
+            ? `<select data-wager-select="${song.id}">
+                ${state.players.map(p => `<option value="${p.id}">${escapeHtml(p.name)} (${p.score} pts)</option>`).join('')}
+              </select>
+              <button class="primary" data-wager-start="${song.id}">🎲 Start Daily Double</button>`
+            : `<span class="muted small">Need a player to wager first</span>`}
+        </div>`
+      : `<button class="primary" data-play="${song.id}" ${isCurrent ? 'disabled' : ''}>${song.played ? 'Replay' : 'Play'}</button>`;
+    return `
     <div class="playlist-row ${song.played ? 'played' : ''}" data-id="${song.id}">
       <span class="grip" title="Drag to reorder">⠿</span>
       <div class="info">
-        <div class="t">${song.id === state.mysterySongId ? '<span class="mystery-badge" title="This game\'s Mystery Round song — modifier stays secret until it plays">🎭</span> ' : ''}${escapeHtml(song.title)}</div>
+        <div class="t">${song.id === state.mysterySongId ? '<span class="mystery-badge" title="This game\'s Mystery Round song — modifier stays secret until it plays">🎭</span> ' : ''}${wagerRoundOn && song.wagerEligible ? '<span title="Daily Double eligible">💰</span> ' : ''}${escapeHtml(song.title)}</div>
         <div class="a">${escapeHtml(song.artist || '')}</div>
         ${song.category ? `<span class="cat">${escapeHtml(song.category)}</span>` : ''}
       </div>
       <div class="actions">
         ${pointValuesOn ? `<input type="number" class="points-input" min="1" step="1" value="${song.points || 1}" data-points="${song.id}" title="Points this song is worth">` : ''}
-        <button class="primary" data-play="${song.id}" ${state.currentIndex >= 0 && state.playlist[state.currentIndex].id === song.id ? 'disabled' : ''}>
-          ${song.played ? 'Replay' : 'Play'}
-        </button>
+        ${wagerRoundOn ? `<button class="wager-toggle ${song.wagerEligible ? 'active' : ''}" data-wager-toggle="${song.id}" title="Mark as Daily Double eligible">💰</button>` : ''}
+        ${playOrWagerControl}
         <button class="danger" data-remove="${song.id}">✕</button>
       </div>
     </div>
-  `).join('') || `<p class="muted">${state.playlist.length ? 'No songs match.' : 'No songs yet — add one above.'}</p>`;
+  `;
+  }).join('') || `<p class="muted">${state.playlist.length ? 'No songs match.' : 'No songs yet — add one above.'}</p>`;
 
   playlistList.querySelectorAll('[data-play]').forEach(btn => {
     btn.addEventListener('click', () => {
       const timerSeconds = Number(timerInput.value) || 0;
       const snippetSeconds = Number(snippetInput.value) || 0;
       socket.emit('host:startRound', { id: btn.dataset.play, timerSeconds, snippetSeconds });
+    });
+  });
+  playlistList.querySelectorAll('[data-wager-start]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const select = playlistList.querySelector(`[data-wager-select="${btn.dataset.wagerStart}"]`);
+      if (!select || !select.value) return;
+      const timerSeconds = Number(timerInput.value) || 0;
+      const snippetSeconds = Number(snippetInput.value) || 0;
+      socket.emit('host:startRound', { id: btn.dataset.wagerStart, timerSeconds, snippetSeconds, wagerPlayerId: select.value });
+    });
+  });
+  playlistList.querySelectorAll('[data-wager-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const song = latestState.playlist.find(s => s.id === btn.dataset.wagerToggle);
+      socket.emit('host:setWagerEligible', { id: btn.dataset.wagerToggle, eligible: !(song && song.wagerEligible) });
     });
   });
   playlistList.querySelectorAll('[data-remove]').forEach(btn => {

@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS = {
   setlistPresets: false,
   achievementBadges: false,
   snippetMode: false,
+  wagerRound: false,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -178,6 +179,7 @@ const state = {
   presets: loadPresets(),          // name -> {playlist, settings, savedAt} — saved setlist+settings combos, see host:savePreset
   badgeStats: { fastestBuzz: null, steals: {}, correct: {}, everLastPlace: {} }, // THIS GAME's running counters for computeBadges() — reset on resetGame
   snippetSeconds: 0,               // how long the TV plays this round's song before auto-pausing, 0 = off — see host:startRound
+  wager: null,                     // {playerId, amount, timerSeconds} | null — Daily-Double-style exclusive round, see host:startRound/player:submitWager
 };
 
 const ACTION_LOG_LIMIT = 50;
@@ -250,15 +252,13 @@ function startRoundTimer(seconds) {
   }, seconds * 1000);
 }
 
-function startRound(id, timerSeconds, snippetSeconds) {
+function startRound(id, timerSeconds, snippetSeconds, wagerPlayerId) {
   const idx = state.playlist.findIndex(s => s.id === id);
   if (idx === -1) return false;
+  const song = state.playlist[idx];
   state.currentIndex = idx;
-  state.roundStatus = 'playing';
   state.buzzOrder = [];
   state.roundHadMiss = false;
-  state.roundStartedAt = Date.now();
-  state.speedBonusPaid = false;
   state.hintRevealedIndices = [];
   // Only meaningful with the toggle on — never carries a value in from a
   // stale client field once the host has switched the setting off.
@@ -269,7 +269,25 @@ function startRound(id, timerSeconds, snippetSeconds) {
   state.categoryVote = null;
   clearRoundTimer();
   clearAutoAdvance();
-  if (timerSeconds > 0) startRoundTimer(timerSeconds);
+
+  // Wager round ("Daily Double"): only when the toggle's on, this specific
+  // song is host-flagged eligible, and the host actually picked someone to
+  // wager. Goes to a 'wagering' holding status first — no video loads, no
+  // buzzing, no round timer yet — until player:submitWager locks in an
+  // amount and flips it over to a normal 'playing' round exclusive to them.
+  const useWager = state.settings.wagerRound && song.wagerEligible && wagerPlayerId && state.players[wagerPlayerId];
+  if (useWager) {
+    state.roundStatus = 'wagering';
+    state.wager = { playerId: wagerPlayerId, amount: null, timerSeconds: Number(timerSeconds) || 0 };
+    state.roundStartedAt = null;
+    state.speedBonusPaid = false;
+  } else {
+    state.roundStatus = 'playing';
+    state.wager = null;
+    state.roundStartedAt = Date.now();
+    state.speedBonusPaid = false;
+    if (timerSeconds > 0) startRoundTimer(timerSeconds);
+  }
   return true;
 }
 
@@ -380,6 +398,7 @@ function makeSong(youtubeId, title, artist, category) {
     category: (category || '').trim(),
     played: false,
     points: 1,                    // how many points a correct buzz on this song is worth — see host:setSongPoints
+    wagerEligible: false,         // host-flagged "Daily Double" song — see host:setWagerEligible
   };
 }
 
@@ -421,6 +440,9 @@ function payloadFor(role) {
     stats: state.stats,
     badges: computeBadges(),
     snippetSeconds: state.settings.snippetMode ? state.snippetSeconds : 0,
+    wager: state.wager
+      ? { playerId: state.wager.playerId, playerName: (state.players[state.wager.playerId] || {}).name || '', amount: state.wager.amount }
+      : null,
     mysteryRound: mysteryModifier ? { modifier: mysteryModifier, label: MYSTERY_LABELS[mysteryModifier] } : null,
     categoryVote: state.categoryVote
       ? {
@@ -467,10 +489,14 @@ function payloadFor(role) {
     const isMysteryBlindLive = mysteryModifier === 'blind' && (state.roundStatus === 'playing' || state.roundStatus === 'buzzed');
     const hideScores = (state.settings.blindMode && state.roundStatus !== 'results') || isMysteryBlindLive;
     const showHint = state.settings.karaokeHint && state.roundStatus === 'playing' && song && mysteryModifier !== 'noHint';
+    // A wager round withholds the song entirely (no video loads, no title
+    // leak) while the chosen player is still deciding their amount — nobody
+    // should be able to size up the clue before the stakes are locked in.
+    const wageringHidden = state.roundStatus === 'wagering';
     return {
       ...base,
       players: hideScores ? base.players.map(p => ({ ...p, score: null })) : base.players,
-      currentSong: song
+      currentSong: song && !wageringHidden
         ? {
             youtubeId: song.youtubeId,
             title: revealed ? song.title : null,
@@ -844,6 +870,9 @@ io.on('connection', (socket) => {
 
   socket.on('player:buzz', () => {
     if (!playerId || state.roundStatus !== 'playing' || state.buzzingLocked || state.paused) return;
+    // Wager round: exclusive to whoever placed the wager — nobody else gets
+    // to race for the buzzer on a Daily Double.
+    if (state.wager && playerId !== state.wager.playerId) return;
     if (state.buzzOrder.find(b => b.id === playerId)) return;
     // Team mode: a buzz locks out the whole team, not just the one player —
     // teammates share the buzz-in the same way an individual player does.
@@ -1031,8 +1060,33 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  socket.on('host:startRound', ({ id, timerSeconds, snippetSeconds }) => {
-    if (startRound(id, timerSeconds, snippetSeconds)) broadcast();
+  socket.on('host:startRound', ({ id, timerSeconds, snippetSeconds, wagerPlayerId }) => {
+    if (startRound(id, timerSeconds, snippetSeconds, wagerPlayerId)) broadcast();
+  });
+
+  socket.on('host:setWagerEligible', ({ id, eligible } = {}) => {
+    const song = state.playlist.find(s => s.id === id);
+    if (!song) return;
+    song.wagerEligible = !!eligible;
+    savePlaylist();
+    broadcast();
+  });
+
+  // The wagering player locks in how much of their own score to risk —
+  // roundStartedAt/round timer deliberately don't start until this happens,
+  // so the "get ready" thinking time isn't eaten by a running clock.
+  socket.on('player:submitWager', ({ amount } = {}) => {
+    if (!playerId || !state.wager || state.wager.playerId !== playerId || state.wager.amount !== null) return;
+    if (state.roundStatus !== 'wagering') return;
+    const player = state.players[playerId];
+    const n = Math.round(Number(amount));
+    if (!player || !Number.isFinite(n) || n < 0 || n > player.score) return;
+    state.wager.amount = n;
+    state.roundStatus = 'playing';
+    state.roundStartedAt = Date.now();
+    state.speedBonusPaid = false;
+    if (state.wager.timerSeconds > 0) startRoundTimer(state.wager.timerSeconds);
+    broadcast();
   });
 
   socket.on('host:resetBuzzers', () => {
@@ -1126,12 +1180,12 @@ io.on('connection', (socket) => {
       // whoever buzzed in after that miss just got it right — bonus point
       // on top of the normal award. Only one bonus per steal opportunity,
       // so a second manual +1 on the same buzzer doesn't re-trigger it.
-      const isSteal = isNaturalCorrectAward && state.settings.stealMechanic && state.roundHadMiss;
+      const isSteal = isNaturalCorrectAward && state.settings.stealMechanic && state.roundHadMiss && !state.wager;
       // Speed bonus: buzzed in within the first few seconds of the round
       // actually starting (not of the reveal, or of this award — the buzz
       // timestamp itself). One bonus per round, same one-shot guard pattern
       // as the steal bonus above.
-      const isSpeedBonus = isNaturalCorrectAward && state.settings.speedBonus && !state.speedBonusPaid
+      const isSpeedBonus = isNaturalCorrectAward && state.settings.speedBonus && !state.speedBonusPaid && !state.wager
         && state.roundStartedAt && (currentBuzzer.time - state.roundStartedAt) <= SPEED_BONUS_WINDOW_MS;
 
       const totalAwarded = delta + (isSteal ? 1 : 0) + (isSpeedBonus ? 1 : 0);
@@ -1312,6 +1366,7 @@ io.on('connection', (socket) => {
     state.roundStatus = 'results';
     state.currentIndex = -1;
     state.buzzOrder = [];
+    state.wager = null;
     clearRoundTimer();
     clearAutoAdvance();
     broadcast();
@@ -1321,6 +1376,7 @@ io.on('connection', (socket) => {
     state.roundStatus = 'idle';
     state.currentIndex = -1;
     state.buzzOrder = [];
+    state.wager = null;
     clearRoundTimer();
     clearAutoAdvance();
     broadcast();
@@ -1345,6 +1401,7 @@ io.on('connection', (socket) => {
     state.pauseRemaining = null;
     state.actionLog = [];
     state.badgeStats = { fastestBuzz: null, steals: {}, correct: {}, everLastPlace: {} };
+    state.wager = null;
     broadcast();
   });
 

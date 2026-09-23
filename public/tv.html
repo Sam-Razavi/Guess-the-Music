@@ -59,6 +59,13 @@
           <p id="snippet-hint" hidden></p>
         </div>
 
+        <!-- wagering state (Daily Double: chosen player is deciding an amount) -->
+        <div class="panel" id="panel-wagering" hidden>
+          <div class="record" aria-hidden="true"></div>
+          <h1>💰 Daily Double!</h1>
+          <p id="wagering-subtext">—</p>
+        </div>
+
         <!-- buzzed state -->
         <div class="panel" id="panel-buzzed" hidden>
           <div class="record" aria-hidden="true"></div>
@@ -86,6 +93,7 @@
            to stay visible through 'playing' → 'buzzed' → 'revealed' as one
            continuous banner for that round, not tied to a single panel. -->
       <div class="mystery-banner" id="mystery-banner" hidden></div>
+      <div class="wager-banner" id="wager-banner" hidden></div>
 
       <!-- Lives outside .overlay: the overlay fades out entirely during the
            'revealed' state to show the real video, but this hint needs to

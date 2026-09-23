@@ -96,6 +96,12 @@ body { min-height: 100vh; }
 #status-text { text-align: center; max-width: 28ch; }
 #mystery-note { text-align: center; color: var(--gold); font-weight: 600; }
 
+#wager-block { text-align: center; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 0.8rem; }
+#wager-block h2 { font-size: 1.3rem; }
+#wager-input { width: 100%; text-align: center; font-size: 1.4rem; padding: 0.7em; }
+#wager-submit-btn { width: 100%; padding: 0.9em; }
+#wager-waiting-block { text-align: center; }
+
 #vote-block { text-align: center; width: 100%; max-width: 360px; }
 #vote-block h2 { font-size: 1.2rem; margin-bottom: 0.8rem; }
 .vote-options-player { display: flex; flex-direction: column; gap: 0.6rem; }

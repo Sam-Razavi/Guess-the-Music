@@ -248,6 +248,20 @@
   border-radius: 999px;
 }
 
+.wager-banner {
+  position: absolute;
+  right: 4%;
+  top: 4%;
+  z-index: 10;
+  background: rgba(245, 185, 66, 0.15);
+  border: 1px solid rgba(245, 185, 66, 0.4);
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding: 0.5em 1.2em;
+  border-radius: 999px;
+}
+
 .vote-options-tv { display: flex; flex-direction: column; gap: 0.6rem; margin: 1rem 0; min-width: 320px; }
 .vote-option-tv {
   display: flex;
