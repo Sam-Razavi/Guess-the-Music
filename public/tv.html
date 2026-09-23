@@ -118,6 +118,13 @@
         </div>
         <div class="mascot-hat"></div>
       </div>
+
+      <!-- Sits above everything else (even the mascot) while paused — the
+           whole point of a pause is a clean, unambiguous break screen. -->
+      <div class="paused-overlay" id="paused-overlay" hidden>
+        <div class="record spin" aria-hidden="true"></div>
+        <h1 data-i18n="gamePaused">Game paused — back in a moment!</h1>
+      </div>
     </main>
 
     <footer class="scoreboard" id="scoreboard"></footer>

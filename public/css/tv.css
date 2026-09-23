@@ -220,6 +220,20 @@
   .mascot, .mascot[data-expression] { animation: none; }
 }
 
+.paused-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  background: rgba(22, 18, 31, 0.94);
+  text-align: center;
+}
+.paused-overlay h1 { font-size: 2.2rem; max-width: 20ch; }
+
 .mystery-banner {
   position: absolute;
   left: 4%;

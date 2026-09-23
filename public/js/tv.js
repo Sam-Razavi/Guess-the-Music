@@ -26,6 +26,7 @@ const mysteryBannerEl = document.getElementById('mystery-banner');
 const mascotEl = document.getElementById('mascot');
 const categoryVotePanelEl = document.getElementById('category-vote-panel');
 const idleWaitingBlockEl = document.getElementById('idle-waiting-block');
+const pausedOverlayEl = document.getElementById('paused-overlay');
 const voteHeadingEl = document.getElementById('vote-heading');
 const voteOptionsTvEl = document.getElementById('vote-options-tv');
 const voteTvStatusEl = document.getElementById('vote-tv-status');
@@ -400,6 +401,7 @@ function renderCategoryVoteTV(state) {
 let wasBuzzed = false;
 let resultsShown = false;
 let lastPlayingSongId = null;
+let wasPaused = false;
 
 function spawnGoFlash() {
   if (reduceMotion) return;
@@ -547,6 +549,19 @@ socket.on('state', (state) => {
   if (state.roundStatus === 'revealed' && state.autoAdvance) {
     autoAdvanceInterval = setInterval(() => updateAutoAdvanceHint(state), 500);
   }
+
+  // ---- pause/resume: covers the whole screen and actually pauses playback,
+  // not just a visual overlay — a round in progress shouldn't keep playing
+  // music underneath while everyone's on a break. ----
+  pausedOverlayEl.hidden = !state.paused;
+  if (player && typeof player.pauseVideo === 'function' && typeof player.playVideo === 'function') {
+    if (state.paused) {
+      player.pauseVideo();
+    } else if (wasPaused && state.roundStatus === 'playing') {
+      player.playVideo(); // only resume actual playback if a round was live when paused
+    }
+  }
+  wasPaused = state.paused;
 
   syncVideo(state);
 });

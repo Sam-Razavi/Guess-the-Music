@@ -113,7 +113,8 @@
 #playback-pill.pending { background: var(--surface-2); color: var(--text-muted); }
 #playback-pill.error { background: rgba(229, 72, 77, 0.18); color: var(--bad); }
 
-#open-youtube-fallback-btn, #find-replacement-live-btn { margin-left: 0.5rem; padding: 0.35em 0.9em; font-size: 0.85rem; }
+#open-youtube-fallback-btn, #find-replacement-live-btn, #pause-btn { margin-left: 0.5rem; padding: 0.35em 0.9em; font-size: 0.85rem; }
+#paused-pill { margin-left: 0.5rem; background: rgba(245, 185, 66, 0.18); color: var(--gold); }
 #find-replacement-live-result:empty { display: none; }
 #find-replacement-live-result { margin-top: 0.5rem; }
 

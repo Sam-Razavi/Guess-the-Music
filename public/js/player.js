@@ -193,6 +193,13 @@ socket.on('state', (state) => {
 
   buzzBtn.classList.remove('locked', 'beaten');
 
+  if (state.paused) {
+    buzzBtn.disabled = true;
+    buzzLabel.textContent = t('gamePaused', lang);
+    statusText.textContent = '';
+    return;
+  }
+
   // "Armed" = this player can buzz right now — pop the button so the exact
   // moment buzzing opens up is obvious, not just an instant disabled->enabled
   // flip. Only fires on the actual transition into that state, not every

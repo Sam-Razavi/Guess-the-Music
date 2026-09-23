@@ -32,6 +32,8 @@ const brokenVideosList = document.getElementById('broken-videos-list');
 const addSongCard = document.getElementById('add-song-card');
 const addSongCollapsedHint = document.getElementById('add-song-collapsed-hint');
 const mysteryPill = document.getElementById('mystery-pill');
+const pauseBtn = document.getElementById('pause-btn');
+const pausedPill = document.getElementById('paused-pill');
 const categoryVoteCard = document.getElementById('category-vote-card');
 const voteSetupEl = document.getElementById('vote-setup');
 const voteCategoryChecksEl = document.getElementById('vote-category-checks');
@@ -329,6 +331,7 @@ document.getElementById('reveal-btn').addEventListener('click', () => {
   socket.emit('host:revealAnswer', { autoAdvanceSeconds });
 });
 document.getElementById('reset-buzzers-btn').addEventListener('click', () => socket.emit('host:resetBuzzers'));
+pauseBtn.addEventListener('click', () => socket.emit('host:togglePause'));
 document.getElementById('close-round-btn').addEventListener('click', () => socket.emit('host:closeRound'));
 const revealHintBtn = document.getElementById('reveal-hint-btn');
 revealHintBtn.addEventListener('click', () => socket.emit('host:revealHintLetter'));
@@ -428,6 +431,15 @@ function renderRound(state) {
   revealHintBtn.hidden = !(state.settings && state.settings.karaokeHint && state.roundStatus === 'playing')
     || (state.mysteryRound && state.mysteryRound.modifier === 'noHint');
 
+  pauseBtn.hidden = !(state.settings && state.settings.pauseGame);
+  pauseBtn.textContent = state.paused ? '▶ Resume game' : '⏸ Pause game';
+  pausedPill.hidden = !state.paused;
+  // Freeze every other round control while paused — the whole point is a
+  // clean break, not a state where a stray tap can still change anything.
+  ['reveal-btn', 'reset-buzzers-btn', 'close-round-btn', 'reveal-hint-btn'].forEach(id => {
+    document.getElementById(id).disabled = state.paused;
+  });
+
   // With "Point values per song" on, awarding a correct buzz gives that
   // song's assigned value instead of a flat point — defaults to 1, so this
   // is a no-op when the setting's off or a song has no value set.
@@ -436,8 +448,8 @@ function renderRound(state) {
     <div class="buzz-row">
       <div><span class="order">#${i + 1}</span>${escapeHtml(b.name)}</div>
       <div class="actions">
-        <button class="good" data-award="${b.id}:${songPoints}">+${songPoints}</button>
-        <button data-award="${b.id}:${-songPoints}">-${songPoints}</button>
+        <button class="good" data-award="${b.id}:${songPoints}" ${state.paused ? 'disabled' : ''}>+${songPoints}</button>
+        <button data-award="${b.id}:${-songPoints}" ${state.paused ? 'disabled' : ''}>-${songPoints}</button>
       </div>
     </div>
   `).join('');

@@ -41,6 +41,8 @@
         <span class="pill" id="timer-pill" hidden></span>
         <span class="pill" id="auto-advance-pill" hidden></span>
         <span class="pill gold" id="mystery-pill" hidden></span>
+        <button id="pause-btn" hidden>⏸ Pause game</button>
+        <span class="pill" id="paused-pill" hidden>⏸ Paused</span>
         <div id="find-replacement-live-result"></div>
         <div id="current-song-info" class="song-info muted">No round started.</div>
         <div id="buzz-order-list" class="buzz-list"></div>
@@ -144,6 +146,10 @@
           <label class="option-row">
             <input type="checkbox" data-setting="categoryVoting">
             <span><strong>Category voting</strong><br><span class="muted small">Let players vote on which category the next song comes from. Start a vote from the new card below while the round is idle.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="pauseGame">
+            <span><strong>Pause game</strong><br><span class="muted small">A Pause button that freezes buzzing and any running timers for a bathroom/food break — resumes exactly where it left off.</span></span>
           </label>
           <label class="option-row">
             <input type="checkbox" data-setting="preflightCheck">

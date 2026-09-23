@@ -40,6 +40,7 @@ const DEFAULT_SETTINGS = {
   mysteryRound: false,
   categoryVoting: false,
   preflightCheck: false,
+  pauseGame: false,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -154,6 +155,8 @@ const state = {
   mysterySongId: null,             // id of this game's one Mystery Modifier Round song, or null — see ensureMysterySong()
   mysteryModifier: null,           // 'double' | 'noHint' | 'blind' | null — only revealed (via payloadFor) once that song's round starts
   categoryVote: null,              // {options, votes: {playerId: category}, closed, result, endsAt} | null — see host:startCategoryVote
+  paused: false,                   // true between host:togglePause calls — freezes buzzing and any running timers for a break
+  pauseRemaining: null,             // {roundTimerSeconds, autoAdvanceSeconds} snapshotted at pause time, restored on resume
 };
 
 const SPEED_BONUS_WINDOW_MS = 3000;
@@ -173,6 +176,30 @@ function clearAutoAdvance() {
   clearTimeout(autoAdvanceHandle);
   autoAdvanceHandle = null;
   state.autoAdvance = null;
+}
+
+// Shared by host:revealAnswer and the pause/resume flow (host:togglePause) —
+// a resume just re-arms the same countdown with whatever time was left when
+// it got frozen, so both call sites need the exact same "start the next
+// unplayed song" behavior when the countdown elapses.
+function scheduleAutoAdvance(seconds, nextRoundTimerSeconds) {
+  // nextRoundTimerSeconds rides along on state.autoAdvance itself (not just
+  // captured in this closure) so a pause can recover it later — pausing
+  // clears this very timeout via clearAutoAdvance(), which would otherwise
+  // lose the value when host:togglePause re-arms it on resume.
+  state.autoAdvance = { endsAt: Date.now() + seconds * 1000, nextRoundTimerSeconds };
+  autoAdvanceHandle = setTimeout(() => {
+    state.autoAdvance = null;
+    // Only proceed if the host hasn't already moved on manually — any of
+    // resetBuzzers/startRound/closeRound/showResults/resetGame would have
+    // changed roundStatus away from 'revealed' by now. A pause also blocks
+    // it, same as those manual actions would.
+    if (state.roundStatus === 'revealed' && !state.paused) {
+      const next = state.playlist.find(s => !s.played);
+      if (next) startRound(next.id, nextRoundTimerSeconds);
+    }
+    broadcast();
+  }, seconds * 1000);
 }
 
 function startRoundTimer(seconds) {
@@ -315,6 +342,7 @@ function payloadFor(role) {
     language: state.language,
     autoAdvance: state.autoAdvance,
     settings: state.settings,
+    paused: state.paused,
     stats: state.stats,
     mysteryRound: mysteryModifier ? { modifier: mysteryModifier, label: MYSTERY_LABELS[mysteryModifier] } : null,
     categoryVote: state.categoryVote
@@ -734,7 +762,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('player:buzz', () => {
-    if (!playerId || state.roundStatus !== 'playing' || state.buzzingLocked) return;
+    if (!playerId || state.roundStatus !== 'playing' || state.buzzingLocked || state.paused) return;
     if (state.buzzOrder.find(b => b.id === playerId)) return;
     // Team mode: a buzz locks out the whole team, not just the one player —
     // teammates share the buzz-in the same way an individual player does.
@@ -892,6 +920,36 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
+  // Pause/resume: freezes buzzing and any running countdowns for a break
+  // (bathroom, food) without resetting anything. A running round timer or
+  // auto-advance countdown is stopped and its remaining seconds snapshotted,
+  // then re-armed with that same remaining time on resume — not restarted
+  // from full, and not left silently ticking in the background while paused.
+  socket.on('host:togglePause', () => {
+    if (!state.settings.pauseGame) return;
+    if (state.paused) {
+      state.paused = false;
+      const snap = state.pauseRemaining;
+      state.pauseRemaining = null;
+      if (snap) {
+        if (snap.roundTimerSeconds > 0) startRoundTimer(snap.roundTimerSeconds);
+        if (snap.autoAdvanceSeconds > 0) scheduleAutoAdvance(snap.autoAdvanceSeconds, snap.nextRoundTimerSeconds);
+      }
+    } else {
+      const roundTimerSeconds = state.roundTimer ? Math.max(1, Math.ceil((state.roundTimer.endsAt - Date.now()) / 1000)) : 0;
+      const autoAdvanceSeconds = state.autoAdvance ? Math.max(1, Math.ceil((state.autoAdvance.endsAt - Date.now()) / 1000)) : 0;
+      state.pauseRemaining = {
+        roundTimerSeconds,
+        autoAdvanceSeconds,
+        nextRoundTimerSeconds: state.autoAdvance ? state.autoAdvance.nextRoundTimerSeconds : 0,
+      };
+      clearRoundTimer();
+      clearAutoAdvance();
+      state.paused = true;
+    }
+    broadcast();
+  });
+
   socket.on('host:revealAnswer', ({ autoAdvanceSeconds } = {}) => {
     // Snapshot the round timer that was active for the song just revealed,
     // so an auto-started next round can reuse the same duration — not
@@ -906,20 +964,7 @@ io.on('connection', (socket) => {
     state.roundStatus = 'revealed';
     clearRoundTimer();
 
-    if (autoAdvanceSeconds > 0) {
-      state.autoAdvance = { endsAt: Date.now() + autoAdvanceSeconds * 1000 };
-      autoAdvanceHandle = setTimeout(() => {
-        state.autoAdvance = null;
-        // Only proceed if the host hasn't already moved on manually —
-        // any of resetBuzzers/startRound/closeRound/showResults/resetGame
-        // would have changed roundStatus away from 'revealed' by now.
-        if (state.roundStatus === 'revealed') {
-          const next = state.playlist.find(s => !s.played);
-          if (next) startRound(next.id, priorTimerSeconds);
-        }
-        broadcast();
-      }, autoAdvanceSeconds * 1000);
-    }
+    if (autoAdvanceSeconds > 0) scheduleAutoAdvance(autoAdvanceSeconds, priorTimerSeconds);
 
     broadcast();
   });
@@ -1123,6 +1168,8 @@ io.on('connection', (socket) => {
     state.categoryVote = null;
     clearRoundTimer();
     clearAutoAdvance();
+    state.paused = false;
+    state.pauseRemaining = null;
     broadcast();
   });
 
