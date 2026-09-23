@@ -550,6 +550,25 @@
 .results-row .rname { flex: 1; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .results-row .rscore { color: var(--gold); font-weight: 700; }
 
+.achievement-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1.2rem;
+  min-width: 320px;
+}
+.badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: rgba(245, 185, 66, 0.1);
+  border-radius: 10px;
+  padding: 0.5em 0.9em;
+  font-size: 1.05rem;
+}
+.badge-icon { font-size: 1.3rem; }
+.badge-text strong { color: var(--gold); }
+
 .session-stats {
   margin-top: 1.2rem;
   color: var(--text-muted);

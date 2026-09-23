@@ -44,6 +44,7 @@ const DEFAULT_SETTINGS = {
   pauseGame: false,
   actionLog: false,
   setlistPresets: false,
+  achievementBadges: false,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -174,6 +175,7 @@ const state = {
   pauseRemaining: null,             // {roundTimerSeconds, autoAdvanceSeconds} snapshotted at pause time, restored on resume
   actionLog: [],                   // [{at, text}] most-recent-first, capped — host-only audit trail, see logAction()
   presets: loadPresets(),          // name -> {playlist, settings, savedAt} — saved setlist+settings combos, see host:savePreset
+  badgeStats: { fastestBuzz: null, steals: {}, correct: {}, everLastPlace: {} }, // THIS GAME's running counters for computeBadges() — reset on resetGame
 };
 
 const ACTION_LOG_LIMIT = 50;
@@ -322,6 +324,44 @@ function buildHintMask(title, revealedIndices) {
   return [...title].map((ch, i) => (/[a-zA-Z0-9]/.test(ch) ? (revealed.has(i) ? ch : '_') : ch)).join(' ');
 }
 
+// "This game" awards computed from state.badgeStats (reset every
+// resetGame) — deliberately server-side rather than reconstructed
+// client-side, since the server already has every counter it needs and
+// this avoids re-implementing the same tie/lead logic in every client.
+// Only ever meaningful once state.roundStatus reaches 'results' (rendered
+// there), but cheap enough to compute unconditionally.
+function computeBadges() {
+  if (!state.settings.achievementBadges) return null;
+  const badges = [];
+  const bs = state.badgeStats;
+
+  if (bs.fastestBuzz && state.players[bs.fastestBuzz.id]) {
+    badges.push({ key: 'fastest', icon: '🏃', label: 'Fastest Buzzer', name: bs.fastestBuzz.name, detail: `${(bs.fastestBuzz.ms / 1000).toFixed(2)}s` });
+  }
+
+  const stealTop = Object.entries(bs.steals).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1])[0];
+  if (stealTop && state.players[stealTop[0]]) {
+    badges.push({ key: 'steals', icon: '🔥', label: 'Most Steals', name: state.players[stealTop[0]].name, detail: `${stealTop[1]} steal${stealTop[1] === 1 ? '' : 's'}` });
+  }
+
+  const correctTop = Object.entries(bs.correct).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1])[0];
+  if (correctTop && state.players[correctTop[0]]) {
+    badges.push({ key: 'sharpshooter', icon: '🎯', label: 'Sharpshooter', name: state.players[correctTop[0]].name, detail: `${correctTop[1]} correct` });
+  }
+
+  // Comeback Kid: ever registered in (sole or shared) last place at some
+  // point this game, and now the sole (non-tied) leader.
+  const entries = Object.entries(state.players);
+  const scores = entries.map(([, p]) => p.score);
+  const max = scores.length ? Math.max(...scores) : 0;
+  const soleLeaders = entries.filter(([, p]) => p.score === max);
+  if (max > 0 && soleLeaders.length === 1 && bs.everLastPlace[soleLeaders[0][0]]) {
+    badges.push({ key: 'comeback', icon: '🔁', label: 'Comeback Kid', name: soleLeaders[0][1].name, detail: 'came from behind' });
+  }
+
+  return badges;
+}
+
 function currentSong() {
   return state.currentIndex >= 0 ? state.playlist[state.currentIndex] : null;
 }
@@ -374,6 +414,7 @@ function payloadFor(role) {
     settings: state.settings,
     paused: state.paused,
     stats: state.stats,
+    badges: computeBadges(),
     mysteryRound: mysteryModifier ? { modifier: mysteryModifier, label: MYSTERY_LABELS[mysteryModifier] } : null,
     categoryVote: state.categoryVote
       ? {
@@ -823,6 +864,16 @@ io.on('connection', (socket) => {
         saveStats();
       }
     }
+    // Achievement badges track THIS game only (reset every resetGame), unlike
+    // the all-time record book above — a badge is "best of tonight", not a
+    // permanent record, so these are two genuinely separate counters even
+    // though they're computed from the exact same buzz.
+    if (state.settings.achievementBadges && isFirstBuzzOfRound && state.roundStartedAt) {
+      const ms = buzzTime - state.roundStartedAt;
+      if (!state.badgeStats.fastestBuzz || ms < state.badgeStats.fastestBuzz.ms) {
+        state.badgeStats.fastestBuzz = { id: playerId, name: state.players[playerId].name, ms };
+      }
+    }
 
     broadcast();
   });
@@ -1111,6 +1162,26 @@ io.on('connection', (socket) => {
       const context = isNaturalCorrectAward && song ? ` — "${song.title}"` : ' (manual)';
       logAction(`${totalAwarded >= 0 ? '+' : ''}${totalAwarded} ${state.players[id].name}${recipientNote}${bonusNote}${context}`);
 
+      if (state.settings.achievementBadges) {
+        if (isNaturalCorrectAward) {
+          state.badgeStats.correct[id] = (state.badgeStats.correct[id] || 0) + 1;
+          if (isSteal) state.badgeStats.steals[id] = (state.badgeStats.steals[id] || 0) + 1;
+        }
+        // Comeback Kid: was any player in sole/shared last place just now?
+        // Checked after every award (not just this one) so it catches a
+        // player being knocked into last by someone ELSE'S point too.
+        const scores = Object.values(state.players).map(p => p.score);
+        if (scores.length >= 2) {
+          const min = Math.min(...scores);
+          const max = Math.max(...scores);
+          if (min < max) {
+            Object.entries(state.players).forEach(([pid, p]) => {
+              if (p.score === min) state.badgeStats.everLastPlace[pid] = true;
+            });
+          }
+        }
+      }
+
       broadcast();
     }
   });
@@ -1267,6 +1338,7 @@ io.on('connection', (socket) => {
     state.paused = false;
     state.pauseRemaining = null;
     state.actionLog = [];
+    state.badgeStats = { fastestBuzz: null, steals: {}, correct: {}, everLastPlace: {} };
     broadcast();
   });
 

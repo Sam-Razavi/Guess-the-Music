@@ -18,6 +18,7 @@ const playingSubtext = document.getElementById('playing-subtext');
 const hintTextEl = document.getElementById('hint-text');
 const resultsListEl = document.getElementById('results-list');
 const sessionStatsEl = document.getElementById('session-stats');
+const achievementBadgesEl = document.getElementById('achievement-badges');
 const autoAdvanceHintEl = document.getElementById('auto-advance-hint');
 const revealCaptionEl = document.getElementById('reveal-caption');
 const captionTitleEl = document.getElementById('caption-title');
@@ -447,6 +448,21 @@ function renderResults(players) {
   `).join('');
 }
 
+function renderAchievementBadges(state) {
+  const badges = state.badges;
+  if (!badges || !badges.length) {
+    achievementBadgesEl.hidden = true;
+    return;
+  }
+  achievementBadgesEl.hidden = false;
+  achievementBadgesEl.innerHTML = badges.map(b => `
+    <div class="badge-row">
+      <span class="badge-icon">${b.icon}</span>
+      <span class="badge-text"><strong>${escapeHtml(b.label)}</strong>: ${escapeHtml(b.name)} <span class="muted">(${escapeHtml(b.detail)})</span></span>
+    </div>
+  `).join('');
+}
+
 function renderSessionStats(state) {
   const stats = state.stats;
   const lines = [];
@@ -529,6 +545,7 @@ socket.on('state', (state) => {
 
   if (state.roundStatus === 'results') {
     renderResults(state.players);
+    renderAchievementBadges(state);
     renderSessionStats(state);
     if (!resultsShown) {
       resultsShown = true;
