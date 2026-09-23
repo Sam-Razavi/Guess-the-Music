@@ -148,6 +148,27 @@ findReplacementLiveBtn.addEventListener('click', () => {
   runFindReplacement(latestState.currentSong.id, findReplacementLiveResult);
 });
 
+// ---------- MC mode ----------
+// A per-device DISPLAY preference, not a shared game rule — deliberately
+// local (localStorage), not state.settings/host:updateSettings, so handing
+// a guest a simplified phone doesn't also simplify the primary host's own
+// screen elsewhere. Still a toggle right here in the host panel, per the
+// ask — it just doesn't sync.
+const mcModeToggleBtn = document.getElementById('mc-mode-toggle');
+function applyMcMode(on) {
+  document.body.classList.toggle('mc-mode', on);
+  mcModeToggleBtn.classList.toggle('active', on);
+  mcModeToggleBtn.textContent = on ? '🎤 Exit MC Mode' : '🎤 MC Mode';
+}
+let mcModeOn = false;
+try { mcModeOn = localStorage.getItem('gtm_mc_mode') === '1'; } catch (e) { /* private browsing etc — just default off */ }
+applyMcMode(mcModeOn);
+mcModeToggleBtn.addEventListener('click', () => {
+  mcModeOn = !mcModeOn;
+  try { localStorage.setItem('gtm_mc_mode', mcModeOn ? '1' : '0'); } catch (e) { /* non-fatal — just won't persist */ }
+  applyMcMode(mcModeOn);
+});
+
 // ---------- language toggle ----------
 document.querySelectorAll('#lang-toggle [data-lang]').forEach(btn => {
   btn.addEventListener('click', () => socket.emit('host:setLanguage', btn.dataset.lang));

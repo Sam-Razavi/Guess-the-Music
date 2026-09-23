@@ -11,7 +11,7 @@
   margin-bottom: 1.2rem;
 }
 .host-header h1 { font-size: 1.6rem; }
-.header-right { display: flex; align-items: center; gap: 0.7rem; }
+.header-right { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; justify-content: flex-end; }
 #conn-pill.online { background: rgba(116, 198, 157, 0.18); color: var(--good); }
 #conn-pill.offline { background: rgba(229, 72, 77, 0.18); color: var(--bad); }
 
@@ -342,6 +342,26 @@
 .preflight-checks li { display: flex; align-items: center; gap: 0.5em; }
 .preflight-checks li.bad { color: var(--bad); }
 .preflight-checks li.skip { opacity: 0.7; }
+
+#mc-mode-toggle.active { background: var(--gold); color: #21170a; }
+
+/* MC Mode: a stripped-down view for handing the phone to a guest host —
+   only the live round controls and scoreboard, nothing that manages the
+   playlist/settings for the whole game. Purely a CSS/JS toggle on this one
+   device (see host.js) — the underlying cards are untouched, just hidden. */
+body.mc-mode #add-song-card,
+body.mc-mode #playlist-card,
+body.mc-mode #options-card,
+body.mc-mode #setlist-presets-card,
+body.mc-mode #action-log-card,
+body.mc-mode #preflight-card,
+body.mc-mode #category-vote-card,
+body.mc-mode .join-card {
+  display: none;
+}
+body.mc-mode .grid { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
+body.mc-mode .round-actions button { font-size: 1.15rem; padding: 0.9em 1.3em; }
+body.mc-mode .buzz-row button { font-size: 1.2rem; min-height: 3rem; }
 
 .join-card { text-align: center; }
 .join-card img { border-radius: 10px; background: var(--text); padding: 8px; margin: 0.6rem 0 1rem; }
