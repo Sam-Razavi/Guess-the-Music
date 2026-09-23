@@ -24,6 +24,9 @@ const importCategoryInput = document.getElementById('import-category-input');
 const importBtn = document.getElementById('import-btn');
 const importStatus = document.getElementById('import-status');
 const timerInput = document.getElementById('timer-input');
+const snippetRow = document.getElementById('snippet-row');
+const snippetInput = document.getElementById('snippet-input');
+const snippetPill = document.getElementById('snippet-pill');
 const categoryFilterEl = document.getElementById('category-filter');
 const playlistSearchInput = document.getElementById('playlist-search');
 const checkPlaylistBtn = document.getElementById('check-playlist-btn');
@@ -438,6 +441,13 @@ function renderRound(state) {
   revealHintBtn.hidden = !(state.settings && state.settings.karaokeHint && state.roundStatus === 'playing')
     || (state.mysteryRound && state.mysteryRound.modifier === 'noHint');
 
+  if (state.snippetSeconds > 0 && (state.roundStatus === 'playing' || state.roundStatus === 'buzzed')) {
+    snippetPill.hidden = false;
+    snippetPill.textContent = `✂️ Snippet: ${state.snippetSeconds}s`;
+  } else {
+    snippetPill.hidden = true;
+  }
+
   pauseBtn.hidden = !(state.settings && state.settings.pauseGame);
   pauseBtn.textContent = state.paused ? '▶ Resume game' : '⏸ Pause game';
   pausedPill.hidden = !state.paused;
@@ -490,6 +500,7 @@ function renderCategoryFilter(state) {
 }
 
 function renderPlaylist(state) {
+  snippetRow.hidden = !(state.settings && state.settings.snippetMode);
   let songs = categoryFilter === 'All' ? state.playlist : state.playlist.filter(s => s.category === categoryFilter);
   if (searchQuery) {
     songs = songs.filter(s =>
@@ -517,7 +528,8 @@ function renderPlaylist(state) {
   playlistList.querySelectorAll('[data-play]').forEach(btn => {
     btn.addEventListener('click', () => {
       const timerSeconds = Number(timerInput.value) || 0;
-      socket.emit('host:startRound', { id: btn.dataset.play, timerSeconds });
+      const snippetSeconds = Number(snippetInput.value) || 0;
+      socket.emit('host:startRound', { id: btn.dataset.play, timerSeconds, snippetSeconds });
     });
   });
   playlistList.querySelectorAll('[data-remove]').forEach(btn => {

@@ -320,6 +320,8 @@
 #reveal-title, #reveal-artist { font-family: var(--font-fun); }
 #reveal-title { color: var(--gold); }
 
+#snippet-hint { color: var(--gold); font-size: 1.05rem; }
+
 #hint-text {
   font-family: var(--font-fun);
   letter-spacing: 0.15em;

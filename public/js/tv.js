@@ -16,6 +16,7 @@ const revealTitleEl = document.getElementById('reveal-title');
 const revealArtistEl = document.getElementById('reveal-artist');
 const playingSubtext = document.getElementById('playing-subtext');
 const hintTextEl = document.getElementById('hint-text');
+const snippetHintEl = document.getElementById('snippet-hint');
 const resultsListEl = document.getElementById('results-list');
 const sessionStatsEl = document.getElementById('session-stats');
 const achievementBadgesEl = document.getElementById('achievement-badges');
@@ -60,8 +61,23 @@ function syncVideo(state) {
 
   if (state.roundStatus === 'idle') {
     loadedYoutubeId = null;
+    clearTimeout(snippetTimeout);
     if (typeof player.stopVideo === 'function') player.stopVideo();
   }
+}
+
+// ---- snippet mode: auto-pause after a set number of seconds so guessing
+// happens from a short hook instead of the whole track. Piggybacks on the
+// exact same "new song actually started" detection the 3-2-1-GO flash
+// already uses (see the socket.on('state', ...) handler below) rather than
+// tracking its own separate one-shot-per-round-start flag. ----
+let snippetTimeout = null;
+function scheduleSnippetPause(state) {
+  clearTimeout(snippetTimeout);
+  if (!state.snippetSeconds || state.snippetSeconds <= 0) return;
+  snippetTimeout = setTimeout(() => {
+    if (player && typeof player.pauseVideo === 'function') player.pauseVideo();
+  }, state.snippetSeconds * 1000);
 }
 
 // The YouTube IFrame API is flaky about actually starting playback on the
@@ -501,6 +517,13 @@ socket.on('state', (state) => {
     hintTextEl.hidden = true;
   }
 
+  if (state.roundStatus === 'playing' && state.snippetSeconds > 0) {
+    snippetHintEl.textContent = `🎧 First ${state.snippetSeconds}s only!`;
+    snippetHintEl.hidden = false;
+  } else {
+    snippetHintEl.hidden = true;
+  }
+
   // "3...2...1...GO" flash the moment a NEW song actually starts playing —
   // tracked separately from syncVideo's own loadedYoutubeId so this fires
   // exactly once per round start regardless of video-loading timing.
@@ -512,6 +535,7 @@ socket.on('state', (state) => {
   if (state.roundStatus === 'playing' && state.currentSong && state.currentSong.youtubeId !== lastPlayingSongId) {
     lastPlayingSongId = state.currentSong.youtubeId;
     if (state.settings && state.settings.extraAnimations) spawnGoFlash();
+    scheduleSnippetPause(state);
   } else if (state.roundStatus !== 'playing' && state.roundStatus !== 'buzzed') {
     lastPlayingSongId = null; // replaying the same song later should flash again
   }
@@ -528,6 +552,10 @@ socket.on('state', (state) => {
   }
 
   if (state.roundStatus === 'revealed' && state.currentSong) {
+    // The reveal is the payoff — resume full playback even if snippet mode
+    // paused it earlier this round. Harmless to call when already playing.
+    clearTimeout(snippetTimeout);
+    if (player && typeof player.playVideo === 'function') player.playVideo();
     const title = state.currentSong.title || t('unknown', currentLang);
     const artist = state.currentSong.artist || '';
     revealTitleEl.textContent = title;

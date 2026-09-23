@@ -45,6 +45,7 @@ const DEFAULT_SETTINGS = {
   actionLog: false,
   setlistPresets: false,
   achievementBadges: false,
+  snippetMode: false,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -176,6 +177,7 @@ const state = {
   actionLog: [],                   // [{at, text}] most-recent-first, capped — host-only audit trail, see logAction()
   presets: loadPresets(),          // name -> {playlist, settings, savedAt} — saved setlist+settings combos, see host:savePreset
   badgeStats: { fastestBuzz: null, steals: {}, correct: {}, everLastPlace: {} }, // THIS GAME's running counters for computeBadges() — reset on resetGame
+  snippetSeconds: 0,               // how long the TV plays this round's song before auto-pausing, 0 = off — see host:startRound
 };
 
 const ACTION_LOG_LIMIT = 50;
@@ -248,7 +250,7 @@ function startRoundTimer(seconds) {
   }, seconds * 1000);
 }
 
-function startRound(id, timerSeconds) {
+function startRound(id, timerSeconds, snippetSeconds) {
   const idx = state.playlist.findIndex(s => s.id === id);
   if (idx === -1) return false;
   state.currentIndex = idx;
@@ -258,6 +260,9 @@ function startRound(id, timerSeconds) {
   state.roundStartedAt = Date.now();
   state.speedBonusPaid = false;
   state.hintRevealedIndices = [];
+  // Only meaningful with the toggle on — never carries a value in from a
+  // stale client field once the host has switched the setting off.
+  state.snippetSeconds = state.settings.snippetMode ? (Number(snippetSeconds) || 0) : 0;
   // The vote (if any) has done its job of picking a category to play from —
   // clear it so a stale result doesn't linger once the round it fed into begins.
   clearVoteTimer();
@@ -415,6 +420,7 @@ function payloadFor(role) {
     paused: state.paused,
     stats: state.stats,
     badges: computeBadges(),
+    snippetSeconds: state.settings.snippetMode ? state.snippetSeconds : 0,
     mysteryRound: mysteryModifier ? { modifier: mysteryModifier, label: MYSTERY_LABELS[mysteryModifier] } : null,
     categoryVote: state.categoryVote
       ? {
@@ -1025,8 +1031,8 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  socket.on('host:startRound', ({ id, timerSeconds }) => {
-    if (startRound(id, timerSeconds)) broadcast();
+  socket.on('host:startRound', ({ id, timerSeconds, snippetSeconds }) => {
+    if (startRound(id, timerSeconds, snippetSeconds)) broadcast();
   });
 
   socket.on('host:resetBuzzers', () => {

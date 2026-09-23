@@ -41,6 +41,7 @@
         <span class="pill" id="timer-pill" hidden></span>
         <span class="pill" id="auto-advance-pill" hidden></span>
         <span class="pill gold" id="mystery-pill" hidden></span>
+        <span class="pill" id="snippet-pill" hidden></span>
         <button id="pause-btn" hidden>⏸ Pause game</button>
         <span class="pill" id="paused-pill" hidden>⏸ Paused</span>
         <div id="find-replacement-live-result"></div>
@@ -84,6 +85,10 @@
         <div class="timer-row">
           <label for="timer-input">Round timer (sec, 0 = off)</label>
           <input id="timer-input" type="number" min="0" step="5" value="0">
+        </div>
+        <div class="timer-row" id="snippet-row" hidden>
+          <label for="snippet-input">Snippet length (sec, 0 = off)</label>
+          <input id="snippet-input" type="number" min="0" step="1" value="0">
         </div>
         <input id="playlist-search" type="text" class="playlist-search" placeholder="🔍 Search songs or artists…">
         <div id="category-filter" class="category-filter"></div>
@@ -154,6 +159,10 @@
           <label class="option-row">
             <input type="checkbox" data-setting="actionLog">
             <span><strong>Action log</strong><br><span class="muted small">A running list of every point awarded, wrong answer, and player removal — settles "wait, who got that point?" disputes.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="snippetMode">
+            <span><strong>Snippet mode</strong><br><span class="muted small">The TV auto-pauses the song after a set number of seconds — guessing happens from a short hook instead of the whole track. Resumes full playback on reveal.</span></span>
           </label>
           <label class="option-row">
             <input type="checkbox" data-setting="achievementBadges">
