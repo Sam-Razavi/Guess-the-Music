@@ -21,6 +21,7 @@ const PLAYLIST_FILE = path.join(__dirname, 'playlist.json');
 const PLAYERS_FILE = path.join(__dirname, 'players.json');
 const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 const STATS_FILE = path.join(__dirname, 'stats.json');
+const PRESETS_FILE = path.join(__dirname, 'presets.json');
 
 const DEFAULT_STATS = {
   fastestBuzz: null,          // {name, ms, at} | null — quickest reaction to a round starting, all-time
@@ -42,6 +43,7 @@ const DEFAULT_SETTINGS = {
   preflightCheck: false,
   pauseGame: false,
   actionLog: false,
+  setlistPresets: false,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -113,6 +115,18 @@ function saveStats() {
   fs.writeFileSync(STATS_FILE, JSON.stringify(state.stats, null, 2));
 }
 
+function loadPresets() {
+  try {
+    return JSON.parse(fs.readFileSync(PRESETS_FILE, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function savePresets() {
+  fs.writeFileSync(PRESETS_FILE, JSON.stringify(state.presets, null, 2));
+}
+
 function getLanIp() {
   const nets = os.networkInterfaces();
   const candidates = [];
@@ -159,6 +173,7 @@ const state = {
   paused: false,                   // true between host:togglePause calls — freezes buzzing and any running timers for a break
   pauseRemaining: null,             // {roundTimerSeconds, autoAdvanceSeconds} snapshotted at pause time, restored on resume
   actionLog: [],                   // [{at, text}] most-recent-first, capped — host-only audit trail, see logAction()
+  presets: loadPresets(),          // name -> {playlist, settings, savedAt} — saved setlist+settings combos, see host:savePreset
 };
 
 const ACTION_LOG_LIMIT = 50;
@@ -382,6 +397,9 @@ function payloadFor(role) {
       // song's own stored points field never changes.
       currentSong: song && mysteryModifier === 'double' ? { ...song, points: (song.points || 1) * 2 } : song,
       actionLog: state.actionLog,
+      presets: Object.entries(state.presets).map(([name, p]) => ({
+        name, songCount: p.playlist.length, savedAt: p.savedAt,
+      })),
       // Which unplayed song is this game's mystery song — shown as a badge
       // in the host's playlist so they can choose when to play it. The
       // MODIFIER itself is still withheld (via mysteryRound above) until
@@ -904,6 +922,55 @@ io.on('connection', (socket) => {
     if (reordered.length !== state.playlist.length) return;
     state.playlist = reordered;
     savePlaylist();
+    broadcast();
+  });
+
+  // Setlist presets: save/load a whole playlist+settings combo under a name
+  // (e.g. "80s night", "Kids party") so a host doesn't have to rebuild the
+  // playlist from scratch each game night. Mirrors the playlist/settings
+  // persistence pattern exactly (presets.json). Deliberately doesn't touch
+  // players/scores — a preset is about songs+rules, not who's currently
+  // playing. Loading is idle-only, same reasoning as category voting: never
+  // let it compete with or corrupt a round that's actually in progress.
+  socket.on('host:savePreset', ({ name } = {}) => {
+    if (!state.settings.setlistPresets) return;
+    const clean = (name || '').trim().slice(0, 40);
+    if (!clean) return;
+    // Deep-copy, not a reference — state.playlist/state.settings keep
+    // mutating after this (new songs, toggles), and a saved preset must be a
+    // frozen snapshot from this exact moment, not a window onto live state.
+    state.presets[clean] = {
+      playlist: state.playlist.map(s => ({ ...s })),
+      settings: { ...state.settings },
+      savedAt: Date.now(),
+    };
+    savePresets();
+    broadcast();
+  });
+
+  socket.on('host:loadPreset', ({ name } = {}) => {
+    if (!state.settings.setlistPresets || state.roundStatus !== 'idle') return;
+    const preset = state.presets[name];
+    if (!preset) return;
+    state.playlist = preset.playlist.map(s => ({ ...s }));
+    // setlistPresets itself always stays on after a load — otherwise loading
+    // a preset saved before this toggle existed (or saved with it off) would
+    // instantly hide the very card the host just used to load it.
+    state.settings = { ...DEFAULT_SETTINGS, ...preset.settings, setlistPresets: true };
+    state.mysterySongId = null;
+    state.mysteryModifier = null;
+    clearVoteTimer();
+    state.categoryVote = null;
+    savePlaylist();
+    saveSettings();
+    broadcast();
+  });
+
+  socket.on('host:deletePreset', ({ name } = {}) => {
+    if (!state.settings.setlistPresets) return;
+    if (!state.presets[name]) return;
+    delete state.presets[name];
+    savePresets();
     broadcast();
   });
 

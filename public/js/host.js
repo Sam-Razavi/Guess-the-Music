@@ -45,6 +45,10 @@ const voteCountdownEl = document.getElementById('vote-countdown');
 const voteTallyEl = document.getElementById('vote-tally');
 const voteResultEl = document.getElementById('vote-result');
 const voteWinnerTextEl = document.getElementById('vote-winner-text');
+const setlistPresetsCard = document.getElementById('setlist-presets-card');
+const presetNameInput = document.getElementById('preset-name-input');
+const savePresetBtn = document.getElementById('save-preset-btn');
+const presetList = document.getElementById('preset-list');
 const actionLogCard = document.getElementById('action-log-card');
 const actionLogList = document.getElementById('action-log-list');
 const clearActionLogBtn = document.getElementById('clear-action-log-btn');
@@ -704,6 +708,53 @@ function renderCategoryVote(state) {
   }
 }
 
+// ---------- setlist presets ----------
+savePresetBtn.addEventListener('click', () => {
+  const name = presetNameInput.value.trim();
+  if (!name) return;
+  const existing = latestState && latestState.presets && latestState.presets.some(p => p.name === name);
+  if (existing && !confirm(`A preset named "${name}" already exists — overwrite it?`)) return;
+  socket.emit('host:savePreset', { name });
+  presetNameInput.value = '';
+});
+
+function renderPresets(state) {
+  const enabled = state.settings && state.settings.setlistPresets;
+  setlistPresetsCard.hidden = !enabled;
+  if (!enabled) return;
+  const presets = state.presets || [];
+  const notIdle = state.roundStatus !== 'idle';
+  presetList.innerHTML = presets.length
+    ? presets.map(p => `
+        <div class="preset-row">
+          <div class="info">
+            <div class="t">${escapeHtml(p.name)}</div>
+            <div class="a muted small">${p.songCount} song${p.songCount === 1 ? '' : 's'} · saved ${new Date(p.savedAt).toLocaleDateString()}</div>
+          </div>
+          <div class="actions">
+            <button class="primary" data-load-preset="${escapeHtml(p.name)}" ${notIdle ? 'disabled title="Only between rounds"' : ''}>Load</button>
+            <button class="danger" data-delete-preset="${escapeHtml(p.name)}">✕</button>
+          </div>
+        </div>
+      `).join('')
+    : '<p class="muted small">No presets saved yet.</p>';
+
+  presetList.querySelectorAll('[data-load-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (confirm(`Load "${btn.dataset.loadPreset}"? This replaces the current playlist and game options (scores are untouched).`)) {
+        socket.emit('host:loadPreset', { name: btn.dataset.loadPreset });
+      }
+    });
+  });
+  presetList.querySelectorAll('[data-delete-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (confirm(`Delete preset "${btn.dataset.deletePreset}"?`)) {
+        socket.emit('host:deletePreset', { name: btn.dataset.deletePreset });
+      }
+    });
+  });
+}
+
 clearActionLogBtn.addEventListener('click', () => socket.emit('host:clearActionLog'));
 
 function renderActionLog(state) {
@@ -745,4 +796,5 @@ socket.on('state', (state) => {
   renderCategoryVote(state);
   renderPreflightCard(state);
   renderActionLog(state);
+  renderPresets(state);
 });

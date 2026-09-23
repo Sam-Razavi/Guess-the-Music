@@ -79,7 +79,7 @@
         </div>
       </section>
 
-      <section class="card">
+      <section class="card" id="playlist-card">
         <h2>Playlist</h2>
         <div class="timer-row">
           <label for="timer-input">Round timer (sec, 0 = off)</label>
@@ -156,6 +156,10 @@
             <span><strong>Action log</strong><br><span class="muted small">A running list of every point awarded, wrong answer, and player removal — settles "wait, who got that point?" disputes.</span></span>
           </label>
           <label class="option-row">
+            <input type="checkbox" data-setting="setlistPresets">
+            <span><strong>Setlist presets</strong><br><span class="muted small">Save the current playlist + game options as a named preset ("80s night", "Kids party") and load it back later instead of rebuilding it.</span></span>
+          </label>
+          <label class="option-row">
             <input type="checkbox" data-setting="preflightCheck">
             <span><strong>Pre-flight check</strong><br><span class="muted small">A "ready to go?" button that scans the whole playlist for broken videos and confirms players have joined, before the party starts.</span></span>
           </label>
@@ -182,6 +186,15 @@
           <p>🏆 Winner: <strong id="vote-winner-text"></strong></p>
           <button id="apply-vote-filter-btn">Filter playlist to this category</button>
         </div>
+      </section>
+
+      <section class="card" id="setlist-presets-card" hidden>
+        <h2>Setlist presets</h2>
+        <div class="stack">
+          <input id="preset-name-input" type="text" maxlength="40" placeholder="Preset name, e.g. 80s night">
+          <button id="save-preset-btn">💾 Save current setlist as…</button>
+        </div>
+        <div id="preset-list" class="preset-list"></div>
       </section>
 
       <section class="card" id="action-log-card" hidden>
