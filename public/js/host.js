@@ -489,29 +489,42 @@ function renderPlaylist(state) {
 // Initialized once: renderPlaylist() only replaces playlistList's children
 // via innerHTML, and Sortable reads children live, so one instance keeps
 // working across every re-render.
-Sortable.create(playlistList, {
-  handle: '.grip',
-  animation: 150,
-  delay: 150,
-  delayOnTouchOnly: true, // avoids mistaking a scroll-through-the-grip for a drag on touch, no delay added for mouse
-  ghostClass: 'sortable-ghost',
-  chosenClass: 'sortable-chosen',
-  onEnd: (evt) => {
-    if (!latestState) return;
-    const draggedId = evt.item.dataset.id;
-    const rows = [...playlistList.querySelectorAll('.playlist-row')];
-    const nextRow = rows[rows.indexOf(evt.item) + 1];
-    const anchorId = nextRow ? nextRow.dataset.id : null;
+//
+// Guarded: this loads from a CDN (see host.html), and everything below this
+// point in the file — including the socket.on('state', ...) registration
+// that drives the entire rest of the page — used to sit after an unguarded
+// top-level Sortable.create() call. A blocked/offline CDN threw here and
+// silently killed every handler registered after it, taking down the whole
+// control panel (playlist, scoreboard, settings, voting — not just
+// reordering) over what should have been a purely cosmetic loss. Drag-to-
+// reorder degrades gracefully now; nothing else should ever depend on it.
+if (typeof Sortable !== 'undefined') {
+  Sortable.create(playlistList, {
+    handle: '.grip',
+    animation: 150,
+    delay: 150,
+    delayOnTouchOnly: true, // avoids mistaking a scroll-through-the-grip for a drag on touch, no delay added for mouse
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onEnd: (evt) => {
+      if (!latestState) return;
+      const draggedId = evt.item.dataset.id;
+      const rows = [...playlistList.querySelectorAll('.playlist-row')];
+      const nextRow = rows[rows.indexOf(evt.item) + 1];
+      const anchorId = nextRow ? nextRow.dataset.id : null;
 
-    const ids = latestState.playlist.map(s => s.id);
-    const from = ids.indexOf(draggedId);
-    if (from === -1) return;
-    ids.splice(from, 1);
-    const to = anchorId ? ids.indexOf(anchorId) : ids.length;
-    ids.splice(to, 0, draggedId);
-    socket.emit('host:reorderPlaylist', { ids });
-  },
-});
+      const ids = latestState.playlist.map(s => s.id);
+      const from = ids.indexOf(draggedId);
+      if (from === -1) return;
+      ids.splice(from, 1);
+      const to = anchorId ? ids.indexOf(anchorId) : ids.length;
+      ids.splice(to, 0, draggedId);
+      socket.emit('host:reorderPlaylist', { ids });
+    },
+  });
+} else {
+  console.error('SortableJS failed to load — drag-to-reorder is unavailable, everything else still works.');
+}
 
 const prevScores = new Map();
 
@@ -621,7 +634,7 @@ function renderCategoryVote(state) {
     const available = [...new Set(state.playlist.filter(s => !s.played && s.category).map(s => s.category))].sort();
     voteCategoryChecksEl.innerHTML = available.length
       ? available.map(c => `
-          <label class="option-row"><input type="checkbox" value="${escapeHtml(c)}" checked><span>${escapeHtml(c)}</span></label>
+          <label class="option-row"><input type="checkbox" value="${escapeHtml(c)}" checked><span>${categoryAvatar(c)} ${escapeHtml(c)}</span></label>
         `).join('')
       : `<p class="muted small">Tag at least 2 categories on unplayed songs first.</p>`;
     const notIdle = state.roundStatus !== 'idle';
@@ -636,7 +649,7 @@ function renderCategoryVote(state) {
     voteResultEl.hidden = true;
     const totalVotes = Object.values(vote.counts).reduce((a, b) => a + b, 0);
     voteTallyEl.innerHTML = vote.options.map(c => `
-      <div class="vote-row"><span>${escapeHtml(c)}</span><span>${vote.counts[c] || 0}</span></div>
+      <div class="vote-row"><span>${categoryAvatar(c)} ${escapeHtml(c)}</span><span>${vote.counts[c] || 0}</span></div>
     `).join('') + `<p class="muted small">${totalVotes} vote${totalVotes === 1 ? '' : 's'} so far</p>`;
     updateVoteCountdown(state);
     if (vote.endsAt) voteInterval = setInterval(() => updateVoteCountdown(state), 500);

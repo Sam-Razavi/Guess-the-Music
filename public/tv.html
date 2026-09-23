@@ -26,22 +26,27 @@
       <div class="overlay" id="overlay">
         <!-- idle state -->
         <div class="panel" id="panel-idle">
-          <div class="record spin" aria-hidden="true"></div>
-          <h1 data-i18n="waitingRound">Waiting for the next round…</h1>
+          <!-- Category vote: swaps in for the whole idle panel (record,
+               heading, and the join block below) while a vote is active —
+               otherwise the record + "waiting for next round" heading eat
+               the vertical space the vote list needs and it clips against
+               the scoreboard footer. Same "swap the panel's own content
+               into two variants" idea as idle-join-block already used. -->
+          <div id="idle-waiting-block">
+            <div class="record spin" aria-hidden="true"></div>
+            <h1 data-i18n="waitingRound">Waiting for the next round…</h1>
+            <div id="idle-join-block">
+              <p data-i18n="scanToBuzz">Scan to grab a buzzer:</p>
+              <img id="qr" alt="QR code to join as a player" width="180" height="180">
+              <p class="muted" id="join-url"></p>
+              <p class="muted" id="idle-hint"></p>
+            </div>
+          </div>
 
-          <!-- Category vote: swaps in for the join block below while a
-               vote is active, so it doesn't need a state of its own. -->
           <div id="category-vote-panel" hidden>
             <h2 id="vote-heading">🗳️ Vote for the next category!</h2>
             <div id="vote-options-tv" class="vote-options-tv"></div>
             <p class="muted small" id="vote-tv-status"></p>
-          </div>
-
-          <div id="idle-join-block">
-            <p data-i18n="scanToBuzz">Scan to grab a buzzer:</p>
-            <img id="qr" alt="QR code to join as a player" width="180" height="180">
-            <p class="muted" id="join-url"></p>
-            <p class="muted" id="idle-hint"></p>
           </div>
         </div>
 
@@ -92,6 +97,27 @@
       <div class="reveal-caption" id="reveal-caption" hidden>
         <span id="caption-title"></span><span id="caption-artist"></span>
       </div>
+
+      <!-- Cartoon mascot companion (extraAnimations toggle — cosmetic
+           only). Also outside .overlay: it needs to stay visible and keep
+           reacting through every roundStatus, 'revealed' included. Built
+           entirely from the same gradient recipe as .record (a face on the
+           record, not a new asset), plus CSS-only eyes/mouth/arms that
+           swap per data-expression instead of separate SVG art. -->
+      <div class="mascot" id="mascot" data-expression="idle" hidden>
+        <div class="mascot-arm mascot-arm-l"></div>
+        <div class="mascot-arm mascot-arm-r"></div>
+        <div class="mascot-head">
+          <div class="mascot-face">
+            <span class="mascot-eye mascot-eye-l"></span>
+            <span class="mascot-eye mascot-eye-r"></span>
+          </div>
+          <span class="mascot-cheek mascot-cheek-l"></span>
+          <span class="mascot-cheek mascot-cheek-r"></span>
+          <span class="mascot-mouth"></span>
+        </div>
+        <div class="mascot-hat"></div>
+      </div>
     </main>
 
     <footer class="scoreboard" id="scoreboard"></footer>
@@ -100,6 +126,7 @@
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/i18n.js"></script>
+  <script src="/js/avatars.js"></script>
   <script src="/js/tv.js"></script>
 </body>
 </html>

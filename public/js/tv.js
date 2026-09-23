@@ -23,8 +23,9 @@ const revealCaptionEl = document.getElementById('reveal-caption');
 const captionTitleEl = document.getElementById('caption-title');
 const captionArtistEl = document.getElementById('caption-artist');
 const mysteryBannerEl = document.getElementById('mystery-banner');
+const mascotEl = document.getElementById('mascot');
 const categoryVotePanelEl = document.getElementById('category-vote-panel');
-const idleJoinBlockEl = document.getElementById('idle-join-block');
+const idleWaitingBlockEl = document.getElementById('idle-waiting-block');
 const voteHeadingEl = document.getElementById('vote-heading');
 const voteOptionsTvEl = document.getElementById('vote-options-tv');
 const voteTvStatusEl = document.getElementById('vote-tv-status');
@@ -256,6 +257,7 @@ function playChime() {
 socket.on('correct', () => {
   spawnConfetti();
   playChime();
+  setMascotExpression('correct');
 });
 
 // ---- steal mechanic: a wrong answer reopened buzzing, and whoever stole it
@@ -273,6 +275,7 @@ function spawnStealBanner(name) {
 socket.on('steal', ({ name }) => {
   spawnConfetti();
   playChime();
+  setMascotExpression('correct');
   if (latestState && latestState.settings && latestState.settings.extraAnimations) spawnStealBanner(name);
 });
 
@@ -321,25 +324,74 @@ function updateMysteryBanner(state) {
   if (active) mysteryBannerEl.textContent = `🎭 Mystery Round: ${state.mysteryRound.label}`;
 }
 
+// ---- cartoon mascot companion (extraAnimations) ----
+// A face on the record (see tv.css), reacting to the game rather than just
+// decorating it. Expression is driven by roundStatus transitions, plus the
+// 'correct'/'steal' socket events for the cheer — 'wrong' has no dedicated
+// TV event (resetBuzzers only signals the specific player who missed), so
+// it's inferred here from the one transition that can only mean that:
+// 'buzzed' going back to 'playing' without ever reaching 'revealed'.
+let prevRoundStatusForMascot = null;
+
+function setMascotExpression(expr) {
+  if (mascotEl) mascotEl.dataset.expression = expr;
+}
+
+function updateMascot(state) {
+  if (!mascotEl) return;
+  const animationsOn = state.settings && state.settings.extraAnimations;
+  mascotEl.hidden = !animationsOn;
+  if (!animationsOn) { prevRoundStatusForMascot = state.roundStatus; return; }
+
+  const status = state.roundStatus;
+  const prev = prevRoundStatusForMascot;
+
+  if (status === 'idle') {
+    setMascotExpression('idle');
+  } else if (status === 'buzzed' && prev !== 'buzzed') {
+    setMascotExpression('buzz');
+  } else if (status === 'playing' && prev === 'buzzed') {
+    setMascotExpression('wrong');
+    setTimeout(() => { if (mascotEl.dataset.expression === 'wrong') setMascotExpression('idle'); }, 550);
+  } else if (status === 'playing' && prev !== 'playing') {
+    setMascotExpression('idle'); // a fresh round just started
+  } else if (status === 'results') {
+    setMascotExpression('results');
+  }
+  // 'revealed' intentionally falls through with no forced change — whatever
+  // was already showing (idle, or 'correct' from the award event just
+  // before the reveal) stays as-is.
+
+  prevRoundStatusForMascot = status;
+}
+
 // ---- category vote ----
 function renderCategoryVoteTV(state) {
   const vote = state.categoryVote;
   const active = state.roundStatus === 'idle' && !!vote;
   categoryVotePanelEl.hidden = !active;
-  idleJoinBlockEl.hidden = active;
+  idleWaitingBlockEl.hidden = active;
   if (!active) return;
 
   if (!vote.closed) {
     voteHeadingEl.textContent = '🗳️ Vote for the next category!';
     const totalVotes = Object.values(vote.counts).reduce((a, b) => a + b, 0);
     voteOptionsTvEl.innerHTML = vote.options.map(c => `
-      <div class="vote-option-tv"><span>${escapeHtml(c)}</span><span class="count">${vote.counts[c] || 0}</span></div>
+      <div class="vote-option-tv">
+        <span class="vote-avatar">${categoryAvatar(c)}</span>
+        <span class="vote-name">${escapeHtml(c)}</span>
+        <span class="count">${vote.counts[c] || 0}</span>
+      </div>
     `).join('');
     voteTvStatusEl.textContent = `${totalVotes} vote${totalVotes === 1 ? '' : 's'} so far — grab your phone!`;
   } else {
     voteHeadingEl.textContent = `🏆 Winner: ${vote.result}!`;
     voteOptionsTvEl.innerHTML = vote.options.map(c => `
-      <div class="vote-option-tv ${c === vote.result ? 'winner' : ''}"><span>${escapeHtml(c)}</span><span class="count">${vote.counts[c] || 0}</span></div>
+      <div class="vote-option-tv ${c === vote.result ? 'winner' : ''}">
+        <span class="vote-avatar">${categoryAvatar(c)}</span>
+        <span class="vote-name">${escapeHtml(c)}</span>
+        <span class="count">${vote.counts[c] || 0}</span>
+      </div>
     `).join('');
     voteTvStatusEl.textContent = '';
   }
@@ -421,6 +473,7 @@ socket.on('state', (state) => {
   renderScoreboard(state.players);
   showPanel(state.roundStatus);
   updateMysteryBanner(state);
+  updateMascot(state);
   renderCategoryVoteTV(state);
 
   if (state.currentSong && state.currentSong.hint) {
@@ -433,10 +486,15 @@ socket.on('state', (state) => {
   // "3...2...1...GO" flash the moment a NEW song actually starts playing —
   // tracked separately from syncVideo's own loadedYoutubeId so this fires
   // exactly once per round start regardless of video-loading timing.
+  // 'buzzed' is deliberately excluded from the reset below: a
+  // host:resetBuzzers (reopening buzzing after a wrong answer) bounces
+  // roundStatus buzzed -> playing on the SAME song, and clearing the memory
+  // on 'buzzed' made the flash incorrectly replay on every reset, as if a
+  // new song had started.
   if (state.roundStatus === 'playing' && state.currentSong && state.currentSong.youtubeId !== lastPlayingSongId) {
     lastPlayingSongId = state.currentSong.youtubeId;
     if (state.settings && state.settings.extraAnimations) spawnGoFlash();
-  } else if (state.roundStatus !== 'playing') {
+  } else if (state.roundStatus !== 'playing' && state.roundStatus !== 'buzzed') {
     lastPlayingSongId = null; // replaying the same song later should flash again
   }
 

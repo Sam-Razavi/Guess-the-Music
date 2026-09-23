@@ -45,6 +45,181 @@
 }
 .auto-advance-hint:empty { display: none; }
 
+/* ---- cartoon mascot companion (extraAnimations) ---- */
+.mascot {
+  position: absolute;
+  right: 4%;
+  bottom: 4%;
+  z-index: 15;
+  width: 110px;
+  height: 132px;
+  pointer-events: none;
+}
+.mascot-head {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  /* Same recipe as .record (a face on the record, not a separate asset) — see the note there on why the shine streak matters. */
+  background:
+    linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.18) 49%, transparent 58%),
+    repeating-radial-gradient(circle at center, #100c18 0px, #100c18 2px, #1c1628 2px, #1c1628 5px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+.mascot-face {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 18px;
+}
+.mascot-eye {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--gold);
+  transition: width 0.15s ease, height 0.15s ease;
+}
+.mascot-mouth {
+  position: absolute;
+  top: 58%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 14px;
+  border: 3px solid var(--gold);
+  border-top: none;
+  border-radius: 0 0 20px 20px;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+.mascot-cheek {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 107, 91, 0.55);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.mascot-cheek-l { left: 16%; }
+.mascot-cheek-r { right: 16%; }
+
+.mascot-arm {
+  position: absolute;
+  bottom: 26px;
+  width: 8px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--gold);
+  transform-origin: top center;
+  transition: transform 0.25s ease;
+}
+.mascot-arm-l { left: 2px; transform: rotate(18deg); }
+.mascot-arm-r { right: 2px; transform: rotate(-18deg); }
+
+/* Triangle apex points up (that's what an uncolored border-top + colored
+   border-bottom on a 0x0 box gives you); base sits at top+26px. Positioned
+   so that base overlaps a little into the head's top curve, like it's
+   actually resting on the head rather than floating above it. */
+.mascot-hat {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%) scale(0);
+  transform-origin: 50% 100%;
+  width: 0;
+  height: 0;
+  border-left: 16px solid transparent;
+  border-right: 16px solid transparent;
+  border-bottom: 26px solid var(--coral);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.mascot-hat::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+/* idle (also 'playing', before anyone's buzzed): gentle bob */
+.mascot[data-expression="idle"] { animation: mascot-bob 2.6s ease-in-out infinite; }
+@keyframes mascot-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* buzz: eyes go wide, mouth pops into an "o", quick jump */
+.mascot[data-expression="buzz"] .mascot-eye { width: 15px; height: 15px; }
+.mascot[data-expression="buzz"] .mascot-mouth {
+  width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--gold);
+}
+.mascot[data-expression="buzz"] { animation: mascot-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes mascot-pop {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-18px) scale(1.08); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* correct / steal: happy squint eyes, big grin, blush, arms raised, hop */
+.mascot[data-expression="correct"] .mascot-eye,
+.mascot[data-expression="results"] .mascot-eye {
+  height: 3px; width: 13px; border-radius: 999px;
+}
+.mascot[data-expression="correct"] .mascot-mouth,
+.mascot[data-expression="results"] .mascot-mouth {
+  width: 34px; height: 18px; border-radius: 0 0 26px 26px; border-width: 4px;
+}
+.mascot[data-expression="correct"] .mascot-cheek,
+.mascot[data-expression="results"] .mascot-cheek { opacity: 1; }
+.mascot[data-expression="correct"] .mascot-arm-l,
+.mascot[data-expression="results"] .mascot-arm-l { transform: rotate(-130deg); }
+.mascot[data-expression="correct"] .mascot-arm-r,
+.mascot[data-expression="results"] .mascot-arm-r { transform: rotate(130deg); }
+.mascot[data-expression="correct"] { animation: mascot-cheer 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes mascot-cheer {
+  0% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-22px) rotate(-6deg); }
+  60% { transform: translateY(-4px) rotate(6deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+/* wrong (a resetBuzzers just reopened buzzing after a miss): frown, droopy arms, sad wobble */
+.mascot[data-expression="wrong"] .mascot-mouth {
+  border: 3px solid var(--gold); border-bottom: none; border-top: 3px solid var(--gold);
+  border-radius: 20px 20px 0 0; top: 62%; height: 10px;
+}
+.mascot[data-expression="wrong"] .mascot-arm-l { transform: rotate(35deg); }
+.mascot[data-expression="wrong"] .mascot-arm-r { transform: rotate(-35deg); }
+.mascot[data-expression="wrong"] { animation: mascot-wobble 0.5s ease; }
+@keyframes mascot-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}
+
+/* results: party hat on, gentle celebratory sway */
+.mascot[data-expression="results"] .mascot-hat { transform: translateX(-50%) scale(1) rotate(-8deg); }
+.mascot[data-expression="results"] { animation: mascot-sway 1.4s ease-in-out infinite; }
+@keyframes mascot-sway {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot, .mascot[data-expression] { animation: none; }
+}
+
 .mystery-banner {
   position: absolute;
   left: 4%;
@@ -59,18 +234,31 @@
   border-radius: 999px;
 }
 
-.vote-options-tv { display: flex; flex-direction: column; gap: 0.6rem; margin: 1rem 0; min-width: 280px; }
+.vote-options-tv { display: flex; flex-direction: column; gap: 0.6rem; margin: 1rem 0; min-width: 320px; }
 .vote-option-tv {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.9rem;
   background: var(--surface);
   border-radius: 12px;
-  padding: 0.6em 1.2em;
+  padding: 0.5em 1em;
   font-size: 1.2rem;
 }
+.vote-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2em;
+  height: 2.2em;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(245, 185, 66, 0.15);
+  font-size: 1.3rem;
+}
+.vote-option-tv .vote-name { flex: 1; text-align: start; }
 .vote-option-tv .count { color: var(--gold); font-weight: 700; }
 .vote-option-tv.winner { box-shadow: 0 0 0 2px var(--gold) inset; }
+.vote-option-tv.winner .vote-avatar { background: var(--gold); }
 
 .reveal-caption {
   position: absolute;

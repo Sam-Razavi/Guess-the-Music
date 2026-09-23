@@ -31,6 +31,7 @@ const buzzLabel = document.getElementById('buzz-label');
 const statusText = document.getElementById('status-text');
 const mysteryNoteEl = document.getElementById('mystery-note');
 const voteBlockEl = document.getElementById('vote-block');
+const voteHeadingEl = document.getElementById('vote-heading');
 const voteOptionsPlayerEl = document.getElementById('vote-options-player');
 const votePlayerStatusEl = document.getElementById('vote-player-status');
 
@@ -151,16 +152,20 @@ function renderCategoryVote(state) {
 
   const myVote = vote.votes[myId];
   if (!vote.closed) {
+    voteHeadingEl.textContent = '🗳️ Vote for the next category!';
     voteOptionsPlayerEl.innerHTML = vote.options.map(c => `
-      <button class="vote-option-btn ${c === myVote ? 'selected' : ''}" data-vote="${escapeHtml(c)}">${escapeHtml(c)}</button>
+      <button class="vote-option-btn ${c === myVote ? 'selected' : ''}" data-vote="${escapeHtml(c)}">
+        <span class="vote-avatar">${categoryAvatar(c)}</span>${escapeHtml(c)}
+      </button>
     `).join('');
     voteOptionsPlayerEl.querySelectorAll('[data-vote]').forEach(btn => {
       btn.addEventListener('click', () => socket.emit('player:voteCategory', { category: btn.dataset.vote }));
     });
     votePlayerStatusEl.textContent = myVote ? `You voted: ${myVote}` : 'Tap a category to vote!';
   } else {
+    voteHeadingEl.textContent = `🏆 Winner: ${vote.result}!`;
     voteOptionsPlayerEl.innerHTML = '';
-    votePlayerStatusEl.textContent = `🏆 Winner: ${vote.result}!`;
+    votePlayerStatusEl.textContent = '';
   }
 }
 

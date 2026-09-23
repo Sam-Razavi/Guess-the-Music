@@ -105,8 +105,23 @@ body { min-height: 100vh; }
   font-size: 1.05rem;
   background: var(--surface-2);
   border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.vote-option-btn .vote-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8em;
+  height: 1.8em;
+  border-radius: 50%;
+  background: rgba(245, 185, 66, 0.15);
+  font-size: 1.1rem;
+  flex-shrink: 0;
 }
 .vote-option-btn.selected { background: var(--gold); color: #21170a; }
+.vote-option-btn.selected .vote-avatar { background: rgba(33, 23, 10, 0.15); }
 
 #my-score { display: inline-block; }
 #my-score.score-pulse { animation: score-pulse 0.5s ease; }
