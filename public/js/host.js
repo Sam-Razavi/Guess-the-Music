@@ -45,6 +45,9 @@ const voteCountdownEl = document.getElementById('vote-countdown');
 const voteTallyEl = document.getElementById('vote-tally');
 const voteResultEl = document.getElementById('vote-result');
 const voteWinnerTextEl = document.getElementById('vote-winner-text');
+const actionLogCard = document.getElementById('action-log-card');
+const actionLogList = document.getElementById('action-log-list');
+const clearActionLogBtn = document.getElementById('clear-action-log-btn');
 const preflightCard = document.getElementById('preflight-card');
 const preflightBtn = document.getElementById('preflight-btn');
 const preflightResults = document.getElementById('preflight-results');
@@ -701,6 +704,23 @@ function renderCategoryVote(state) {
   }
 }
 
+clearActionLogBtn.addEventListener('click', () => socket.emit('host:clearActionLog'));
+
+function renderActionLog(state) {
+  const enabled = state.settings && state.settings.actionLog;
+  actionLogCard.hidden = !enabled;
+  if (!enabled) return;
+  const log = state.actionLog || [];
+  actionLogList.innerHTML = log.length
+    ? log.map(entry => `
+        <div class="action-log-row">
+          <span class="time">${new Date(entry.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          <span>${escapeHtml(entry.text)}</span>
+        </div>
+      `).join('')
+    : '<p class="muted small">Nothing logged yet.</p>';
+}
+
 function renderPreflightCard(state) {
   preflightCard.hidden = !(state.settings && state.settings.preflightCheck);
 }
@@ -724,4 +744,5 @@ socket.on('state', (state) => {
   renderSettings(state);
   renderCategoryVote(state);
   renderPreflightCard(state);
+  renderActionLog(state);
 });

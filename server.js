@@ -41,6 +41,7 @@ const DEFAULT_SETTINGS = {
   categoryVoting: false,
   preflightCheck: false,
   pauseGame: false,
+  actionLog: false,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -157,7 +158,21 @@ const state = {
   categoryVote: null,              // {options, votes: {playerId: category}, closed, result, endsAt} | null — see host:startCategoryVote
   paused: false,                   // true between host:togglePause calls — freezes buzzing and any running timers for a break
   pauseRemaining: null,             // {roundTimerSeconds, autoAdvanceSeconds} snapshotted at pause time, restored on resume
+  actionLog: [],                   // [{at, text}] most-recent-first, capped — host-only audit trail, see logAction()
 };
+
+const ACTION_LOG_LIMIT = 50;
+
+// Host-only audit trail for settling "wait, who got that point?" disputes
+// live. Only accumulates while the actionLog setting is on — same opt-in
+// pattern as sessionStats — so there's zero cost when it's off. Never sent
+// to tv/player (see payloadFor's host-only branch), same reasoning as the
+// playlist itself: this is host-management data, not shared game state.
+function logAction(text) {
+  if (!state.settings.actionLog) return;
+  state.actionLog.unshift({ at: Date.now(), text });
+  if (state.actionLog.length > ACTION_LOG_LIMIT) state.actionLog.length = ACTION_LOG_LIMIT;
+}
 
 const SPEED_BONUS_WINDOW_MS = 3000;
 
@@ -366,6 +381,7 @@ function payloadFor(role) {
       // overriding the runtime value shown/awarded for this one round. The
       // song's own stored points field never changes.
       currentSong: song && mysteryModifier === 'double' ? { ...song, points: (song.points || 1) * 2 } : song,
+      actionLog: state.actionLog,
       // Which unplayed song is this game's mystery song — shown as a badge
       // in the host's playlist so they can choose when to play it. The
       // MODIFIER itself is still withheld (via mysteryRound above) until
@@ -908,6 +924,10 @@ io.on('connection', (socket) => {
     // Marks this round as "had a miss" — powers the steal-mechanic bonus if
     // whoever buzzes in next actually gets it right (see host:awardPoint).
     if (current) state.roundHadMiss = true;
+    if (current) {
+      const song = currentSong();
+      logAction(`❌ ${current.name} answered wrong${song ? ` on "${song.title}"` : ''}`);
+    }
     const priorTimerSeconds = state.roundTimer ? state.roundTimer.seconds : 0;
     state.roundStatus = 'playing';
     clearRoundTimer();
@@ -1016,6 +1036,14 @@ io.on('connection', (socket) => {
       } else if (isNaturalCorrectAward) {
         io.to('tv').emit('correct', { name: state.players[id].name, speedBonus: isSpeedBonus });
       }
+
+      const song = currentSong();
+      const bonusTags = [isSteal ? '🔥 steal' : null, isSpeedBonus ? '⚡ speed' : null].filter(Boolean);
+      const bonusNote = bonusTags.length ? ` (${bonusTags.join(', ')})` : '';
+      const recipientNote = recipients.length > 1 ? ` [+${recipients.length - 1} teammate${recipients.length > 2 ? 's' : ''}]` : '';
+      const context = isNaturalCorrectAward && song ? ` — "${song.title}"` : ' (manual)';
+      logAction(`${totalAwarded >= 0 ? '+' : ''}${totalAwarded} ${state.players[id].name}${recipientNote}${bonusNote}${context}`);
+
       broadcast();
     }
   });
@@ -1122,6 +1150,7 @@ io.on('connection', (socket) => {
 
   socket.on('host:removePlayer', ({ id }) => {
     if (!state.players[id]) return;
+    logAction(`🗑️ ${state.players[id].name} removed from the game`);
     delete state.players[id];
     const hadBuzzed = state.buzzOrder.some(b => b.id === id);
     state.buzzOrder = state.buzzOrder.filter(b => b.id !== id);
@@ -1170,6 +1199,12 @@ io.on('connection', (socket) => {
     clearAutoAdvance();
     state.paused = false;
     state.pauseRemaining = null;
+    state.actionLog = [];
+    broadcast();
+  });
+
+  socket.on('host:clearActionLog', () => {
+    state.actionLog = [];
     broadcast();
   });
 

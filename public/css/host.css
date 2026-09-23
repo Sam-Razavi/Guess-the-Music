@@ -284,6 +284,26 @@
 #vote-result p { margin-bottom: 0.6rem; }
 #vote-result strong { color: var(--gold); }
 
+#action-log-card h2 { display: flex; align-items: center; justify-content: space-between; }
+.small-link {
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.2em 0.5em;
+}
+.small-link:hover { color: var(--text); background: var(--surface-2); }
+.action-log { display: flex; flex-direction: column; gap: 0.3rem; max-height: 260px; overflow-y: auto; }
+.action-log-row {
+  display: flex;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+  padding: 0.3em 0;
+  border-bottom: 1px solid var(--surface-2);
+}
+.action-log-row:last-child { border-bottom: none; }
+.action-log-row .time { color: var(--text-muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
 #preflight-btn { width: 100%; }
 .preflight-verdict { font-weight: 700; margin: 0.7rem 0 0.5rem; }
 .preflight-verdict.ok { color: var(--good); }

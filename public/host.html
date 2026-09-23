@@ -152,6 +152,10 @@
             <span><strong>Pause game</strong><br><span class="muted small">A Pause button that freezes buzzing and any running timers for a bathroom/food break — resumes exactly where it left off.</span></span>
           </label>
           <label class="option-row">
+            <input type="checkbox" data-setting="actionLog">
+            <span><strong>Action log</strong><br><span class="muted small">A running list of every point awarded, wrong answer, and player removal — settles "wait, who got that point?" disputes.</span></span>
+          </label>
+          <label class="option-row">
             <input type="checkbox" data-setting="preflightCheck">
             <span><strong>Pre-flight check</strong><br><span class="muted small">A "ready to go?" button that scans the whole playlist for broken videos and confirms players have joined, before the party starts.</span></span>
           </label>
@@ -178,6 +182,11 @@
           <p>🏆 Winner: <strong id="vote-winner-text"></strong></p>
           <button id="apply-vote-filter-btn">Filter playlist to this category</button>
         </div>
+      </section>
+
+      <section class="card" id="action-log-card" hidden>
+        <h2>Action log <button id="clear-action-log-btn" class="small-link">Clear</button></h2>
+        <div id="action-log-list" class="action-log"></div>
       </section>
 
       <section class="card" id="preflight-card" hidden>
