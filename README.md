@@ -130,6 +130,8 @@ The host page can bulk-import a whole YouTube playlist by link, using the offici
 
 Everything else works fine without this — the host page just shows a clear error on the import button if it's not configured.
 
+The same key also powers **"🔁 Find replacement"**, next to any song flagged as non-embeddable (the "Check for broken videos" scan, or the live "❌ Embedding disabled" error during a round). It searches YouTube for a different upload of the same song — often an "Artist - Topic" auto-upload or a lyric video allows embedding even when the official music video doesn't — and lets you swap it in with one click, keeping the song's title/artist/category/points as-is. Each lookup costs about 100 of your daily 10,000 API quota units, so it's a per-song action, not something to run on a whole playlist at once.
+
 ### Spotify auto-categories (optional)
 
 With the "Auto-categories" game option turned on, the host page can suggest

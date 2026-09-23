@@ -113,7 +113,9 @@
 #playback-pill.pending { background: var(--surface-2); color: var(--text-muted); }
 #playback-pill.error { background: rgba(229, 72, 77, 0.18); color: var(--bad); }
 
-#open-youtube-fallback-btn { margin-left: 0.5rem; padding: 0.35em 0.9em; font-size: 0.85rem; }
+#open-youtube-fallback-btn, #find-replacement-live-btn { margin-left: 0.5rem; padding: 0.35em 0.9em; font-size: 0.85rem; }
+#find-replacement-live-result:empty { display: none; }
+#find-replacement-live-result { margin-top: 0.5rem; }
 
 .playlist-search { width: 100%; margin-bottom: 0.7rem; }
 
@@ -132,9 +134,24 @@
 }
 .broken-videos .broken-header { display: flex; align-items: center; justify-content: space-between; }
 .broken-videos .broken-header strong { color: var(--bad); }
-.broken-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.broken-row { display: flex; flex-direction: column; gap: 0.4rem; }
+.broken-row-main { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
 .broken-row .info { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .broken-row button { padding: 0.3em 0.7em; font-size: 0.85rem; }
+.broken-row .actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.replacement-result:empty { display: none; }
+.replacement-found {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 0.4em 0.7em;
+}
+.replacement-found .info { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85rem; }
+.replacement-found .actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
+.replacement-found button { padding: 0.25em 0.6em; font-size: 0.8rem; }
 
 .category-filter { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem; }
 .category-filter button {

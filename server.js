@@ -506,6 +506,59 @@ async function checkEmbeddable(apiKey, videoIds) {
   return embeddable;
 }
 
+// Looks for a differently-uploaded copy of the same song when the current
+// video has embedding disabled — many official-label uploads block it, but
+// an "Artist - Topic" auto-generated upload, a lyric video, or a fan upload
+// of the same track often doesn't. videoEmbeddable=true pre-filters on
+// YouTube's own end; checkEmbeddable() re-verifies anyway since that filter
+// can be stale, same as everywhere else this app checks embeddability.
+// Costs real API quota (100 units for the search + ~1 for the re-check), so
+// this is a deliberate, host-triggered lookup — never automatic.
+async function findReplacement(apiKey, title, artist) {
+  const q = [title, artist].filter(Boolean).join(' ');
+  const apiUrl = new URL('https://www.googleapis.com/youtube/v3/search');
+  apiUrl.searchParams.set('part', 'snippet');
+  apiUrl.searchParams.set('q', q);
+  apiUrl.searchParams.set('type', 'video');
+  apiUrl.searchParams.set('videoCategoryId', '10'); // Music — cuts down on reaction/cover-compilation noise
+  apiUrl.searchParams.set('videoEmbeddable', 'true');
+  apiUrl.searchParams.set('maxResults', '5');
+  apiUrl.searchParams.set('key', apiKey);
+
+  const r = await fetch(apiUrl);
+  const data = await r.json();
+  if (!r.ok) throw new Error((data.error && data.error.message) || `YouTube API error (${r.status})`);
+
+  const candidates = (data.items || [])
+    .map(item => ({
+      youtubeId: item.id && item.id.videoId,
+      title: item.snippet && item.snippet.title,
+      channelTitle: item.snippet && item.snippet.channelTitle,
+    }))
+    .filter(c => c.youtubeId);
+  if (!candidates.length) return null;
+
+  const embeddable = await checkEmbeddable(apiKey, candidates.map(c => c.youtubeId));
+  return candidates.find(c => embeddable.has(c.youtubeId)) || null;
+}
+
+app.post('/api/find-replacement', async (req, res) => {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) {
+    return res.status(400).json({
+      error: "YouTube search isn't configured — add YOUTUBE_API_KEY to your .env file (see README).",
+    });
+  }
+  const song = state.playlist.find(s => s.id === (req.body && req.body.id));
+  if (!song) return res.status(404).json({ error: 'Song not found.' });
+  try {
+    const replacement = await findReplacement(apiKey, song.title, song.artist);
+    res.json({ replacement });
+  } catch (e) {
+    res.status(502).json({ error: 'Could not reach the YouTube API — check your connection and try again.' });
+  }
+});
+
 app.post('/api/import-playlist', async (req, res) => {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
@@ -730,6 +783,22 @@ io.on('connection', (socket) => {
     const n = Number(points);
     if (!song || !Number.isFinite(n) || n < 1) return;
     song.points = Math.round(n);
+    savePlaylist();
+    broadcast();
+  });
+
+  // Swaps in a replacement video found via /api/find-replacement — only the
+  // youtubeId changes, title/artist/category/points/played stay exactly as
+  // the host already had them. If this song is the live currentSong,
+  // broadcasting the new youtubeId is enough on its own: tv.js's syncVideo()
+  // reloads whenever currentSong.youtubeId differs from what's loaded, so a
+  // mid-round swap just plays automatically, no separate "reload" event
+  // needed. Re-validates the id's shape rather than trusting the client,
+  // same as host:openOnYoutube.
+  socket.on('host:replaceSongVideo', ({ id, youtubeId } = {}) => {
+    const song = state.playlist.find(s => s.id === id);
+    if (!song || !youtubeId || !/^[\w-]{11}$/.test(youtubeId)) return;
+    song.youtubeId = youtubeId;
     savePlaylist();
     broadcast();
   });

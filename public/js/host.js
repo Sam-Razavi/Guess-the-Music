@@ -9,6 +9,8 @@ const connPill = document.getElementById('conn-pill');
 const roundStatusPill = document.getElementById('round-status-pill');
 const playbackPill = document.getElementById('playback-pill');
 const openYoutubeFallbackBtn = document.getElementById('open-youtube-fallback-btn');
+const findReplacementLiveBtn = document.getElementById('find-replacement-live-btn');
+const findReplacementLiveResult = document.getElementById('find-replacement-live-result');
 const timerPill = document.getElementById('timer-pill');
 const autoAdvancePill = document.getElementById('auto-advance-pill');
 const autoAdvanceInput = document.getElementById('auto-advance-input');
@@ -70,6 +72,8 @@ socket.on('addSongWarning', ({ message }) => {
 
 socket.on('playerStatus', ({ status, message }) => {
   openYoutubeFallbackBtn.hidden = status !== 'error';
+  findReplacementLiveBtn.hidden = status !== 'error';
+  if (status !== 'error') findReplacementLiveResult.innerHTML = '';
   if (status === 'error') setPlaybackPill('❌ ' + (message || 'Playback error'), 'error');
   else if (status === 'playing') setPlaybackPill('🔊 Playing', 'ok');
   else if (status === 'buffering') setPlaybackPill('⏳ Buffering…', 'pending');
@@ -79,6 +83,54 @@ socket.on('playerStatus', ({ status, message }) => {
 });
 
 openYoutubeFallbackBtn.addEventListener('click', () => socket.emit('host:openOnYoutube'));
+
+// ---------- find a replacement for a non-embeddable video ----------
+// Shared by the live "playback error" button and every broken-video scan
+// row below — same lookup (/api/find-replacement), same found/apply/dismiss
+// UI, just rendered into whichever container element is passed in.
+async function runFindReplacement(songId, containerEl) {
+  containerEl.innerHTML = '<p class="muted small">🔍 Searching for a replacement…</p>';
+  try {
+    const r = await fetch('/api/find-replacement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: songId }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      containerEl.innerHTML = `<p class="muted small">${escapeHtml(data.error || 'Search failed.')}</p>`;
+      return;
+    }
+    if (!data.replacement) {
+      containerEl.innerHTML = '<p class="muted small">No embeddable copy found.</p>';
+      return;
+    }
+    const { youtubeId, title, channelTitle } = data.replacement;
+    containerEl.innerHTML = `
+      <div class="replacement-found">
+        <span class="info">Found: ${escapeHtml(title)}${channelTitle ? ` — ${escapeHtml(channelTitle)}` : ''}</span>
+        <div class="actions">
+          <button class="primary" data-apply-replacement>✅ Use this</button>
+          <button data-dismiss-replacement>✕</button>
+        </div>
+      </div>
+    `;
+    containerEl.querySelector('[data-apply-replacement]').addEventListener('click', () => {
+      socket.emit('host:replaceSongVideo', { id: songId, youtubeId });
+      containerEl.innerHTML = '<p class="muted small">✅ Swapped in.</p>';
+    });
+    containerEl.querySelector('[data-dismiss-replacement]').addEventListener('click', () => {
+      containerEl.innerHTML = '';
+    });
+  } catch (e) {
+    containerEl.innerHTML = '<p class="muted small">Could not reach the server — try again.</p>';
+  }
+}
+
+findReplacementLiveBtn.addEventListener('click', () => {
+  if (!latestState || !latestState.currentSong) return;
+  runFindReplacement(latestState.currentSong.id, findReplacementLiveResult);
+});
 
 // ---------- language toggle ----------
 document.querySelectorAll('#lang-toggle [data-lang]').forEach(btn => {
@@ -207,8 +259,14 @@ function renderBrokenVideos(broken) {
       </div>
       ${broken.map(s => `
         <div class="broken-row" data-id="${s.id}">
-          <span class="info">${escapeHtml(s.title)}${s.artist ? ` — ${escapeHtml(s.artist)}` : ''}</span>
-          <button class="danger" data-remove-broken="${s.id}">✕</button>
+          <div class="broken-row-main">
+            <span class="info">${escapeHtml(s.title)}${s.artist ? ` — ${escapeHtml(s.artist)}` : ''}</span>
+            <div class="actions">
+              <button data-find-replacement="${s.id}">🔁 Find replacement</button>
+              <button class="danger" data-remove-broken="${s.id}">✕</button>
+            </div>
+          </div>
+          <div class="replacement-result" data-replacement-result="${s.id}"></div>
         </div>
       `).join('')}
     </div>
@@ -218,6 +276,12 @@ function renderBrokenVideos(broken) {
       socket.emit('host:removeSong', { id: btn.dataset.removeBroken });
       btn.closest('.broken-row').remove();
       if (!brokenVideosList.querySelector('.broken-row')) brokenVideosList.innerHTML = '';
+    });
+  });
+  brokenVideosList.querySelectorAll('[data-find-replacement]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.findReplacement;
+      runFindReplacement(id, brokenVideosList.querySelector(`[data-replacement-result="${id}"]`));
     });
   });
   const removeAllBtn = document.getElementById('remove-all-broken-btn');
