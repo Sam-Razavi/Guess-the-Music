@@ -705,6 +705,21 @@ function renderScoreboard(state) {
 }
 
 // ---------- game options ----------
+// Collapsible — the list has grown long (15+ toggles), and most of them get
+// set once per game night rather than looked at every visit. Remembered
+// per-device via localStorage, same pattern as MC mode, defaulting to open
+// so nothing changes for a host who's never touched the toggle.
+const optionsCard = document.getElementById('options-card');
+const optionsToggle = document.getElementById('options-toggle');
+let optionsCollapsed = false;
+try { optionsCollapsed = localStorage.getItem('gtm_options_collapsed') === '1'; } catch (e) { /* private browsing etc */ }
+optionsCard.classList.toggle('collapsed', optionsCollapsed);
+optionsToggle.addEventListener('click', () => {
+  optionsCollapsed = !optionsCollapsed;
+  optionsCard.classList.toggle('collapsed', optionsCollapsed);
+  try { localStorage.setItem('gtm_options_collapsed', optionsCollapsed ? '1' : '0'); } catch (e) { /* non-fatal */ }
+});
+
 document.querySelectorAll('#options-card [data-setting]').forEach(input => {
   input.addEventListener('change', () => {
     socket.emit('host:updateSettings', { [input.dataset.setting]: input.checked });

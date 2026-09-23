@@ -278,7 +278,25 @@
   .score-row .pts.score-pulse { animation: none; }
 }
 
-.options-list { display: flex; flex-direction: column; gap: 0.8rem; }
+#options-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+#options-toggle .chevron { transition: transform 0.25s ease; color: var(--text-muted); font-size: 0.9em; }
+#options-card.collapsed #options-toggle .chevron { transform: rotate(-90deg); }
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  overflow: hidden;
+  max-height: 2000px;
+  opacity: 1;
+  transition: max-height 0.35s ease, opacity 0.25s ease;
+}
+#options-card.collapsed .options-list { max-height: 0; opacity: 0; }
 .option-row { display: flex; gap: 0.7rem; align-items: flex-start; cursor: pointer; }
 .option-row input[type="checkbox"] { width: 1.3rem; height: 1.3rem; margin-top: 0.15rem; flex-shrink: 0; accent-color: var(--gold); }
 .option-row:has(input:disabled) { cursor: not-allowed; opacity: 0.5; }
