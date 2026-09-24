@@ -32,6 +32,8 @@ const mascotEl = document.getElementById('mascot');
 const discoBallEl = document.getElementById('disco-ball');
 const equalizerLeftEl = document.getElementById('equalizer-left');
 const equalizerRightEl = document.getElementById('equalizer-right');
+const spotlightsEl = document.getElementById('spotlights');
+const danceCrowdEl = document.getElementById('dance-crowd');
 const categoryVotePanelEl = document.getElementById('category-vote-panel');
 const idleWaitingBlockEl = document.getElementById('idle-waiting-block');
 const pausedOverlayEl = document.getElementById('paused-overlay');
@@ -283,6 +285,7 @@ socket.on('correct', () => {
   playChime();
   setMascotExpression('correct');
   celebrateDiscoBall();
+  if (latestState && latestState.settings && latestState.settings.extraAnimations) spawnLaserFlash();
 });
 
 // ---- steal mechanic: a wrong answer reopened buzzing, and whoever stole it
@@ -302,7 +305,10 @@ socket.on('steal', ({ name }) => {
   playChime();
   setMascotExpression('correct');
   celebrateDiscoBall();
-  if (latestState && latestState.settings && latestState.settings.extraAnimations) spawnStealBanner(name);
+  if (latestState && latestState.settings && latestState.settings.extraAnimations) {
+    spawnStealBanner(name);
+    spawnLaserFlash();
+  }
 });
 
 // ---- round timer countdown (soft cutoff — purely a display, the server
@@ -424,6 +430,61 @@ function updateEqualizer(state) {
   const visible = animationsOn && songAudible;
   equalizerLeftEl.hidden = !visible;
   equalizerRightEl.hidden = !visible;
+}
+
+// ---- ambient spotlight beams ----
+function updateSpotlights(state) {
+  if (!spotlightsEl) return;
+  spotlightsEl.hidden = !(state.settings && state.settings.extraAnimations);
+}
+
+// ---- dancing crowd ---- only the actual "party" moments (between rounds,
+// and celebrating after the game), never while a round needs attention.
+function updateDanceCrowd(state) {
+  if (!danceCrowdEl) return;
+  const animationsOn = state.settings && state.settings.extraAnimations;
+  const partyTime = state.roundStatus === 'idle' || state.roundStatus === 'results';
+  danceCrowdEl.hidden = !(animationsOn && partyTime);
+}
+
+// ---- fireworks ---- a bigger one-shot flourish than confetti, for the
+// results screen specifically. A handful of burst origins, each throwing a
+// ring of particles whose actual end offset is computed here in plain JS
+// (Math.cos/sin) rather than leaning on CSS's own trig functions.
+function spawnFireworks() {
+  if (reduceMotion) return;
+  const colors = ['#f5b942', '#ff6b5b', '#74c69d', '#f4efe6', '#ffe27a'];
+  const origins = [
+    { x: 25, y: 30 }, { x: 75, y: 25 }, { x: 50, y: 40 },
+  ];
+  origins.forEach((origin, i) => {
+    setTimeout(() => {
+      const particleCount = 14;
+      for (let j = 0; j < particleCount; j++) {
+        const particle = document.createElement('div');
+        particle.className = 'firework-particle';
+        const angle = (Math.PI * 2 * j) / particleCount + Math.random() * 0.3;
+        const distance = 90 + Math.random() * 70;
+        particle.style.left = origin.x + 'vw';
+        particle.style.top = origin.y + 'vh';
+        particle.style.background = colors[(i + j) % colors.length];
+        particle.style.setProperty('--tx', `${Math.cos(angle) * distance}px`);
+        particle.style.setProperty('--ty', `${Math.sin(angle) * distance}px`);
+        document.body.appendChild(particle);
+        particle.addEventListener('animationend', () => particle.remove());
+      }
+    }, i * 220); // stagger the bursts instead of all firing at once
+  });
+}
+
+// ---- laser flash ---- a quick colorful sweep for a correct answer/steal,
+// layered on top of the existing gold buzz-flash — gone well under a second.
+function spawnLaserFlash() {
+  if (reduceMotion) return;
+  const flash = document.createElement('div');
+  flash.className = 'laser-flash';
+  document.getElementById('stage').appendChild(flash);
+  setTimeout(() => flash.remove(), 700);
 }
 
 // ---- category vote ----
@@ -554,6 +615,8 @@ socket.on('state', (state) => {
   updateMascot(state);
   updateDiscoBall(state);
   updateEqualizer(state);
+  updateSpotlights(state);
+  updateDanceCrowd(state);
   renderCategoryVoteTV(state);
 
   if (state.currentSong && state.currentSong.hint) {
@@ -625,6 +688,7 @@ socket.on('state', (state) => {
       resultsShown = true;
       spawnConfetti();
       celebrateDiscoBall();
+      if (state.settings && state.settings.extraAnimations) spawnFireworks();
     }
   } else {
     resultsShown = false;

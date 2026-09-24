@@ -19,6 +19,17 @@
     </header>
 
     <main class="stage" id="stage">
+      <!-- Ambient concert-style spotlight beams (extraAnimations toggle —
+           cosmetic only). First in the DOM / lowest z-index so they sit
+           behind the video and every panel, only visible in the margins
+           around them — pure background atmosphere, never over anything
+           that needs reading. -->
+      <div class="spotlights" id="spotlights" aria-hidden="true" hidden>
+        <span class="spotlight spotlight-1"></span>
+        <span class="spotlight spotlight-2"></span>
+        <span class="spotlight spotlight-3"></span>
+      </div>
+
       <div class="video-box">
         <div id="yt-player"></div>
       </div>
@@ -140,6 +151,20 @@
       </div>
       <div class="equalizer equalizer-right" id="equalizer-right" aria-hidden="true" hidden>
         <span></span><span></span><span></span><span></span><span></span>
+      </div>
+
+      <!-- Dancing crowd (extraAnimations toggle — cosmetic only). Only
+           during 'idle' and 'results' — the actual party moments between
+           and after rounds — never during playing/buzzed/revealed where
+           the focus needs to stay on the round itself. Each dancer is the
+           same handful of divs repeated with a different accent color and
+           animation offset, not individually hand-built. -->
+      <div class="dance-crowd" id="dance-crowd" aria-hidden="true" hidden>
+        <div class="dancer d1"><div class="dancer-head"></div><div class="dancer-body"></div><div class="dancer-arm-l"></div><div class="dancer-arm-r"></div></div>
+        <div class="dancer d2"><div class="dancer-head"></div><div class="dancer-body"></div><div class="dancer-arm-l"></div><div class="dancer-arm-r"></div></div>
+        <div class="dancer d3"><div class="dancer-head"></div><div class="dancer-body"></div><div class="dancer-arm-l"></div><div class="dancer-arm-r"></div></div>
+        <div class="dancer d4"><div class="dancer-head"></div><div class="dancer-body"></div><div class="dancer-arm-l"></div><div class="dancer-arm-r"></div></div>
+        <div class="dancer d5"><div class="dancer-head"></div><div class="dancer-body"></div><div class="dancer-arm-l"></div><div class="dancer-arm-r"></div></div>
       </div>
 
       <!-- Disco ball (extraAnimations toggle — cosmetic only). Mirrors the
