@@ -180,6 +180,7 @@ const state = {
   badgeStats: { fastestBuzz: null, steals: {}, correct: {}, everLastPlace: {} }, // THIS GAME's running counters for computeBadges() — reset on resetGame
   snippetSeconds: 0,               // how long the TV plays this round's song before auto-pausing, 0 = off — see host:startRound
   wager: null,                     // {playerId, amount, timerSeconds} | null — Daily-Double-style exclusive round, see host:startRound/player:submitWager
+  knownBroken: {},                 // songId -> {message, at} — songs the TV has *actually* hit a real playback error on, see tv:playerStatus. In-memory only (not persisted, doesn't survive a restart) — it's a live diagnostic, not durable data, same reasoning the original playerStatus relay used for staying out of state/broadcast().
 };
 
 const ACTION_LOG_LIMIT = 50;
@@ -498,6 +499,7 @@ function payloadFor(role) {
       players: hideScores ? base.players.map(p => ({ ...p, score: null })) : base.players,
       currentSong: song && !wageringHidden
         ? {
+            id: song.id, // lets tv.js attribute a real playback error to this specific song — see tv:playerStatus
             youtubeId: song.youtubeId,
             title: revealed ? song.title : null,
             artist: revealed ? song.artist : null,
@@ -788,15 +790,25 @@ app.post('/api/import-playlist', async (req, res) => {
 // touch state — removal is a separate, explicit host action.
 app.post('/api/check-playlist', async (req, res) => {
   const apiKey = process.env.YOUTUBE_API_KEY;
+  // Real-playback failures the TV has actually hit (see tv:playerStatus) are
+  // ground truth regardless of whether a YOUTUBE_API_KEY is even configured
+  // — never gate those behind the optional key the way the Data-API check
+  // below is.
+  const knownBrokenIds = new Set(Object.keys(state.knownBroken));
+
   if (!apiKey) {
-    return res.status(400).json({
-      error: "YouTube checks aren't configured — add YOUTUBE_API_KEY to your .env file (see README).",
+    const broken = state.playlist
+      .filter(s => knownBrokenIds.has(s.id))
+      .map(s => ({ id: s.id, title: s.title, artist: s.artist }));
+    return res.json({
+      broken,
+      checkError: "Full playlist scan isn't configured — add YOUTUBE_API_KEY to your .env file (see README). Showing only songs with a confirmed real playback failure so far.",
     });
   }
   try {
     const { embeddable, hadApiError } = await checkEmbeddable(apiKey, state.playlist.map(s => s.youtubeId));
     const broken = state.playlist
-      .filter(s => !embeddable.has(s.youtubeId))
+      .filter(s => !embeddable.has(s.youtubeId) || knownBrokenIds.has(s.id))
       .map(s => ({ id: s.id, title: s.title, artist: s.artist }));
     // hadApiError means at least one batch's own API call failed (bad key,
     // quota exceeded, network issue) and that batch was skipped rather than
@@ -999,6 +1011,7 @@ io.on('connection', (socket) => {
       state.roundStatus = 'idle';
       clearRoundTimer();
     }
+    delete state.knownBroken[id];
     savePlaylist();
     broadcast();
   });
@@ -1024,6 +1037,7 @@ io.on('connection', (socket) => {
     const song = state.playlist.find(s => s.id === id);
     if (!song || !youtubeId || !/^[\w-]{11}$/.test(youtubeId)) return;
     song.youtubeId = youtubeId;
+    delete state.knownBroken[id]; // fresh video — give it a clean slate rather than carrying over the old one's failure
     savePlaylist();
     broadcast();
   });
@@ -1354,10 +1368,26 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  // Relay only — TV-local playback monitoring for the host's benefit, not
-  // shared game state, so it deliberately bypasses state/broadcast().
+  // Relay to the host (unchanged — TV-local monitoring info, not shared
+  // game state, deliberately bypasses state/broadcast() same as always).
+  // Also the one place this app learns the GROUND TRUTH about a video: the
+  // YouTube Data API's status.embeddable flag can say true for a video that
+  // still fails at actual iframe playback time (a real, documented quirk —
+  // Content-ID-claimed major-label uploads in particular can block
+  // embedding in a way that only shows up as an onError from the real
+  // player, never as an API field) — so a confirmed real failure here is
+  // recorded and fed into /api/check-playlist's broken-video scan too,
+  // catching exactly the case the Data-API-only check can miss.
   socket.on('tv:playerStatus', (payload) => {
     io.to('host').emit('playerStatus', payload);
+    if (!payload || !payload.songId) return;
+    if (payload.status === 'error') {
+      state.knownBroken[payload.songId] = { message: payload.message || 'Playback error', at: Date.now() };
+    } else if (payload.status === 'playing' || payload.status === 'buffering') {
+      // A real success for this song (this attempt, or after a replacement
+      // was applied) — the earlier failure no longer applies.
+      delete state.knownBroken[payload.songId];
+    }
   });
 
   // Manual fallback for videos with embedding disabled (no client fix exists

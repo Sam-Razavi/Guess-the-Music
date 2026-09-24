@@ -107,9 +107,18 @@ function ensurePlaybackStarted(attempt = 0) {
 
 // Lets the host see whether a song is *actually* playing, not just that
 // the round's game-state is 'playing' — the two can disagree (silently
-// stuck loading, or a video that flat-out can't play here).
+// stuck loading, or a video that flat-out can't play here). Also includes
+// which song this is about (server.js now sends currentSong.id for exactly
+// this) so a real playback error can be attributed to that specific song
+// and remembered — YouTube's Data API embeddable flag can say a video is
+// fine when it actually isn't, so this ground-truth signal is what catches
+// the gap.
 function reportPlayerStatus(status, message) {
-  socket.emit('tv:playerStatus', { status, message: message || null });
+  socket.emit('tv:playerStatus', {
+    status,
+    message: message || null,
+    songId: latestState && latestState.currentSong ? latestState.currentSong.id : null,
+  });
 }
 
 const YT_STATE_NAMES = { '-1': 'unstarted', 0: 'ended', 1: 'playing', 2: 'paused', 3: 'buffering', 5: 'cued' };

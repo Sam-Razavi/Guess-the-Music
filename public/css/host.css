@@ -145,6 +145,8 @@
   margin-bottom: 0.7rem;
 }
 .broken-videos .broken-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem; }
+.broken-header-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+#find-all-replacements-btn { font-size: 0.85rem; padding: 0.4em 0.8em; }
 .broken-videos .broken-header strong { color: var(--bad); }
 .broken-row { display: flex; flex-direction: column; gap: 0.4rem; }
 .broken-row-main { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }

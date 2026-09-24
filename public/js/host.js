@@ -86,11 +86,27 @@ socket.on('addSongWarning', ({ message }) => {
   addError.classList.add('warn');
 });
 
+// Auto-search once per distinct error occurrence — saves the host a click
+// at exactly the moment it matters most (a song just failed mid-party),
+// without silently re-spending quota on every repeated error event for the
+// same song (onError/onStateChange can both fire for one real failure).
+let lastAutoSearchedErrorSongId = null;
+
 socket.on('playerStatus', ({ status, message }) => {
   openYoutubeFallbackBtn.hidden = status !== 'error';
   findReplacementLiveBtn.hidden = status !== 'error';
-  if (status !== 'error') findReplacementLiveResult.innerHTML = '';
-  if (status === 'error') setPlaybackPill('❌ ' + (message || 'Playback error'), 'error');
+  if (status !== 'error') {
+    findReplacementLiveResult.innerHTML = '';
+    lastAutoSearchedErrorSongId = null; // a later, separate failure should be free to auto-search again
+  }
+  if (status === 'error') {
+    setPlaybackPill('❌ ' + (message || 'Playback error'), 'error');
+    const songId = latestState && latestState.currentSong && latestState.currentSong.id;
+    if (songId && lastAutoSearchedErrorSongId !== songId) {
+      lastAutoSearchedErrorSongId = songId;
+      runFindReplacement(songId, findReplacementLiveResult);
+    }
+  }
   else if (status === 'playing') setPlaybackPill('🔊 Playing', 'ok');
   else if (status === 'buffering') setPlaybackPill('⏳ Buffering…', 'pending');
   else if (status === 'paused') setPlaybackPill('⏸ Paused', 'pending');
@@ -293,7 +309,10 @@ function renderBrokenVideos(broken) {
     <div class="broken-videos">
       <div class="broken-header">
         <strong>❌ ${broken.length} won't play (embedding disabled)</strong>
-        <button class="danger" id="remove-all-broken-btn">Remove all</button>
+        <div class="broken-header-actions">
+          <button id="find-all-replacements-btn">🔁 Find replacements for all</button>
+          <button class="danger" id="remove-all-broken-btn">Remove all</button>
+        </div>
       </div>
       ${broken.map(s => `
         <div class="broken-row" data-id="${s.id}">
@@ -329,6 +348,24 @@ function renderBrokenVideos(broken) {
       broken.forEach(s => socket.emit('host:removeSong', { id: s.id }));
       brokenVideosList.innerHTML = '';
       checkPlaylistStatus.textContent = 'Removed.';
+    });
+  }
+  const findAllBtn = document.getElementById('find-all-replacements-btn');
+  if (findAllBtn) {
+    findAllBtn.addEventListener('click', async () => {
+      // Each search is its own YouTube search.list call (~100 quota units,
+      // same cost as the single-song button) — worth a clear heads-up before
+      // firing N of them at once, especially since quota exhaustion is
+      // exactly what can make the scanner itself look unreliable.
+      if (!confirm(`Search for replacements for all ${broken.length} broken videos? This uses about ${broken.length * 100} YouTube API quota units (roughly ${broken.length}% of the free daily default).`)) return;
+      findAllBtn.disabled = true;
+      // Sequential, not concurrent — keeps quota usage visible/predictable
+      // one result at a time rather than firing everything at once.
+      for (const s of broken) {
+        const container = brokenVideosList.querySelector(`[data-replacement-result="${s.id}"]`);
+        if (container) await runFindReplacement(s.id, container);
+      }
+      findAllBtn.disabled = false;
     });
   }
 }
