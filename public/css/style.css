@@ -43,7 +43,14 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
-  height: 100%;
+  /* min-height, not height — a fixed height:100% on both html and body is
+     the classic cause of "content below the fold is unreachable" on a
+     standalone-display PWA (host.html installs as one — see
+     manifest-host.json): the page still needs to grow taller than one
+     viewport and stay scrollable once its content (now several long cards
+     deep on the host page) exceeds it, which a bare height doesn't
+     guarantee the way min-height does. */
+  min-height: 100%;
   -webkit-font-smoothing: antialiased;
 }
 

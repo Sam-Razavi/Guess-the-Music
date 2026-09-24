@@ -460,7 +460,9 @@ function spawnPartyOrb() {
   const orb = document.createElement('div');
   orb.className = 'party-orb';
   const colors = ['var(--gold)', 'var(--coral)', 'var(--good)'];
-  orb.style.background = colors[Math.floor(Math.random() * colors.length)];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  orb.style.background = color;
+  orb.style.color = color; // the glow (box-shadow: currentColor) reads this
   // Far side edges only (0-12% or 88-100% from either side) — clear of the
   // video-box's own 20% margins, nowhere near centered panel content.
   const onLeft = Math.random() < 0.5;
@@ -590,7 +592,7 @@ function spawnLeadBanner(name) {
   banner.addEventListener('animationend', () => banner.remove());
 }
 
-function renderResults(players) {
+function renderResults(players, animationsOn) {
   const sorted = [...players].sort((a, b) => b.score - a.score);
   if (!sorted.length) {
     resultsListEl.innerHTML = `<p class="muted">${t('noOnePlayed', currentLang)}</p>`;
@@ -598,7 +600,7 @@ function renderResults(players) {
   }
   const topScore = sorted[0].score;
   resultsListEl.innerHTML = sorted.map((p, i) => `
-    <div class="results-row ${p.score === topScore ? 'first' : ''}">
+    <div class="results-row ${p.score === topScore ? 'first' : ''} ${p.score === topScore && animationsOn ? 'winner-glow' : ''}">
       <span class="rank">${p.score === topScore ? '🏆' : i + 1}</span>
       <span class="rname">${escapeHtml(p.name)}</span>
       <span class="rscore">${p.score}</span>
@@ -706,6 +708,12 @@ socket.on('state', (state) => {
     const title = state.currentSong.title || t('unknown', currentLang);
     const artist = state.currentSong.artist || '';
     revealTitleEl.textContent = title;
+    // Restarts automatically each time — .panel's own hidden->visible toggle
+    // on entering 'revealed' is what actually restarts a CSS animation
+    // declared on a descendant (same mechanism .panel-enter already relies
+    // on), so just keeping this class present is enough, no extra JS guard
+    // needed to replay it every round.
+    revealTitleEl.classList.toggle('shimmer', !!(state.settings && state.settings.extraAnimations));
     revealArtistEl.textContent = artist;
     // The big center reveal (above) fades out with .overlay almost right
     // away so the real video shows through — too quick to actually read.
@@ -719,7 +727,7 @@ socket.on('state', (state) => {
   }
 
   if (state.roundStatus === 'results') {
-    renderResults(state.players);
+    renderResults(state.players, !!(state.settings && state.settings.extraAnimations));
     renderAchievementBadges(state);
     renderSessionStats(state);
     if (!resultsShown) {

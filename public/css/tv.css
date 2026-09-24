@@ -220,16 +220,37 @@
   .mascot, .mascot[data-expression] { animation: none; }
 }
 
-/* ---- disco ball (extraAnimations) ---- */
+/* ---- disco ball (extraAnimations) ---- hangs from the top, off-center
+   (not dead-center or a screen corner) so it stays clear of the reveal
+   caption (top:4%, centered) and the mystery/wager banners (top:4%, the
+   4% corners) without needing to hide or move for either. Rotating the
+   whole element (string included, via transform-origin at the string's own
+   attachment point) for a real pendulum swing reads as more "hanging
+   object" than the old up/down bob ever did. */
 .disco-ball {
   position: absolute;
-  left: 4%;
-  bottom: 4%;
+  top: 3%;
+  left: 22%;
   z-index: 15;
-  width: 70px;
-  height: 70px;
+  width: 72px;
+  height: 72px;
   pointer-events: none;
-  animation: mascot-bob 2.6s ease-in-out infinite; /* same gentle bob as the mascot's idle, for a consistent motion language */
+  transform-origin: top center;
+  animation: disco-swing 3.6s ease-in-out infinite;
+}
+.disco-ball::before {
+  content: "";
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 24px;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.5));
+}
+@keyframes disco-swing {
+  0%, 100% { transform: rotate(-7deg); }
+  50% { transform: rotate(7deg); }
 }
 .disco-ball-sphere {
   width: 100%;
@@ -241,23 +262,43 @@
      the light, instead of the whole circle just spinning uniformly — same
      reasoning as the record's diagonal shine streak elsewhere on this page. */
   background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.4) 0 3px, transparent 3px 9px),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.5) 0 3px, transparent 3px 9px),
     repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.3) 0 3px, transparent 3px 9px),
-    radial-gradient(circle at 35% 30%, #eef0fa, #b6b8ca 45%, #7d7f94 100%);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+    radial-gradient(circle at 35% 30%, #f4f5ff, #c3c5da 45%, #8d8fa6 100%);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 30px rgba(245, 185, 66, 0.25);
   animation: disco-spin 5s linear infinite;
 }
 @keyframes disco-spin {
   from { background-position: 0 0, 0 0, 0 0; }
   to { background-position: 70px 0, -70px 0, 0 0; }
 }
+/* A soft downward cone of colored light, like the ball is actually casting
+   it — the single biggest thing that reads as "bright" rather than "a
+   spinning gray ball with a few dots on it". */
+.disco-ball-glow {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 260px;
+  height: 260px;
+  clip-path: polygon(46% 0%, 54% 0%, 100% 100%, 0% 100%);
+  background: conic-gradient(from 200deg at 50% 0%, var(--gold), var(--coral), var(--good), var(--gold));
+  opacity: 0.14;
+  mix-blend-mode: screen;
+  animation: disco-glow-pulse 3.2s ease-in-out infinite;
+}
+@keyframes disco-glow-pulse {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.2; }
+}
 .disco-sparkle {
   position: absolute;
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 10px 3px rgba(255, 255, 255, 0.9);
   opacity: 0;
   animation: disco-sparkle 2.2s ease-in-out infinite;
 }
@@ -269,12 +310,14 @@
   50% { opacity: 1; transform: scale(1.3); }
 }
 /* A brief extra flourish for a correct answer / steal / results — faster
-   spin, bigger sparkle pulse — triggered alongside the existing
-   confetti/chime at those same moments (see tv.js). */
+   spin/swing, bigger sparkle pulse, brighter glow — triggered alongside the
+   existing confetti/chime at those same moments (see tv.js). */
+.disco-ball.celebrate { animation-duration: 1s; }
 .disco-ball.celebrate .disco-ball-sphere { animation-duration: 1.2s; }
 .disco-ball.celebrate .disco-sparkle { animation-duration: 0.6s; }
+.disco-ball.celebrate .disco-ball-glow { opacity: 0.28; animation-duration: 0.8s; }
 @media (prefers-reduced-motion: reduce) {
-  .disco-ball, .disco-ball-sphere, .disco-sparkle { animation: none; }
+  .disco-ball, .disco-ball-sphere, .disco-sparkle, .disco-ball-glow { animation: none; }
 }
 
 /* ---- equalizer bars (extraAnimations) ---- flank the video in its own
@@ -300,6 +343,7 @@
   width: 9px;
   border-radius: 4px 4px 0 0;
   background: linear-gradient(180deg, var(--gold), var(--coral));
+  box-shadow: 0 0 10px rgba(245, 185, 66, 0.5);
 }
 /* Each bar gets its own duration/delay/peak-height keyframe so the row
    bounces unevenly rather than all in lockstep — that unevenness is most
@@ -349,16 +393,17 @@
   width: 45vw;
   height: 45vw;
   border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.14;
+  filter: blur(55px);
+  opacity: 0.24;
   mix-blend-mode: screen;
-  animation: glow-drift 26s ease-in-out infinite;
+  animation: glow-drift 22s ease-in-out infinite;
 }
-.glow-pool-1 { background: var(--gold); top: -10%; left: -8%; animation-duration: 24s; }
-.glow-pool-2 { background: var(--coral); bottom: -14%; right: -10%; animation-duration: 30s; animation-delay: -8s; }
+.glow-pool-1 { background: var(--gold); top: -10%; left: -8%; animation-duration: 20s; }
+.glow-pool-2 { background: var(--coral); bottom: -14%; right: -10%; animation-duration: 26s; animation-delay: -8s; }
+.glow-pool-3 { background: var(--good); top: 30%; left: 38%; width: 30vw; height: 30vw; opacity: 0.16; animation-duration: 32s; animation-delay: -15s; }
 @keyframes glow-drift {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(6%, 4%) scale(1.15); }
+  50% { transform: translate(6%, 4%) scale(1.2); }
 }
 @media (prefers-reduced-motion: reduce) {
   .glow-pool { animation: none; }
@@ -374,19 +419,20 @@
 .party-orb {
   position: absolute;
   bottom: 6%;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   filter: blur(1px);
   opacity: 0;
   pointer-events: none;
   z-index: 6;
+  box-shadow: 0 0 18px 4px currentColor;
   animation: party-orb-rise 6s ease-in forwards;
 }
 @keyframes party-orb-rise {
   0% { transform: translateY(0) scale(0.6); opacity: 0; }
-  12% { opacity: 0.55; }
-  85% { opacity: 0.35; }
+  12% { opacity: 0.85; }
+  85% { opacity: 0.5; }
   100% { transform: translateY(-70vh) scale(1); opacity: 0; }
 }
 
@@ -399,12 +445,12 @@
    kiosk deployment on. */
 .firework-particle {
   position: fixed;
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   z-index: 55;
   pointer-events: none;
-  box-shadow: 0 0 8px 2px currentColor;
+  box-shadow: 0 0 12px 4px currentColor;
   animation: firework-burst 1.3s ease-out forwards;
 }
 @keyframes firework-burst {
@@ -551,6 +597,29 @@
 
 #reveal-title, #reveal-artist { font-family: var(--font-fun); }
 #reveal-title { color: var(--gold); }
+/* A bright diagonal shine sweeps across the title once as it appears — a
+   common "unveiling" touch in real broadcast graphics packages, and
+   deliberately a ONE-SHOT (animation, not infinite) so it doesn't compete
+   with actually reading the answer afterward. Only under the
+   extraAnimations toggle (like every other flourish here) — added via a
+   class in tv.js rather than unconditionally, so the plain solid-gold
+   #reveal-title above stays the reliable fallback whenever it's off. */
+#reveal-title.shimmer {
+  background: linear-gradient(110deg, var(--gold) 40%, #fff 50%, var(--gold) 60%);
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: title-shimmer 1.4s ease-out 0.15s;
+}
+@keyframes title-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -20% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #reveal-title.shimmer { animation: none; background-position: -20% 0; }
+}
 
 #snippet-hint { color: var(--gold); font-size: 1.05rem; }
 
@@ -780,6 +849,18 @@
   font-size: 1.3rem;
 }
 .results-row.first { box-shadow: 0 0 0 2px var(--gold) inset; }
+/* Winner glow (extraAnimations) — a slow pulsing gold halo around the #1
+   row specifically, applied as its own class from tv.js rather than
+   unconditionally, so results still look complete and correct with
+   extraAnimations off (just the plain inset ring above, no pulse). */
+.results-row.first.winner-glow { animation: winner-glow-pulse 2.2s ease-in-out infinite; }
+@keyframes winner-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--gold) inset, 0 0 18px 2px rgba(245, 185, 66, 0.35); }
+  50% { box-shadow: 0 0 0 2px var(--gold) inset, 0 0 34px 8px rgba(245, 185, 66, 0.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .results-row.first.winner-glow { animation: none; }
+}
 .results-row .rank { color: var(--text-muted); width: 2ch; }
 .results-row .rname { flex: 1; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .results-row .rscore { color: var(--gold); font-weight: 700; }

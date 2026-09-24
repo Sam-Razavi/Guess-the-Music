@@ -27,6 +27,7 @@
       <div class="ambient-glow" id="ambient-glow" aria-hidden="true" hidden>
         <span class="glow-pool glow-pool-1"></span>
         <span class="glow-pool glow-pool-2"></span>
+        <span class="glow-pool glow-pool-3"></span>
       </div>
 
       <div class="video-box">
@@ -161,14 +162,16 @@
            collision to chase as that content's height changes. -->
 
 
-      <!-- Disco ball (extraAnimations toggle — cosmetic only). Mirrors the
-           mascot's corner placement on the opposite side; same "no new
-           asset" CSS-only approach — the spinning-facets look comes from
-           animating the tiled gradient's background-position rather than
-           rotating the whole circle, so individual facets appear to catch
-           the light as they slide past, not just the ball as a whole
-           spinning uniformly. -->
+      <!-- Disco ball (extraAnimations toggle — cosmetic only). Hangs from
+           the top, off-center — clear of the centered reveal caption and
+           the corner mystery/wager banners without needing to hide or move
+           for either. Same "no new asset" CSS-only approach as the mascot
+           — the spinning-facets look comes from animating the tiled
+           gradient's background-position rather than rotating the whole
+           circle, so individual facets appear to catch the light as they
+           slide past, not just the ball as a whole spinning uniformly. -->
       <div class="disco-ball" id="disco-ball" aria-hidden="true" hidden>
+        <div class="disco-ball-glow"></div>
         <div class="disco-ball-sphere"></div>
         <span class="disco-sparkle s1"></span>
         <span class="disco-sparkle s2"></span>
