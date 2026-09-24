@@ -33,6 +33,7 @@ const discoBallEl = document.getElementById('disco-ball');
 const equalizerLeftEl = document.getElementById('equalizer-left');
 const equalizerRightEl = document.getElementById('equalizer-right');
 const ambientGlowEl = document.getElementById('ambient-glow');
+const laserBeamsEl = document.getElementById('laser-beams');
 const categoryVotePanelEl = document.getElementById('category-vote-panel');
 const idleWaitingBlockEl = document.getElementById('idle-waiting-block');
 const pausedOverlayEl = document.getElementById('paused-overlay');
@@ -415,16 +416,27 @@ function updateMascot(state) {
   prevRoundStatusForMascot = status;
 }
 
-// ---- disco ball ----
+// ---- disco ball + laser beams ---- one "the lights are going off" moment,
+// triggered together for a correct answer/steal/results.
 function celebrateDiscoBall() {
-  if (!discoBallEl || discoBallEl.hidden) return;
-  discoBallEl.classList.add('celebrate');
-  setTimeout(() => discoBallEl.classList.remove('celebrate'), 1800);
+  if (discoBallEl && !discoBallEl.hidden) {
+    discoBallEl.classList.add('celebrate');
+    setTimeout(() => discoBallEl.classList.remove('celebrate'), 1800);
+  }
+  if (laserBeamsEl && !laserBeamsEl.hidden) {
+    laserBeamsEl.classList.add('celebrate');
+    setTimeout(() => laserBeamsEl.classList.remove('celebrate'), 1800);
+  }
 }
 
 function updateDiscoBall(state) {
   if (!discoBallEl) return;
   discoBallEl.hidden = !(state.settings && state.settings.extraAnimations);
+}
+
+function updateLaserBeams(state) {
+  if (!laserBeamsEl) return;
+  laserBeamsEl.hidden = !(state.settings && state.settings.extraAnimations);
 }
 
 // ---- equalizer bars ---- visible whenever a song is actually audibly
@@ -648,6 +660,7 @@ socket.on('state', (state) => {
   latestState = state;
   currentLang = state.language || 'en';
   applyTranslations(currentLang);
+  document.documentElement.dataset.theme = state.theme || 'dark';
   renderScoreboard(state.players);
   showPanel(state.roundStatus);
   updateMysteryBanner(state);
@@ -656,6 +669,7 @@ socket.on('state', (state) => {
   updateDiscoBall(state);
   updateEqualizer(state);
   updateAmbientGlow(state);
+  updateLaserBeams(state);
   updatePartyOrbs(state);
   renderCategoryVoteTV(state);
 

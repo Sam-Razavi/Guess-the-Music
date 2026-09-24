@@ -28,6 +28,32 @@ html[dir="rtl"] {
   --font-fun: "Vazirmatn", var(--font-body);
 }
 
+/* Light theme (host:setTheme, mirrors the language toggle exactly — a
+   shared state.theme broadcast to host/tv/player alike, same "in-memory
+   only, defaults fresh on restart" treatment as state.language). Same
+   attribute-selector-overrides-:root technique as the RTL block above, so
+   it cleanly wins everywhere a token is used via var() with zero changes
+   needed in host.css/tv.css/player.css themselves.
+   --gold/--good/--coral are darkened here, not left as-is: they're used as
+   plain TEXT color in dozens of places (scores, pills, titles) sitting on
+   a neutral/tinted-neutral surface, and the bright dark-mode versions have
+   under 2:1 contrast against white — nowhere near readable. A handful of
+   TV elements intentionally keep a fixed dark backdrop regardless of theme
+   (the paused overlay, the reveal caption, the auto-advance hint) — those
+   pin their own text to fixed colors instead of these tokens, see tv.css. */
+html[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: #f5f2ea;
+  --surface-2: #eae4d5;
+  --text: #1e1832;
+  --text-muted: #6b6478;
+  --gold: #9c6b00;
+  --coral: #c9432f;
+  --good: #1f8a5c;
+  --bad: #c62828;
+  color-scheme: light;
+}
+
 * { box-sizing: border-box; }
 
 /* Any element using the `hidden` attribute must actually hide, regardless

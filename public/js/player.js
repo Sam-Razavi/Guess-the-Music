@@ -213,6 +213,7 @@ let wasArmed = false;
 socket.on('state', (state) => {
   const lang = state.language || 'en';
   applyTranslations(lang);
+  document.documentElement.dataset.theme = state.theme || 'dark';
   renderMysteryNote(state);
   renderCategoryVote(state);
   renderWager(state);

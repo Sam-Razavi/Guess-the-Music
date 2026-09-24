@@ -196,6 +196,22 @@ function renderLangToggle(state) {
   });
 }
 
+// ---------- theme toggle ---------- shared with tv/player (host:setTheme,
+// mirrors host:setLanguage exactly) — the host's own page follows it too,
+// for the same reason MC mode doesn't: unlike MC mode this is a shared
+// look for the whole game, not a per-device layout choice.
+document.querySelectorAll('#theme-toggle [data-theme]').forEach(btn => {
+  btn.addEventListener('click', () => socket.emit('host:setTheme', btn.dataset.theme));
+});
+
+function renderThemeToggle(state) {
+  const theme = state.theme || 'dark';
+  document.documentElement.dataset.theme = theme;
+  document.querySelectorAll('#theme-toggle [data-theme]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+}
+
 // ---------- join info ----------
 fetch('/join-info').then(r => r.json()).then(({ url, mdnsUrl }) => {
   document.getElementById('join-url').textContent = url;
@@ -922,6 +938,7 @@ socket.on('state', (state) => {
   renderPlaylist(state);
   renderScoreboard(state);
   renderLangToggle(state);
+  renderThemeToggle(state);
   renderAddSongCollapse(state);
   renderSettings(state);
   renderCategoryVote(state);

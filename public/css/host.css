@@ -407,5 +407,8 @@ body.mc-mode .round-actions button { font-size: 1.15rem; padding: 0.9em 1.3em; }
 body.mc-mode .buzz-row button { font-size: 1.2rem; min-height: 3rem; }
 
 .join-card { text-align: center; }
-.join-card img { border-radius: 10px; background: var(--text); padding: 8px; margin: 0.6rem 0 1rem; }
+/* Fixed white, not var(--text) — see the matching #qr comment in tv.css:
+   the generated QR PNG is dark modules on a transparent background, so its
+   backdrop needs to stay light regardless of theme. */
+.join-card img { border-radius: 10px; background: #ffffff; padding: 8px; margin: 0.6rem 0 1rem; }
 .join-actions { display: flex; justify-content: center; gap: 0.6rem; flex-wrap: wrap; }

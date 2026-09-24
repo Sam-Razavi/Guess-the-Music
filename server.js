@@ -163,6 +163,7 @@ const state = {
   roundTimer: null,               // {seconds, endsAt} | null — a soft cutoff, doesn't change roundStatus
   buzzingLocked: false,           // true once the timer expires with no buzz — host still controls reveal/close
   language: 'en',                 // 'en' | 'fa' — TV/player display language, set by the host
+  theme: 'dark',                  // 'dark' | 'light' — TV/player/host display theme, set by the host; same in-memory-only, resets-on-restart treatment as language
   autoAdvance: null,               // {endsAt} | null — pending auto-start of the next unplayed song after a reveal
   settings: loadSettings(),       // host-toggleable game options — see DEFAULT_SETTINGS
   roundHadMiss: false,             // true once resetBuzzers has fired this round — powers the steal-mechanic bonus
@@ -435,6 +436,7 @@ function payloadFor(role) {
     roundTimer: state.roundTimer,
     buzzingLocked: state.buzzingLocked,
     language: state.language,
+    theme: state.theme,
     autoAdvance: state.autoAdvance,
     settings: state.settings,
     paused: state.paused,
@@ -1292,6 +1294,12 @@ io.on('connection', (socket) => {
   socket.on('host:setLanguage', (lang) => {
     if (lang !== 'en' && lang !== 'fa') return;
     state.language = lang;
+    broadcast();
+  });
+
+  socket.on('host:setTheme', (theme) => {
+    if (theme !== 'dark' && theme !== 'light') return;
+    state.theme = theme;
     broadcast();
   });
 

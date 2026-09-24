@@ -38,6 +38,13 @@
   bottom: 3%;
   transform: translateX(-50%);
   background: rgba(22, 18, 31, 0.85);
+  /* Fixed, not var(--text-muted) — this chip's own backdrop deliberately
+     stays dark regardless of theme (a floating caption over video content
+     reads fine dark in either), so its text needs to stay light to match,
+     not follow --text-muted into a near-unreadable dark-on-dark in light
+     mode. Same reasoning for #caption-title/#caption-artist and
+     .paused-overlay h1 below. */
+  color: #9c93b0;
   padding: 0.5em 1.2em;
   border-radius: 999px;
   font-size: 1.05rem;
@@ -409,6 +416,44 @@
   .glow-pool { animation: none; }
 }
 
+/* ---- laser beams (extraAnimations) ---- thin club-style beams pivoting
+   from just above the top edge, sweeping at different speeds/phases so they
+   cross rather than move in lockstep. Same negative-z-index layer as the
+   ambient glow (behind the video, in its own margins), so a real "laser
+   show" feel never actually crosses over the video or any readable text. */
+.laser-beams {
+  position: absolute;
+  inset: 0;
+  z-index: -1; /* same reasoning as .ambient-glow: negative, not a small positive, to guarantee it stays behind .video-box (which has no z-index of its own) */
+  overflow: hidden;
+  pointer-events: none;
+}
+.laser-beam {
+  position: absolute;
+  top: -8%;
+  width: 3px;
+  height: 130%;
+  transform-origin: top center;
+  opacity: 0.4;
+  mix-blend-mode: screen;
+  animation: laser-sweep ease-in-out infinite;
+}
+.laser-beam-1 { left: 8%; background: linear-gradient(180deg, var(--gold), transparent 75%); animation-duration: 4.5s; }
+.laser-beam-2 { left: 28%; background: linear-gradient(180deg, var(--coral), transparent 75%); animation-duration: 5.5s; animation-delay: -1.5s; animation-direction: reverse; }
+.laser-beam-3 { right: 24%; background: linear-gradient(180deg, var(--good), transparent 75%); animation-duration: 6s; animation-delay: -3s; }
+.laser-beam-4 { right: 6%; background: linear-gradient(180deg, var(--gold), transparent 75%); animation-duration: 5s; animation-delay: -2s; animation-direction: reverse; }
+@keyframes laser-sweep {
+  0%, 100% { transform: rotate(-22deg); }
+  50% { transform: rotate(22deg); }
+}
+/* A brief brighter, faster sweep for a correct answer/steal/results,
+   triggered alongside the disco ball's own celebrate burst (see tv.js) —
+   ties the two effects together as one "the lights are going off" moment. */
+.laser-beams.celebrate .laser-beam { opacity: 0.7; animation-duration: 0.9s !important; }
+@media (prefers-reduced-motion: reduce) {
+  .laser-beam { animation: none; }
+}
+
 /* ---- party light orbs (extraAnimations) ---- soft bokeh lights drifting
    up the far side edges, spawned one at a time in tv.js (same pattern as
    the idle screen's floating musical notes) — deliberately abstract rather
@@ -494,6 +539,7 @@
   justify-content: center;
   gap: 1.2rem;
   background: rgba(22, 18, 31, 0.94);
+  color: #f4efe6; /* fixed, not inherited --text — see the .auto-advance-hint comment above */
   text-align: center;
 }
 .paused-overlay h1 { font-size: 2.2rem; max-width: 20ch; }
@@ -566,8 +612,8 @@
   white-space: nowrap;
   animation: caption-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-#caption-title { color: var(--gold); font-weight: 600; }
-#caption-artist { color: var(--text-muted); font-size: 0.85em; }
+#caption-title { color: #f5b942; font-weight: 600; } /* fixed, not var(--gold) — see the .auto-advance-hint comment near the top of this file */
+#caption-artist { color: #9c93b0; font-size: 0.85em; }
 #caption-artist:not(:empty)::before { content: " — "; }
 @keyframes caption-pop {
   0% { transform: translateX(-50%) scale(0.85); opacity: 0; }
@@ -708,7 +754,11 @@
   #playing-subtext.timer-critical { animation: none; }
 }
 
-#qr { border-radius: 12px; background: var(--text); padding: 10px; }
+/* Fixed white, not var(--text) — the generated QR PNG itself is dark
+   modules on a transparent background (see server.js's QRCode.toBuffer
+   call), so its backdrop needs to stay light regardless of theme or the
+   dark modules would vanish against a dark backdrop in light mode. */
+#qr { border-radius: 12px; background: #ffffff; padding: 10px; }
 
 #idle-hint { min-height: 1.4em; transition: opacity 0.4s ease; }
 
