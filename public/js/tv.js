@@ -32,8 +32,7 @@ const mascotEl = document.getElementById('mascot');
 const discoBallEl = document.getElementById('disco-ball');
 const equalizerLeftEl = document.getElementById('equalizer-left');
 const equalizerRightEl = document.getElementById('equalizer-right');
-const spotlightsEl = document.getElementById('spotlights');
-const danceCrowdEl = document.getElementById('dance-crowd');
+const ambientGlowEl = document.getElementById('ambient-glow');
 const categoryVotePanelEl = document.getElementById('category-vote-panel');
 const idleWaitingBlockEl = document.getElementById('idle-waiting-block');
 const pausedOverlayEl = document.getElementById('paused-overlay');
@@ -294,7 +293,7 @@ socket.on('correct', () => {
   playChime();
   setMascotExpression('correct');
   celebrateDiscoBall();
-  if (latestState && latestState.settings && latestState.settings.extraAnimations) spawnLaserFlash();
+  if (latestState && latestState.settings && latestState.settings.extraAnimations) spawnCorrectPulse();
 });
 
 // ---- steal mechanic: a wrong answer reopened buzzing, and whoever stole it
@@ -316,7 +315,7 @@ socket.on('steal', ({ name }) => {
   celebrateDiscoBall();
   if (latestState && latestState.settings && latestState.settings.extraAnimations) {
     spawnStealBanner(name);
-    spawnLaserFlash();
+    spawnCorrectPulse();
   }
 });
 
@@ -441,59 +440,89 @@ function updateEqualizer(state) {
   equalizerRightEl.hidden = !visible;
 }
 
-// ---- ambient spotlight beams ----
-function updateSpotlights(state) {
-  if (!spotlightsEl) return;
-  spotlightsEl.hidden = !(state.settings && state.settings.extraAnimations);
+// ---- ambient glow ----
+function updateAmbientGlow(state) {
+  if (!ambientGlowEl) return;
+  ambientGlowEl.hidden = !(state.settings && state.settings.extraAnimations);
 }
 
-// ---- dancing crowd ---- only the actual "party" moments (between rounds,
-// and celebrating after the game), never while a round needs attention.
-function updateDanceCrowd(state) {
-  if (!danceCrowdEl) return;
+// ---- party light orbs ---- replaces an earlier literal "dancing crowd" of
+// little cartoon figures — abstract bokeh lights read as more polished and,
+// just as importantly, drifting up the far side edges (well outside the
+// video-box's own margins) can never collide with the centered idle-panel
+// content the way a fixed-position row anchored to the bottom center did
+// (that's what was actually overlapping the join QR code before). Only the
+// actual "party" moments — idle (between rounds) and results — never while
+// a round needs attention.
+let partyOrbInterval = null;
+function spawnPartyOrb() {
+  if (reduceMotion) return;
+  const orb = document.createElement('div');
+  orb.className = 'party-orb';
+  const colors = ['var(--gold)', 'var(--coral)', 'var(--good)'];
+  orb.style.background = colors[Math.floor(Math.random() * colors.length)];
+  // Far side edges only (0-12% or 88-100% from either side) — clear of the
+  // video-box's own 20% margins, nowhere near centered panel content.
+  const onLeft = Math.random() < 0.5;
+  orb.style[onLeft ? 'left' : 'right'] = (2 + Math.random() * 10) + '%';
+  orb.style.animationDuration = (5 + Math.random() * 3) + 's';
+  document.getElementById('stage').appendChild(orb);
+  orb.addEventListener('animationend', () => orb.remove());
+}
+
+function updatePartyOrbs(state) {
   const animationsOn = state.settings && state.settings.extraAnimations;
   const partyTime = state.roundStatus === 'idle' || state.roundStatus === 'results';
-  danceCrowdEl.hidden = !(animationsOn && partyTime);
+  const active = animationsOn && partyTime;
+  if (active && !partyOrbInterval) {
+    spawnPartyOrb();
+    partyOrbInterval = setInterval(spawnPartyOrb, 1400);
+  } else if (!active && partyOrbInterval) {
+    clearInterval(partyOrbInterval);
+    partyOrbInterval = null;
+  }
 }
 
 // ---- fireworks ---- a bigger one-shot flourish than confetti, for the
-// results screen specifically. A handful of burst origins, each throwing a
-// ring of particles whose actual end offset is computed here in plain JS
+// results screen specifically. A handful of soft-glowing burst origins,
+// restrained to the brand's own 3 accent colors rather than a scattershot
+// rainbow, each particle's actual end offset computed here in plain JS
 // (Math.cos/sin) rather than leaning on CSS's own trig functions.
 function spawnFireworks() {
   if (reduceMotion) return;
-  const colors = ['#f5b942', '#ff6b5b', '#74c69d', '#f4efe6', '#ffe27a'];
-  const origins = [
-    { x: 25, y: 30 }, { x: 75, y: 25 }, { x: 50, y: 40 },
-  ];
+  const colors = ['#f5b942', '#ff6b5b', '#74c69d'];
+  const origins = [{ x: 30, y: 32 }, { x: 70, y: 28 }];
   origins.forEach((origin, i) => {
     setTimeout(() => {
-      const particleCount = 14;
+      const particleCount = 10;
+      const color = colors[i % colors.length];
       for (let j = 0; j < particleCount; j++) {
         const particle = document.createElement('div');
         particle.className = 'firework-particle';
         const angle = (Math.PI * 2 * j) / particleCount + Math.random() * 0.3;
-        const distance = 90 + Math.random() * 70;
+        const distance = 80 + Math.random() * 55;
         particle.style.left = origin.x + 'vw';
         particle.style.top = origin.y + 'vh';
-        particle.style.background = colors[(i + j) % colors.length];
+        particle.style.background = color;
+        particle.style.color = color; // box-shadow glow reads currentColor — see .firework-particle
         particle.style.setProperty('--tx', `${Math.cos(angle) * distance}px`);
         particle.style.setProperty('--ty', `${Math.sin(angle) * distance}px`);
         document.body.appendChild(particle);
         particle.addEventListener('animationend', () => particle.remove());
       }
-    }, i * 220); // stagger the bursts instead of all firing at once
+    }, i * 260); // stagger the bursts instead of both firing at once
   });
 }
 
-// ---- laser flash ---- a quick colorful sweep for a correct answer/steal,
-// layered on top of the existing gold buzz-flash — gone well under a second.
-function spawnLaserFlash() {
+// ---- correct-answer light pulse ---- a clean expanding ring from center
+// for a correct answer/steal, replacing an earlier "crossing lasers"
+// version — gone in under a second, well clear of the moment's own text.
+function spawnCorrectPulse() {
   if (reduceMotion) return;
-  const flash = document.createElement('div');
-  flash.className = 'laser-flash';
-  document.getElementById('stage').appendChild(flash);
-  setTimeout(() => flash.remove(), 700);
+  const pulse = document.createElement('div');
+  pulse.className = 'correct-pulse';
+  document.getElementById('stage').appendChild(pulse);
+  pulse.addEventListener('animationend', () => pulse.remove());
 }
 
 // ---- category vote ----
@@ -624,8 +653,8 @@ socket.on('state', (state) => {
   updateMascot(state);
   updateDiscoBall(state);
   updateEqualizer(state);
-  updateSpotlights(state);
-  updateDanceCrowd(state);
+  updateAmbientGlow(state);
+  updatePartyOrbs(state);
   renderCategoryVoteTV(state);
 
   if (state.currentSong && state.currentSong.hint) {

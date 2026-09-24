@@ -327,11 +327,13 @@
   .equalizer span { animation: none; height: 40%; }
 }
 
-/* ---- ambient spotlight beams (extraAnimations) ---- pure background
-   atmosphere: low opacity, low z-index, behind the video and every panel,
-   never over anything that needs reading. Each beam is a soft-edged wedge
-   (conic-gradient) anchored off-screen above a corner, slowly sweeping. */
-.spotlights {
+/* ---- ambient glow (extraAnimations) ---- replaces an earlier, busier
+   "rotating spotlight beam" version — this is deliberately calmer: two
+   large, very soft blurred pools of color that slowly drift and breathe
+   behind the video, more like premium ambient stage wash than a searchlight
+   sweep. Pure background atmosphere: low opacity, negative z-index, never
+   over anything that needs reading. */
+.ambient-glow {
   position: absolute;
   inset: 0;
   /* Negative, not a small positive number: .video-box has no z-index of its
@@ -342,150 +344,98 @@
   overflow: hidden;
   pointer-events: none;
 }
-.spotlight {
+.glow-pool {
   position: absolute;
-  top: -20%;
-  width: 140%;
-  height: 140%;
-  background: conic-gradient(from 0deg, transparent 0deg, var(--beam-color, var(--gold)) 6deg, transparent 14deg);
-  opacity: 0.16;
+  width: 45vw;
+  height: 45vw;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.14;
   mix-blend-mode: screen;
-  animation: spotlight-sweep 14s ease-in-out infinite;
+  animation: glow-drift 26s ease-in-out infinite;
 }
-.spotlight-1 { --beam-color: var(--gold); left: -30%; animation-duration: 16s; }
-.spotlight-2 { --beam-color: var(--coral); right: -30%; left: auto; animation-duration: 19s; animation-delay: -4s; animation-direction: reverse; }
-.spotlight-3 { --beam-color: var(--good); left: 20%; animation-duration: 22s; animation-delay: -9s; }
-@keyframes spotlight-sweep {
-  0%, 100% { transform: rotate(-35deg); }
-  50% { transform: rotate(35deg); }
+.glow-pool-1 { background: var(--gold); top: -10%; left: -8%; animation-duration: 24s; }
+.glow-pool-2 { background: var(--coral); bottom: -14%; right: -10%; animation-duration: 30s; animation-delay: -8s; }
+@keyframes glow-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(6%, 4%) scale(1.15); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .spotlight { animation: none; transform: rotate(0deg); }
+  .glow-pool { animation: none; }
 }
 
-/* ---- dancing crowd (extraAnimations) ---- only during idle/results (see
-   tv.js) — a little cluster of party-goers, not meant to be looked at
-   closely, so each one is a handful of divs (head, body, two arms) rather
-   than the mascot's more detailed face-and-expression build. */
-.dance-crowd {
+/* ---- party light orbs (extraAnimations) ---- soft bokeh lights drifting
+   up the far side edges, spawned one at a time in tv.js (same pattern as
+   the idle screen's floating musical notes) — deliberately abstract rather
+   than literal little dancing figures, and kept well outside the video-
+   box's own margins so it can never collide with centered panel content
+   (the join QR code in particular) regardless of that content's height.
+   Only during 'idle' and 'results' — the actual party moments. */
+.party-orb {
   position: absolute;
-  left: 50%;
-  bottom: 3%;
-  transform: translateX(-50%);
-  z-index: 11;
-  display: flex;
-  align-items: flex-end;
-  gap: 1.4rem;
-  pointer-events: none;
-}
-.dancer { position: relative; width: 26px; height: 58px; animation: dancer-sway 1.1s ease-in-out infinite; }
-.dancer-head {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 16px;
-  height: 16px;
+  bottom: 6%;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: var(--dancer-color, var(--gold));
+  filter: blur(1px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 6;
+  animation: party-orb-rise 6s ease-in forwards;
 }
-.dancer-body {
-  position: absolute;
-  top: 15px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 14px;
-  height: 30px;
-  border-radius: 7px;
-  background: var(--dancer-color, var(--gold));
-  opacity: 0.85;
-}
-.dancer-arm-l, .dancer-arm-r {
-  position: absolute;
-  top: 18px;
-  width: 5px;
-  height: 20px;
-  border-radius: 999px;
-  background: var(--dancer-color, var(--gold));
-  transform-origin: top center;
-  animation: dancer-arms 1.1s ease-in-out infinite;
-}
-.dancer-arm-l { left: 2px; }
-.dancer-arm-r { right: 2px; animation-delay: 0.15s; }
-/* Different accent color + a slightly different beat per dancer so the row
-   reads as a crowd, not five clones moving in lockstep. */
-.dancer.d1 { --dancer-color: var(--gold); animation-duration: 0.9s; }
-.dancer.d2 { --dancer-color: var(--coral); animation-duration: 1.05s; animation-delay: -0.2s; }
-.dancer.d3 { --dancer-color: var(--good); animation-duration: 0.8s; animation-delay: -0.5s; }
-.dancer.d4 { --dancer-color: var(--coral); animation-duration: 1.15s; animation-delay: -0.1s; }
-.dancer.d5 { --dancer-color: var(--gold); animation-duration: 0.95s; animation-delay: -0.35s; }
-@keyframes dancer-sway {
-  0%, 100% { transform: translateY(0) rotate(-6deg); }
-  50% { transform: translateY(-10px) rotate(6deg); }
-}
-@keyframes dancer-arms {
-  0%, 100% { transform: rotate(-50deg); }
-  50% { transform: rotate(50deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dancer, .dancer-arm-l, .dancer-arm-r { animation: none; }
+@keyframes party-orb-rise {
+  0% { transform: translateY(0) scale(0.6); opacity: 0; }
+  12% { opacity: 0.55; }
+  85% { opacity: 0.35; }
+  100% { transform: translateY(-70vh) scale(1); opacity: 0; }
 }
 
 /* ---- fireworks (extraAnimations) ---- a bigger flourish than confetti,
-   reserved for the results screen: a few burst points, each throwing a
-   ring of particles outward. Each particle's actual end offset (--tx/--ty)
-   is computed in JS with plain Math.cos/sin and set as inline custom
-   properties — deliberately not CSS's own trig functions (cos()/sin() in
-   calc()), which are recent enough not to bet a kiosk deployment on. */
+   reserved for the results screen: a few soft-glowing bursts rather than
+   the more cartoonish sharp confetti-style dots this started as. Each
+   particle's actual end offset (--tx/--ty) is computed in JS with plain
+   Math.cos/sin and set as inline custom properties — deliberately not
+   CSS's own trig functions in calc(), which are recent enough not to bet a
+   kiosk deployment on. */
 .firework-particle {
   position: fixed;
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   z-index: 55;
   pointer-events: none;
-  animation: firework-burst 1.1s ease-out forwards;
+  box-shadow: 0 0 8px 2px currentColor;
+  animation: firework-burst 1.3s ease-out forwards;
 }
 @keyframes firework-burst {
   0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(var(--tx), calc(var(--ty) + 40px)) scale(0.3); opacity: 0; }
+  100% { transform: translate(var(--tx), calc(var(--ty) + 50px)) scale(0.2); opacity: 0; }
 }
 
-/* ---- laser flash (extraAnimations) ---- a quick colorful sweep on top of
-   the existing gold buzz-flash, for a correct answer / steal specifically —
-   two diagonal beams in opposite directions, gone in well under a second so
-   it never gets in the way of actually reading the moment. */
-.laser-flash {
-  position: absolute;
-  inset: 0;
-  z-index: 42;
-  pointer-events: none;
-  overflow: hidden;
-}
-.laser-flash::before, .laser-flash::after {
-  content: "";
+/* ---- correct-answer light pulse (extraAnimations) ---- a clean expanding
+   ring from center, replacing an earlier "crossing lasers" version — reuses
+   the exact same scale+fade ring technique already established for the
+   buzzed-panel's own shockwave (#panel-buzzed h1::after), just bigger, so
+   it reads as part of the same design language instead of a new one. */
+.correct-pulse {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 220%;
-  height: 14px;
-  opacity: 0;
-  /* The animation's own transform fully replaces this rule's transform for
-     its duration rather than blending with it, so --rot has to be read
-     inside the @keyframes via var() to actually differ per pseudo-element —
-     a static `transform: rotate(...)` here would just get overridden to the
-     same angle on both. */
-  animation: laser-sweep 0.5s ease-out;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  border: 3px solid var(--gold);
+  z-index: 42;
+  pointer-events: none;
+  animation: correct-pulse-expand 0.9s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.laser-flash::before { --rot: -20deg; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
-.laser-flash::after { --rot: 20deg; background: linear-gradient(90deg, transparent, var(--coral), transparent); animation-delay: 0.08s; }
-@keyframes laser-sweep {
-  0% { opacity: 0; transform: translate(-50%, -220%) rotate(var(--rot)); }
-  40% { opacity: 0.8; }
-  100% { opacity: 0; transform: translate(-50%, 120%) rotate(var(--rot)); }
+@keyframes correct-pulse-expand {
+  0% { width: 10px; height: 10px; margin: -5px 0 0 -5px; opacity: 0.9; border-width: 4px; }
+  100% { width: 70vmin; height: 70vmin; margin: -35vmin 0 0 -35vmin; opacity: 0; border-width: 1px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .firework-particle, .laser-flash::before, .laser-flash::after { display: none; }
+  .firework-particle, .correct-pulse { display: none; }
 }
 
 .paused-overlay {

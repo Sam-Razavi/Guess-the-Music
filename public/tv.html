@@ -19,15 +19,14 @@
     </header>
 
     <main class="stage" id="stage">
-      <!-- Ambient concert-style spotlight beams (extraAnimations toggle —
-           cosmetic only). First in the DOM / lowest z-index so they sit
-           behind the video and every panel, only visible in the margins
-           around them — pure background atmosphere, never over anything
-           that needs reading. -->
-      <div class="spotlights" id="spotlights" aria-hidden="true" hidden>
-        <span class="spotlight spotlight-1"></span>
-        <span class="spotlight spotlight-2"></span>
-        <span class="spotlight spotlight-3"></span>
+      <!-- Ambient glow (extraAnimations toggle — cosmetic only). First in
+           the DOM / lowest z-index so it sits behind the video and every
+           panel, only visible in the margins around them — soft, slow,
+           pure background atmosphere, never over anything that needs
+           reading. -->
+      <div class="ambient-glow" id="ambient-glow" aria-hidden="true" hidden>
+        <span class="glow-pool glow-pool-1"></span>
+        <span class="glow-pool glow-pool-2"></span>
       </div>
 
       <div class="video-box">
@@ -153,19 +152,14 @@
         <span></span><span></span><span></span><span></span><span></span>
       </div>
 
-      <!-- Dancing crowd (extraAnimations toggle — cosmetic only). Only
-           during 'idle' and 'results' — the actual party moments between
-           and after rounds — never during playing/buzzed/revealed where
-           the focus needs to stay on the round itself. Each dancer is the
-           same handful of divs repeated with a different accent color and
-           animation offset, not individually hand-built. -->
-      <div class="dance-crowd" id="dance-crowd" aria-hidden="true" hidden>
-        <div class="dancer d1"><div class="dancer-head"></div><div class="dancer-body"></div><div class="dancer-arm-l"></div><div class="dancer-arm-r"></div></div>
-        <div class="dancer d2"><div class="dancer-head"></div><div class="dancer-body"></div><div class="dancer-arm-l"></div><div class="dancer-arm-r"></div></div>
-        <div class="dancer d3"><div class="dancer-head"></div><div class="dancer-body"></div><div class="dancer-arm-l"></div><div class="dancer-arm-r"></div></div>
-        <div class="dancer d4"><div class="dancer-head"></div><div class="dancer-body"></div><div class="dancer-arm-l"></div><div class="dancer-arm-r"></div></div>
-        <div class="dancer d5"><div class="dancer-head"></div><div class="dancer-body"></div><div class="dancer-arm-l"></div><div class="dancer-arm-r"></div></div>
-      </div>
+      <!-- Party light orbs spawn here dynamically (extraAnimations toggle,
+           idle/results only) — same spawn-one-at-a-time-and-remove-on-
+           animationend pattern as the idle screen's floating notes below,
+           just drifting up the far side edges instead: outside the
+           video-box's own margins and nowhere near the centered panel
+           content (the join QR in particular), so there's no layout
+           collision to chase as that content's height changes. -->
+
 
       <!-- Disco ball (extraAnimations toggle — cosmetic only). Mirrors the
            mascot's corner placement on the opposite side; same "no new
