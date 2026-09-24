@@ -27,6 +27,11 @@ const timerInput = document.getElementById('timer-input');
 const snippetRow = document.getElementById('snippet-row');
 const snippetInput = document.getElementById('snippet-input');
 const snippetPill = document.getElementById('snippet-pill');
+const startOffsetRow = document.getElementById('start-offset-row');
+const startOffsetInput = document.getElementById('start-offset-input');
+const startOffsetPill = document.getElementById('start-offset-pill');
+const prevSongBtn = document.getElementById('prev-song-btn');
+const nextSongBtn = document.getElementById('next-song-btn');
 const categoryFilterEl = document.getElementById('category-filter');
 const playlistSearchInput = document.getElementById('playlist-search');
 const checkPlaylistBtn = document.getElementById('check-playlist-btn');
@@ -412,6 +417,37 @@ preflightBtn.addEventListener('click', async () => {
 });
 
 // ---------- round controls ----------
+
+// Shared by the playlist's own Play/wager-start buttons and the Next/
+// Previous buttons below — one place reading the round-start options
+// (round timer, snippet length, start offset) currently set in the inputs,
+// so all four ways to start a round apply them consistently.
+function startRoundWithCurrentOptions(id, wagerPlayerId) {
+  const timerSeconds = Number(timerInput.value) || 0;
+  const snippetSeconds = Number(snippetInput.value) || 0;
+  const startOffsetSeconds = Number(startOffsetInput.value) || 0;
+  const payload = { id, timerSeconds, snippetSeconds, startOffsetSeconds };
+  if (wagerPlayerId) payload.wagerPlayerId = wagerPlayerId;
+  socket.emit('host:startRound', payload);
+}
+
+// Next/Previous: jump to the adjacent song in the playlist's current order
+// (not "next unplayed" — this is a quick DJ-style skip control tied to the
+// visible list order the host already controls via drag-to-reorder), same
+// round-start options as the Play button. Wraps around at either end.
+// Deliberately never triggers wager mode even for a wager-eligible song —
+// that needs the host to explicitly pick who's wagering via its own picker,
+// which a quick skip button can't do; it just plays normally instead.
+function stepToAdjacentSong(delta) {
+  if (!latestState || !latestState.playlist.length) return;
+  const playlist = latestState.playlist;
+  const from = latestState.currentIndex >= 0 ? latestState.currentIndex : (delta > 0 ? -1 : 0);
+  const to = (from + delta + playlist.length) % playlist.length;
+  startRoundWithCurrentOptions(playlist[to].id);
+}
+prevSongBtn.addEventListener('click', () => stepToAdjacentSong(-1));
+nextSongBtn.addEventListener('click', () => stepToAdjacentSong(1));
+
 document.getElementById('reveal-btn').addEventListener('click', () => {
   const autoAdvanceSeconds = Number(autoAdvanceInput.value) || 0;
   socket.emit('host:revealAnswer', { autoAdvanceSeconds });
@@ -533,6 +569,16 @@ function renderRound(state) {
     snippetPill.hidden = true;
   }
 
+  if (state.startOffsetSeconds > 0 && (state.roundStatus === 'playing' || state.roundStatus === 'buzzed' || state.roundStatus === 'revealed')) {
+    startOffsetPill.hidden = false;
+    startOffsetPill.textContent = `⏩ Starts at ${state.startOffsetSeconds}s`;
+  } else {
+    startOffsetPill.hidden = true;
+  }
+
+  prevSongBtn.disabled = !state.playlist.length;
+  nextSongBtn.disabled = !state.playlist.length;
+
   pauseBtn.hidden = !(state.settings && state.settings.pauseGame);
   pauseBtn.textContent = state.paused ? '▶ Resume game' : '⏸ Pause game';
   pausedPill.hidden = !state.paused;
@@ -589,6 +635,7 @@ function renderCategoryFilter(state) {
 
 function renderPlaylist(state) {
   snippetRow.hidden = !(state.settings && state.settings.snippetMode);
+  startOffsetRow.hidden = !(state.settings && state.settings.startOffset);
   let songs = categoryFilter === 'All' ? state.playlist : state.playlist.filter(s => s.category === categoryFilter);
   if (searchQuery) {
     songs = songs.filter(s =>
@@ -631,19 +678,13 @@ function renderPlaylist(state) {
   }).join('') || `<p class="muted">${state.playlist.length ? 'No songs match.' : 'No songs yet — add one above.'}</p>`;
 
   playlistList.querySelectorAll('[data-play]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const timerSeconds = Number(timerInput.value) || 0;
-      const snippetSeconds = Number(snippetInput.value) || 0;
-      socket.emit('host:startRound', { id: btn.dataset.play, timerSeconds, snippetSeconds });
-    });
+    btn.addEventListener('click', () => startRoundWithCurrentOptions(btn.dataset.play));
   });
   playlistList.querySelectorAll('[data-wager-start]').forEach(btn => {
     btn.addEventListener('click', () => {
       const select = playlistList.querySelector(`[data-wager-select="${btn.dataset.wagerStart}"]`);
       if (!select || !select.value) return;
-      const timerSeconds = Number(timerInput.value) || 0;
-      const snippetSeconds = Number(snippetInput.value) || 0;
-      socket.emit('host:startRound', { id: btn.dataset.wagerStart, timerSeconds, snippetSeconds, wagerPlayerId: select.value });
+      startRoundWithCurrentOptions(btn.dataset.wagerStart, select.value);
     });
   });
   playlistList.querySelectorAll('[data-wager-toggle]').forEach(btn => {

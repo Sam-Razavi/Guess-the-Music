@@ -47,6 +47,7 @@ const DEFAULT_SETTINGS = {
   achievementBadges: false,
   snippetMode: false,
   wagerRound: false,
+  startOffset: false,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -180,6 +181,7 @@ const state = {
   presets: loadPresets(),          // name -> {playlist, settings, savedAt} — saved setlist+settings combos, see host:savePreset
   badgeStats: { fastestBuzz: null, steals: {}, correct: {}, everLastPlace: {} }, // THIS GAME's running counters for computeBadges() — reset on resetGame
   snippetSeconds: 0,               // how long the TV plays this round's song before auto-pausing, 0 = off — see host:startRound
+  startOffsetSeconds: 0,           // how many seconds into the video this round starts playback from, 0 = the beginning — see host:startRound
   wager: null,                     // {playerId, amount, timerSeconds} | null — Daily-Double-style exclusive round, see host:startRound/player:submitWager
   knownBroken: {},                 // songId -> {message, at} — songs the TV has *actually* hit a real playback error on, see tv:playerStatus. In-memory only (not persisted, doesn't survive a restart) — it's a live diagnostic, not durable data, same reasoning the original playerStatus relay used for staying out of state/broadcast().
 };
@@ -254,7 +256,7 @@ function startRoundTimer(seconds) {
   }, seconds * 1000);
 }
 
-function startRound(id, timerSeconds, snippetSeconds, wagerPlayerId) {
+function startRound(id, timerSeconds, snippetSeconds, wagerPlayerId, startOffsetSeconds) {
   const idx = state.playlist.findIndex(s => s.id === id);
   if (idx === -1) return false;
   const song = state.playlist[idx];
@@ -265,6 +267,7 @@ function startRound(id, timerSeconds, snippetSeconds, wagerPlayerId) {
   // Only meaningful with the toggle on — never carries a value in from a
   // stale client field once the host has switched the setting off.
   state.snippetSeconds = state.settings.snippetMode ? (Number(snippetSeconds) || 0) : 0;
+  state.startOffsetSeconds = state.settings.startOffset ? Math.max(0, Number(startOffsetSeconds) || 0) : 0;
   // The vote (if any) has done its job of picking a category to play from —
   // clear it so a stale result doesn't linger once the round it fed into begins.
   clearVoteTimer();
@@ -443,6 +446,7 @@ function payloadFor(role) {
     stats: state.stats,
     badges: computeBadges(),
     snippetSeconds: state.settings.snippetMode ? state.snippetSeconds : 0,
+    startOffsetSeconds: state.settings.startOffset ? state.startOffsetSeconds : 0,
     wager: state.wager
       ? { playerId: state.wager.playerId, playerName: (state.players[state.wager.playerId] || {}).name || '', amount: state.wager.amount }
       : null,
@@ -1105,8 +1109,8 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  socket.on('host:startRound', ({ id, timerSeconds, snippetSeconds, wagerPlayerId }) => {
-    if (startRound(id, timerSeconds, snippetSeconds, wagerPlayerId)) broadcast();
+  socket.on('host:startRound', ({ id, timerSeconds, snippetSeconds, wagerPlayerId, startOffsetSeconds }) => {
+    if (startRound(id, timerSeconds, snippetSeconds, wagerPlayerId, startOffsetSeconds)) broadcast();
   });
 
   socket.on('host:setWagerEligible', ({ id, eligible } = {}) => {

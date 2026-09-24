@@ -117,7 +117,7 @@
 }
 .timer-row input { width: 5rem; }
 
-#timer-pill, #snippet-pill { margin-left: 0.5rem; background: rgba(245, 185, 66, 0.18); color: var(--gold); }
+#timer-pill, #snippet-pill, #start-offset-pill { margin-left: 0.5rem; background: rgba(245, 185, 66, 0.18); color: var(--gold); }
 
 #playback-pill { margin-left: 0.5rem; }
 #playback-pill.ok { background: rgba(116, 198, 157, 0.18); color: var(--good); }

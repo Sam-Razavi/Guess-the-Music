@@ -64,7 +64,10 @@ function syncVideo(state) {
   if (state.currentSong && state.currentSong.youtubeId && state.roundStatus === 'playing'
       && state.currentSong.youtubeId !== loadedYoutubeId) {
     loadedYoutubeId = state.currentSong.youtubeId;
-    player.loadVideoById(state.currentSong.youtubeId);
+    // Object form (not the plain-string form used everywhere else this app
+    // has called loadVideoById) — startSeconds is how the "start at N
+    // seconds in" option actually skips the intro, per the IFrame API.
+    player.loadVideoById({ videoId: state.currentSong.youtubeId, startSeconds: state.startOffsetSeconds || 0 });
     player.playVideo();
     ensurePlaybackStarted();
   }
