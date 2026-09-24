@@ -29,6 +29,9 @@ const mysteryBannerEl = document.getElementById('mystery-banner');
 const wagerBannerEl = document.getElementById('wager-banner');
 const wageringSubtextEl = document.getElementById('wagering-subtext');
 const mascotEl = document.getElementById('mascot');
+const discoBallEl = document.getElementById('disco-ball');
+const equalizerLeftEl = document.getElementById('equalizer-left');
+const equalizerRightEl = document.getElementById('equalizer-right');
 const categoryVotePanelEl = document.getElementById('category-vote-panel');
 const idleWaitingBlockEl = document.getElementById('idle-waiting-block');
 const pausedOverlayEl = document.getElementById('paused-overlay');
@@ -279,6 +282,7 @@ socket.on('correct', () => {
   spawnConfetti();
   playChime();
   setMascotExpression('correct');
+  celebrateDiscoBall();
 });
 
 // ---- steal mechanic: a wrong answer reopened buzzing, and whoever stole it
@@ -297,6 +301,7 @@ socket.on('steal', ({ name }) => {
   spawnConfetti();
   playChime();
   setMascotExpression('correct');
+  celebrateDiscoBall();
   if (latestState && latestState.settings && latestState.settings.extraAnimations) spawnStealBanner(name);
 });
 
@@ -394,6 +399,31 @@ function updateMascot(state) {
   // before the reveal) stays as-is.
 
   prevRoundStatusForMascot = status;
+}
+
+// ---- disco ball ----
+function celebrateDiscoBall() {
+  if (!discoBallEl || discoBallEl.hidden) return;
+  discoBallEl.classList.add('celebrate');
+  setTimeout(() => discoBallEl.classList.remove('celebrate'), 1800);
+}
+
+function updateDiscoBall(state) {
+  if (!discoBallEl) return;
+  discoBallEl.hidden = !(state.settings && state.settings.extraAnimations);
+}
+
+// ---- equalizer bars ---- visible whenever a song is actually audibly
+// playing: 'playing'/'buzzed'/'revealed' (the video keeps playing under the
+// fading overlay during 'revealed' — see the Phase 5 note on why). Silent
+// during 'idle'/'results'/'wagering' (no song loaded/playing yet).
+function updateEqualizer(state) {
+  if (!equalizerLeftEl || !equalizerRightEl) return;
+  const animationsOn = state.settings && state.settings.extraAnimations;
+  const songAudible = state.roundStatus === 'playing' || state.roundStatus === 'buzzed' || state.roundStatus === 'revealed';
+  const visible = animationsOn && songAudible;
+  equalizerLeftEl.hidden = !visible;
+  equalizerRightEl.hidden = !visible;
 }
 
 // ---- category vote ----
@@ -522,6 +552,8 @@ socket.on('state', (state) => {
   updateMysteryBanner(state);
   updateWagerBanner(state);
   updateMascot(state);
+  updateDiscoBall(state);
+  updateEqualizer(state);
   renderCategoryVoteTV(state);
 
   if (state.currentSong && state.currentSong.hint) {
@@ -592,6 +624,7 @@ socket.on('state', (state) => {
     if (!resultsShown) {
       resultsShown = true;
       spawnConfetti();
+      celebrateDiscoBall();
     }
   } else {
     resultsShown = false;

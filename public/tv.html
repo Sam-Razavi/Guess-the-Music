@@ -129,6 +129,33 @@
         <div class="mascot-hat"></div>
       </div>
 
+      <!-- Equalizer bars (extraAnimations toggle — cosmetic only). Flanks
+           the video in its own 20%-margin side gutters (see .video-box's
+           inset). Not real audio analysis — a YouTube iframe embed is
+           cross-origin, so there's no way to tap its actual audio data via
+           Web Audio API; this is a lively randomized bounce instead, shown
+           only while a song is actually audibly playing. -->
+      <div class="equalizer equalizer-left" id="equalizer-left" aria-hidden="true" hidden>
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="equalizer equalizer-right" id="equalizer-right" aria-hidden="true" hidden>
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+
+      <!-- Disco ball (extraAnimations toggle — cosmetic only). Mirrors the
+           mascot's corner placement on the opposite side; same "no new
+           asset" CSS-only approach — the spinning-facets look comes from
+           animating the tiled gradient's background-position rather than
+           rotating the whole circle, so individual facets appear to catch
+           the light as they slide past, not just the ball as a whole
+           spinning uniformly. -->
+      <div class="disco-ball" id="disco-ball" aria-hidden="true" hidden>
+        <div class="disco-ball-sphere"></div>
+        <span class="disco-sparkle s1"></span>
+        <span class="disco-sparkle s2"></span>
+        <span class="disco-sparkle s3"></span>
+      </div>
+
       <!-- Sits above everything else (even the mascot) while paused — the
            whole point of a pause is a clean, unambiguous break screen. -->
       <div class="paused-overlay" id="paused-overlay" hidden>
