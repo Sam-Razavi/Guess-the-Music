@@ -69,7 +69,7 @@ This is how the game is deployed on the always-on PC that's HDMI'd into the TV. 
 | Check the game is running | `pm2 status` |
 | See the server's console output | `pm2 logs guess-the-music` |
 | Restart the server (e.g. after a config change) | `pm2 restart guess-the-music` |
-| Re-open the TV kiosk screen (e.g. you closed it) | `powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Project\guess-the-music\guess-the-music\scripts\launch-kiosk.ps1` |
+| Re-open the TV kiosk screen (e.g. you closed it) | `powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Guess-the-Music\scripts\launch-kiosk.ps1` |
 | Add songs / run the game | Open `host.html` on your phone — see [Set it up](#2-set-it-up) above |
 
 `npm start` will fail with `EADDRINUSE` if you try it here — that's expected, it just means pm2 already has the server running on port 3000. You don't need it.
@@ -80,7 +80,7 @@ Install pm2 and the Windows startup helper globally, then start the app under it
 
 ```powershell
 npm install -g pm2 pm2-windows-startup
-cd C:\Project\guess-the-music\guess-the-music
+cd C:\Guess-the-Music
 pm2 start server.js --name guess-the-music
 pm2 save
 pm2-startup install
@@ -103,14 +103,14 @@ pm2 logs guess-the-music   # tail the server's console output
 To register it to launch automatically at logon (creates a shortcut in the Startup folder):
 
 ```powershell
-cd C:\Project\guess-the-music\guess-the-music\scripts
+cd C:\Guess-the-Music\scripts
 powershell -ExecutionPolicy Bypass -File .\install-kiosk-startup.ps1
 ```
 
 To launch it manually / test it without logging out:
 
 ```powershell
-powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Project\guess-the-music\guess-the-music\scripts\launch-kiosk.ps1
+powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Guess-the-Music\scripts\launch-kiosk.ps1
 ```
 
 To exit kiosk mode, `Alt+F4` the Chrome window (or kill it from Task Manager).
@@ -161,20 +161,20 @@ The server also advertises itself as `guess-the-music.local` on the network, sho
 `pm2-logrotate` (the usual way to bound pm2's log file sizes) can't install on this machine — its installer breaks on the space in the Windows profile path (`C:\Users\Min Dator`), a known PM2-on-Windows issue. Instead, a small scheduled task handles it directly:
 
 ```powershell
-cd C:\Project\guess-the-music\guess-the-music\scripts
+cd C:\Guess-the-Music\scripts
 powershell -ExecutionPolicy Bypass -File .\install-log-rotation.ps1
 ```
 
 This registers a daily task (`GuessTheMusic-LogRotate`, runs at 4am) that rotates any pm2 log file over 10MB, keeping 3 old generations, and asks pm2 to reopen fresh log files. To run it manually / test it:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File C:\Project\guess-the-music\guess-the-music\scripts\rotate-logs.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Guess-the-Music\scripts\rotate-logs.ps1
 ```
 
 ### Updating the app later
 
 ```powershell
-cd C:\Project\guess-the-music\guess-the-music
+cd C:\Guess-the-Music
 git pull
 npm install
 pm2 restart guess-the-music

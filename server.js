@@ -992,6 +992,20 @@ io.on('connection', (socket) => {
   let role = null;
   let playerId = null;
 
+  // A single malformed payload (e.g. null where a handler destructures an
+  // object) used to throw straight out of the handler and crash the whole
+  // process mid-game. Every handler below is registered through this guard,
+  // so a bad event is logged and dropped instead of taking the server down.
+  const rawOn = socket.on.bind(socket);
+  socket.on = (event, handler) => rawOn(event, (...args) => {
+    try {
+      const result = handler(...args);
+      if (result && typeof result.catch === 'function') result.catch(e => console.error(`[socket ${event}]`, e));
+    } catch (e) {
+      console.error(`[socket ${event}]`, e);
+    }
+  });
+
   socket.on('register', ({ role: r, id, name, team }) => {
     role = r;
     socket.join(role);
