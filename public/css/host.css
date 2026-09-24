@@ -117,6 +117,11 @@
 }
 .timer-row input { width: 5rem; }
 
+#play-order-row { flex-wrap: wrap; }
+#play-order-row #play-next-btn { margin-left: auto; }
+
+#game-limit-inputs { flex-wrap: wrap; }
+
 #timer-pill, #snippet-pill, #start-offset-pill { margin-left: 0.5rem; background: rgba(245, 185, 66, 0.18); color: var(--gold); }
 
 #playback-pill { margin-left: 0.5rem; }

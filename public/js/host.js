@@ -30,6 +30,9 @@ const snippetPill = document.getElementById('snippet-pill');
 const startOffsetRow = document.getElementById('start-offset-row');
 const startOffsetInput = document.getElementById('start-offset-input');
 const startOffsetPill = document.getElementById('start-offset-pill');
+const gameLimitInputs = document.getElementById('game-limit-inputs');
+const scoreLimitInput = document.getElementById('score-limit-input');
+const roundLimitInput = document.getElementById('round-limit-input');
 const prevSongBtn = document.getElementById('prev-song-btn');
 const nextSongBtn = document.getElementById('next-song-btn');
 const categoryFilterEl = document.getElementById('category-filter');
@@ -41,6 +44,7 @@ const addSongCard = document.getElementById('add-song-card');
 const addSongCollapsedHint = document.getElementById('add-song-collapsed-hint');
 const mysteryPill = document.getElementById('mystery-pill');
 const wagerPill = document.getElementById('wager-pill');
+const gameLimitPill = document.getElementById('game-limit-pill');
 const pauseBtn = document.getElementById('pause-btn');
 const pausedPill = document.getElementById('paused-pill');
 const categoryVoteCard = document.getElementById('category-vote-card');
@@ -188,6 +192,11 @@ mcModeToggleBtn.addEventListener('click', () => {
   mcModeOn = !mcModeOn;
   try { localStorage.setItem('gtm_mc_mode', mcModeOn ? '1' : '0'); } catch (e) { /* non-fatal — just won't persist */ }
   applyMcMode(mcModeOn);
+  // Turning MC mode off re-reveals #options-card (display: none while MC
+  // mode is on collapses its scrollHeight to 0 at measurement time) —
+  // re-measure so a stale 0px max-height doesn't hide every option. See
+  // applyOptionsCollapse()/measureOptionsHeight() further down this file.
+  if (!mcModeOn && !optionsCollapsed) optionsListEl.style.maxHeight = measureOptionsHeight() + 'px';
 });
 
 // ---------- language toggle ----------
@@ -216,6 +225,28 @@ function renderThemeToggle(state) {
     btn.classList.toggle('active', btn.dataset.theme === theme);
   });
 }
+
+// ---------- play order ---------- which unplayed song auto-advance/Play
+// next picks: sequential (playlist order, same as before this existed) or
+// random. Neither ever repeats an already-played song — manually clicking
+// Play/Replay on a specific row is the only way to intentionally replay one.
+document.querySelectorAll('#play-order-toggle [data-order]').forEach(btn => {
+  btn.addEventListener('click', () => socket.emit('host:setPlayOrder', btn.dataset.order));
+});
+
+function renderPlayOrderToggle(state) {
+  const order = state.playOrder || 'sequential';
+  document.querySelectorAll('#play-order-toggle [data-order]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.order === order);
+  });
+}
+
+document.getElementById('play-next-btn').addEventListener('click', () => {
+  const timerSeconds = Number(timerInput.value) || 0;
+  const snippetSeconds = Number(snippetInput.value) || 0;
+  const startOffsetSeconds = Number(startOffsetInput.value) || 0;
+  socket.emit('host:playNext', { timerSeconds, snippetSeconds, startOffsetSeconds });
+});
 
 // ---------- join info ----------
 fetch('/join-info').then(r => r.json()).then(({ url, mdnsUrl }) => {
@@ -576,6 +607,19 @@ function renderRound(state) {
     startOffsetPill.hidden = true;
   }
 
+  if (state.settings && state.settings.gameLimit && (state.settings.scoreLimitValue > 0 || state.settings.roundLimitValue > 0)) {
+    const bits = [];
+    if (state.settings.scoreLimitValue > 0) {
+      const highScore = Math.max(0, ...(state.players || []).map(p => p.score));
+      bits.push(`🏁 ${highScore}/${state.settings.scoreLimitValue} pts`);
+    }
+    if (state.settings.roundLimitValue > 0) bits.push(`🎯 round ${state.roundsPlayed || 0}/${state.settings.roundLimitValue}`);
+    gameLimitPill.hidden = false;
+    gameLimitPill.textContent = bits.join(' · ');
+  } else {
+    gameLimitPill.hidden = true;
+  }
+
   prevSongBtn.disabled = !state.playlist.length;
   nextSongBtn.disabled = !state.playlist.length;
 
@@ -597,7 +641,7 @@ function renderRound(state) {
     : (state.currentSong && state.currentSong.points) || 1;
   buzzOrderList.innerHTML = state.buzzOrder.map((b, i) => `
     <div class="buzz-row">
-      <div><span class="order">#${i + 1}</span>${escapeHtml(b.name)}</div>
+      <div><span class="order">#${i + 1}</span>${escapeHtml(b.name)}${b.tease ? ` <span class="muted small">${escapeHtml(b.tease)}</span>` : ''}</div>
       <div class="actions">
         <button class="good" data-award="${b.id}:${songPoints}" ${state.paused ? 'disabled' : ''}>+${songPoints}</button>
         <button data-award="${b.id}:${-songPoints}" ${state.paused ? 'disabled' : ''}>-${songPoints}</button>
@@ -800,19 +844,53 @@ function renderScoreboard(state) {
 }
 
 // ---------- game options ----------
-// Collapsible — the list has grown long (15+ toggles), and most of them get
+// Collapsible — the list has grown long (20+ toggles), and most of them get
 // set once per game night rather than looked at every visit. Remembered
 // per-device via localStorage, same pattern as MC mode, defaulting to open
 // so nothing changes for a host who's never touched the toggle.
+//
+// The expand/collapse animation needs an actual max-height to transition
+// to/from (max-height: none doesn't animate) — this used to be a hardcoded
+// 2000px in host.css. That silently clipped the bottom of the list once
+// enough options were added to exceed it (with overflow: hidden and no
+// scrollbar, those options became completely unreachable, not just
+// visually cut off). Measuring the real content height in JS instead means
+// this can never happen again regardless of how many options get added in
+// future phases.
 const optionsCard = document.getElementById('options-card');
 const optionsToggle = document.getElementById('options-toggle');
+const optionsListEl = optionsCard.querySelector('.options-list');
 let optionsCollapsed = false;
 try { optionsCollapsed = localStorage.getItem('gtm_options_collapsed') === '1'; } catch (e) { /* private browsing etc */ }
-optionsCard.classList.toggle('collapsed', optionsCollapsed);
+
+function measureOptionsHeight() {
+  const prevMaxHeight = optionsListEl.style.maxHeight;
+  optionsListEl.style.maxHeight = 'none'; // unclip momentarily to get the true content height
+  const height = optionsListEl.scrollHeight;
+  optionsListEl.style.maxHeight = prevMaxHeight;
+  return height;
+}
+
+function applyOptionsCollapse() {
+  optionsCard.classList.toggle('collapsed', optionsCollapsed);
+  optionsListEl.style.maxHeight = optionsCollapsed ? '0px' : measureOptionsHeight() + 'px';
+}
+applyOptionsCollapse();
+
 optionsToggle.addEventListener('click', () => {
   optionsCollapsed = !optionsCollapsed;
-  optionsCard.classList.toggle('collapsed', optionsCollapsed);
   try { localStorage.setItem('gtm_options_collapsed', optionsCollapsed ? '1' : '0'); } catch (e) { /* non-fatal */ }
+  applyOptionsCollapse();
+});
+
+// Re-measure on resize (debounced) — rotating a phone or resizing the
+// window reflows the option descriptions onto a different number of lines,
+// which changes the real content height.
+let optionsResizeTimer = null;
+window.addEventListener('resize', () => {
+  if (optionsCollapsed) return; // nothing visible to re-measure
+  clearTimeout(optionsResizeTimer);
+  optionsResizeTimer = setTimeout(() => { optionsListEl.style.maxHeight = measureOptionsHeight() + 'px'; }, 150);
 });
 
 document.querySelectorAll('#options-card [data-setting]').forEach(input => {
@@ -826,7 +904,26 @@ function renderSettings(state) {
     const key = input.dataset.setting;
     if (state.settings && key in state.settings) input.checked = state.settings[key];
   });
+  const gameLimitInputsWereHidden = gameLimitInputs.hidden;
+  gameLimitInputs.hidden = !(state.settings && state.settings.gameLimit);
+  // Only sync from server state when the host isn't actively typing in it —
+  // a value blindly overwritten on every broadcast would fight the cursor.
+  if (document.activeElement !== scoreLimitInput) scoreLimitInput.value = (state.settings && state.settings.scoreLimitValue) || 0;
+  if (document.activeElement !== roundLimitInput) roundLimitInput.value = (state.settings && state.settings.roundLimitValue) || 0;
+  // Showing/hiding that row changes the options list's real content height —
+  // re-measure so the collapse animation's max-height stays accurate (see
+  // applyOptionsCollapse() above).
+  if (gameLimitInputsWereHidden !== gameLimitInputs.hidden && !optionsCollapsed) {
+    optionsListEl.style.maxHeight = measureOptionsHeight() + 'px';
+  }
 }
+
+scoreLimitInput.addEventListener('change', () => {
+  socket.emit('host:updateSettings', { scoreLimitValue: Number(scoreLimitInput.value) || 0 });
+});
+roundLimitInput.addEventListener('change', () => {
+  socket.emit('host:updateSettings', { roundLimitValue: Number(roundLimitInput.value) || 0 });
+});
 
 // ---------- category vote ----------
 startVoteBtn.addEventListener('click', () => {
@@ -980,6 +1077,7 @@ socket.on('state', (state) => {
   renderScoreboard(state);
   renderLangToggle(state);
   renderThemeToggle(state);
+  renderPlayOrderToggle(state);
   renderAddSongCollapse(state);
   renderSettings(state);
   renderCategoryVote(state);

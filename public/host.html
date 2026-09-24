@@ -49,6 +49,7 @@
         <span class="pill" id="snippet-pill" hidden></span>
         <span class="pill" id="start-offset-pill" hidden></span>
         <span class="pill gold" id="wager-pill" hidden></span>
+        <span class="pill" id="game-limit-pill" hidden></span>
         <button id="pause-btn" hidden>⏸ Pause game</button>
         <span class="pill" id="paused-pill" hidden>⏸ Paused</span>
         <div id="find-replacement-live-result"></div>
@@ -91,6 +92,14 @@
 
       <section class="card" id="playlist-card">
         <h2>Playlist</h2>
+        <div class="timer-row" id="play-order-row">
+          <label>Play order</label>
+          <div class="lang-toggle" id="play-order-toggle">
+            <button type="button" data-order="sequential" class="active">▶️ Sequential</button>
+            <button type="button" data-order="random">🔀 Random</button>
+          </div>
+          <button type="button" id="play-next-btn" title="Starts whichever unplayed song is next in the order above.">⏭ Play next</button>
+        </div>
         <div class="timer-row">
           <label for="timer-input">Round timer (sec, 0 = off)</label>
           <input id="timer-input" type="number" min="0" step="5" value="0">
@@ -196,6 +205,20 @@
           <label class="option-row">
             <input type="checkbox" data-setting="preflightCheck">
             <span><strong>Pre-flight check</strong><br><span class="muted small">A "ready to go?" button that scans the whole playlist for broken videos and confirms players have joined, before the party starts.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="gameLimit" id="game-limit-toggle">
+            <span><strong>Game limit</strong><br><span class="muted small">End the game early and jump straight to results once a player (or team) reaches a score, or once a number of rounds have been played — whichever comes first.</span></span>
+          </label>
+          <div id="game-limit-inputs" class="timer-row" hidden>
+            <label for="score-limit-input">Score limit (0 = off)</label>
+            <input id="score-limit-input" type="number" min="0" step="1" value="0">
+            <label for="round-limit-input">Round limit (0 = off)</label>
+            <input id="round-limit-input" type="number" min="0" step="1" value="0">
+          </div>
+          <label class="option-row">
+            <input type="checkbox" data-setting="easterEggMahtab">
+            <span><strong>🎉 Easter egg: Mahtab</strong><br><span class="muted small">Fun-only. Adds a teasing suffix to a player named "Mahtab"/"مهتاب" wherever their name is shown, plus a little tease when they buzz in.</span></span>
           </label>
         </div>
       </section>

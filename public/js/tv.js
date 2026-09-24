@@ -13,6 +13,7 @@ const panels = {
 };
 const scoreboardEl = document.getElementById('scoreboard');
 const buzzedNameEl = document.getElementById('buzzed-name');
+const buzzedTeaseEl = document.getElementById('buzzed-tease');
 const revealTitleEl = document.getElementById('reveal-title');
 const revealArtistEl = document.getElementById('reveal-artist');
 const playingSubtext = document.getElementById('playing-subtext');
@@ -732,7 +733,10 @@ socket.on('state', (state) => {
     // The *current* buzzer is whoever buzzed most recently, not the first
     // person to buzz this round — those differ after a reset + a second,
     // different buzzer.
-    buzzedNameEl.textContent = state.buzzOrder[state.buzzOrder.length - 1].name;
+    const latestBuzz = state.buzzOrder[state.buzzOrder.length - 1];
+    buzzedNameEl.textContent = latestBuzz.name;
+    buzzedTeaseEl.hidden = !latestBuzz.tease;
+    buzzedTeaseEl.textContent = latestBuzz.tease || '';
     if (!wasBuzzed) spawnBuzzFlash();
     wasBuzzed = true;
   } else {

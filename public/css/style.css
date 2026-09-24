@@ -138,6 +138,13 @@ input::placeholder { color: var(--text-muted); }
   background: var(--surface);
   border-radius: var(--radius);
   padding: 1.2rem;
+  /* Grid items default to min-width: auto, which refuses to shrink below
+     the content's min-content size — on a narrow phone that blows the
+     whole card (and the page) out wider than the viewport instead of
+     letting the content wrap/scroll/ellipsis inside it like it's supposed
+     to. Same fix already used locally for .playlist-row .info etc., just
+     needed at this top level too. */
+  min-width: 0;
 }
 
 .pill {

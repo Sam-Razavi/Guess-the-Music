@@ -48,6 +48,10 @@ const DEFAULT_SETTINGS = {
   snippetMode: false,
   wagerRound: false,
   startOffset: false,
+  gameLimit: false,
+  scoreLimitValue: 0,    // score at which a player/team ends the game early (0 = off) — see checkGameLimit()
+  roundLimitValue: 0,    // rounds played at which the game ends early (0 = off) — see checkGameLimit()
+  easterEggMahtab: false,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -144,10 +148,21 @@ function getLanIp() {
   // VirtualBox's default host-only network (used by e.g. BlueStacks) —
   // phones can never reach this, so never pick it if anything else exists.
   const isVirtualboxDefault = (ip) => ip.startsWith('192.168.56.');
-  const isWifi = (name) => /wi-?fi|wlan/i.test(name);
+  // Carrier-grade NAT range (100.64.0.0/10) — used by VPN clients like
+  // NordVPN/NordLynx and Tailscale, never a real home LAN.
+  const isCgnat = (ip) => {
+    const parts = ip.split('.').map(Number);
+    return parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127;
+  };
+  // VPN clients, Hyper-V/container virtual switches — never the network
+  // a phone is actually joined to, even though they get a real-looking IP.
+  const isVirtualOrVpn = (name) => /vpn|nordlynx|wireguard|tailscale|zerotier|tap-|vethernet|virtual|vswitch|hyper-v|docker|wsl/i.test(name);
+  const isRealLan = (c) => !isVirtualboxDefault(c.address) && !isCgnat(c.address) && !isVirtualOrVpn(c.name);
+  const isWifiOrEthernet = (name) => /^wi-?fi|wlan|^ethernet/i.test(name);
 
   return (
-    candidates.find(c => isWifi(c.name) && !isVirtualboxDefault(c.address)) ||
+    candidates.find(c => isRealLan(c) && isWifiOrEthernet(c.name)) ||
+    candidates.find(c => isRealLan(c)) ||
     candidates.find(c => !isVirtualboxDefault(c.address)) ||
     candidates[0]
   ).address;
@@ -165,6 +180,7 @@ const state = {
   buzzingLocked: false,           // true once the timer expires with no buzz — host still controls reveal/close
   language: 'en',                 // 'en' | 'fa' — TV/player display language, set by the host
   theme: 'dark',                  // 'dark' | 'light' — TV/player/host display theme, set by the host; same in-memory-only, resets-on-restart treatment as language
+  playOrder: 'sequential',        // 'sequential' | 'random' — order pickNextSong() picks from for auto-advance/host:playNext; same in-memory-only treatment as language/theme. Manually clicking Play on a specific song always ignores this and just plays that song.
   autoAdvance: null,               // {endsAt} | null — pending auto-start of the next unplayed song after a reveal
   settings: loadSettings(),       // host-toggleable game options — see DEFAULT_SETTINGS
   roundHadMiss: false,             // true once resetBuzzers has fired this round — powers the steal-mechanic bonus
@@ -184,6 +200,7 @@ const state = {
   startOffsetSeconds: 0,           // how many seconds into the video this round starts playback from, 0 = the beginning — see host:startRound
   wager: null,                     // {playerId, amount, timerSeconds} | null — Daily-Double-style exclusive round, see host:startRound/player:submitWager
   knownBroken: {},                 // songId -> {message, at} — songs the TV has *actually* hit a real playback error on, see tv:playerStatus. In-memory only (not persisted, doesn't survive a restart) — it's a live diagnostic, not durable data, same reasoning the original playerStatus relay used for staying out of state/broadcast().
+  roundsPlayed: 0,                 // count of rounds revealed this game — powers the gameLimit setting's round-count end condition, reset by host:resetGame
 };
 
 const ACTION_LOG_LIMIT = 50;
@@ -218,6 +235,61 @@ function clearAutoAdvance() {
   state.autoAdvance = null;
 }
 
+// Picks which unplayed song plays next, honoring state.playOrder — shared by
+// auto-advance and host:playNext so both respect the same host-chosen order.
+// 'random' never repeats an already-played song within a session, same as
+// 'sequential' — it only ever draws from the unplayed pool. Manually clicking
+// Play/Replay on a specific playlist row bypasses this entirely by design
+// (that's the one place a deliberate repeat is allowed).
+function pickNextSong() {
+  const unplayed = state.playlist.filter(s => !s.played);
+  if (!unplayed.length) return null;
+  if (state.playOrder === 'random') return unplayed[Math.floor(Math.random() * unplayed.length)];
+  return unplayed[0];
+}
+
+// Shared by host:showResults and checkGameLimit() below (an early, automatic
+// game-over hits the exact same end state a host manually clicking "Show
+// results" would).
+function showResults() {
+  state.roundStatus = 'results';
+  state.currentIndex = -1;
+  state.buzzOrder = [];
+  state.wager = null;
+  clearRoundTimer();
+  clearAutoAdvance();
+}
+
+// Game limit: host-toggleable early end condition — the first player (or,
+// in team mode, team) to reach scoreLimitValue points, or roundLimitValue
+// rounds played, jumps straight to results. Checked at the two moments
+// either limit can newly be crossed: right after a score changes
+// (host:awardPoint) and right after a round is revealed (host:revealAnswer,
+// where roundsPlayed increments). No-ops once already at 'results'/'idle' so
+// it can't refire after the host has already moved past it.
+function checkGameLimit() {
+  if (!state.settings.gameLimit || state.roundStatus === 'results' || state.roundStatus === 'idle') return;
+  const { scoreLimitValue, roundLimitValue } = state.settings;
+  let hit = false;
+
+  if (scoreLimitValue > 0) {
+    if (state.settings.teamMode) {
+      const teamTotals = {};
+      Object.values(state.players).forEach(p => {
+        const t = (p.team || '').trim();
+        if (t) teamTotals[t] = (teamTotals[t] || 0) + p.score;
+        else if (p.score >= scoreLimitValue) hit = true; // solo (no-team) player, scored individually
+      });
+      if (Object.values(teamTotals).some(total => total >= scoreLimitValue)) hit = true;
+    } else if (Object.values(state.players).some(p => p.score >= scoreLimitValue)) {
+      hit = true;
+    }
+  }
+  if (!hit && roundLimitValue > 0 && state.roundsPlayed >= roundLimitValue) hit = true;
+
+  if (hit) showResults();
+}
+
 // Shared by host:revealAnswer and the pause/resume flow (host:togglePause) —
 // a resume just re-arms the same countdown with whatever time was left when
 // it got frozen, so both call sites need the exact same "start the next
@@ -235,7 +307,7 @@ function scheduleAutoAdvance(seconds, nextRoundTimerSeconds) {
     // changed roundStatus away from 'revealed' by now. A pause also blocks
     // it, same as those manual actions would.
     if (state.roundStatus === 'revealed' && !state.paused) {
-      const next = state.playlist.find(s => !s.played);
+      const next = pickNextSong();
       if (next) startRound(next.id, nextRoundTimerSeconds);
     }
     broadcast();
@@ -364,17 +436,17 @@ function computeBadges() {
   const bs = state.badgeStats;
 
   if (bs.fastestBuzz && state.players[bs.fastestBuzz.id]) {
-    badges.push({ key: 'fastest', icon: '🏃', label: 'Fastest Buzzer', name: bs.fastestBuzz.name, detail: `${(bs.fastestBuzz.ms / 1000).toFixed(2)}s` });
+    badges.push({ key: 'fastest', icon: '🏃', label: 'Fastest Buzzer', name: displayName(bs.fastestBuzz.name), detail: `${(bs.fastestBuzz.ms / 1000).toFixed(2)}s` });
   }
 
   const stealTop = Object.entries(bs.steals).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1])[0];
   if (stealTop && state.players[stealTop[0]]) {
-    badges.push({ key: 'steals', icon: '🔥', label: 'Most Steals', name: state.players[stealTop[0]].name, detail: `${stealTop[1]} steal${stealTop[1] === 1 ? '' : 's'}` });
+    badges.push({ key: 'steals', icon: '🔥', label: 'Most Steals', name: displayName(state.players[stealTop[0]].name), detail: `${stealTop[1]} steal${stealTop[1] === 1 ? '' : 's'}` });
   }
 
   const correctTop = Object.entries(bs.correct).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1])[0];
   if (correctTop && state.players[correctTop[0]]) {
-    badges.push({ key: 'sharpshooter', icon: '🎯', label: 'Sharpshooter', name: state.players[correctTop[0]].name, detail: `${correctTop[1]} correct` });
+    badges.push({ key: 'sharpshooter', icon: '🎯', label: 'Sharpshooter', name: displayName(state.players[correctTop[0]].name), detail: `${correctTop[1]} correct` });
   }
 
   // Comeback Kid: ever registered in (sole or shared) last place at some
@@ -384,7 +456,7 @@ function computeBadges() {
   const max = scores.length ? Math.max(...scores) : 0;
   const soleLeaders = entries.filter(([, p]) => p.score === max);
   if (max > 0 && soleLeaders.length === 1 && bs.everLastPlace[soleLeaders[0][0]]) {
-    badges.push({ key: 'comeback', icon: '🔁', label: 'Comeback Kid', name: soleLeaders[0][1].name, detail: 'came from behind' });
+    badges.push({ key: 'comeback', icon: '🔁', label: 'Comeback Kid', name: displayName(soleLeaders[0][1].name), detail: 'came from behind' });
   }
 
   return badges;
@@ -407,9 +479,42 @@ function makeSong(youtubeId, title, artist, category) {
   };
 }
 
+// ---------- Easter egg: Mahtab ----------
+// A host-toggleable, fun-only joke for a specific friend. Never touches the
+// stored name (state.players[id].name) — only the copy sent out for
+// display — so it doesn't affect team grouping, player lookup, or what's
+// saved to players.json. Off by default; see DEFAULT_SETTINGS.easterEggMahtab.
+function isMahtabName(name) {
+  if (!name) return false;
+  const n = name.trim();
+  if (n.toLowerCase() === 'mahtab') return true;
+  // ي/ك (Arabic forms) vs ی/ک (Persian forms) — normalize so either
+  // keyboard layout still matches "مهتاب".
+  const normalizedFa = n.replace(/[يى]/g, 'ی').replace(/ك/g, 'ک');
+  return normalizedFa === 'مهتاب';
+}
+
+const MAHTAB_TEASES = {
+  en: ['😏 uh oh…', '👀 here we go', '💍 the usual suspect', '😂 called it', '🙄 again?'],
+  fa: ['😏 اوه اوه…', '👀 بازم این یکی', '💍 بازم همون داستان', '😂 حدس زده بودیم', '🙄 بازم؟'],
+};
+
+// Applied only at display time — the suffix follows whichever language the
+// host currently has selected (shared state.language, same as every other
+// TV/player-facing string), not the viewer's own device.
+function displayName(name) {
+  if (!state.settings.easterEggMahtab || !isMahtabName(name)) return name;
+  return `${name} ${state.language === 'fa' ? 'شوهری' : 'Shohari'}`;
+}
+
+function mahtabTease() {
+  const list = MAHTAB_TEASES[state.language === 'fa' ? 'fa' : 'en'];
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 function publicPlayers() {
   return Object.entries(state.players).map(([id, p]) => ({
-    id, name: p.name, score: p.score, connected: p.connected, team: p.team || '',
+    id, name: displayName(p.name), score: p.score, connected: p.connected, team: p.team || '',
   }));
 }
 
@@ -434,7 +539,8 @@ function payloadFor(role) {
 
   const base = {
     roundStatus: state.roundStatus,
-    buzzOrder: state.buzzOrder.map(b => ({ id: b.id, name: b.name })),
+    buzzOrder: state.buzzOrder.map(b => ({ id: b.id, name: displayName(b.name), tease: b.tease || null })),
+    roundsPlayed: state.roundsPlayed,
     players: publicPlayers(),
     roundTimer: state.roundTimer,
     buzzingLocked: state.buzzingLocked,
@@ -468,6 +574,7 @@ function payloadFor(role) {
       ...base,
       playlist: state.playlist,
       currentIndex: state.currentIndex,
+      playOrder: state.playOrder,
       // "Double points" reuses the points-per-song pipeline exactly — just
       // overriding the runtime value shown/awarded for this one round. The
       // song's own stored points field never changes.
@@ -933,7 +1040,10 @@ io.on('connection', (socket) => {
     // a host:resetBuzzers reopened things.
     const buzzTime = Date.now();
     const isFirstBuzzOfRound = state.buzzOrder.length === 0;
-    state.buzzOrder.push({ id: playerId, name: state.players[playerId].name, time: buzzTime });
+    // Tease is rolled once, right at buzz time, so it stays the same across
+    // every re-broadcast of this round instead of changing on every render.
+    const tease = state.settings.easterEggMahtab && isMahtabName(state.players[playerId].name) ? mahtabTease() : null;
+    state.buzzOrder.push({ id: playerId, name: state.players[playerId].name, time: buzzTime, tease });
     state.roundStatus = 'buzzed';
 
     // Fastest-buzz record only counts the round's actual first reaction —
@@ -1055,7 +1165,15 @@ io.on('connection', (socket) => {
     // Only accept it if it's a true reordering (same songs, new order) —
     // a stale/partial list from a slow client shouldn't drop songs.
     if (reordered.length !== state.playlist.length) return;
+    // currentIndex is a position, not a song identity — reordering while a
+    // round is live (or just closed) must re-find the same song by id, or
+    // it silently points at whatever song now sits at the old position.
+    // That bug used to make revealAnswer mark the WRONG song as played,
+    // leaving the actually-played one eligible to be picked again later —
+    // a repeat within the same session.
+    const playingId = state.currentIndex >= 0 ? state.playlist[state.currentIndex].id : null;
     state.playlist = reordered;
+    state.currentIndex = playingId !== null ? state.playlist.findIndex(s => s.id === playingId) : -1;
     savePlaylist();
     broadcast();
   });
@@ -1206,12 +1324,18 @@ io.on('connection', (socket) => {
     clearAutoAdvance();
     if (state.currentIndex >= 0) {
       state.playlist[state.currentIndex].played = true;
+      state.roundsPlayed += 1;
       savePlaylist();
     }
     state.roundStatus = 'revealed';
     clearRoundTimer();
 
-    if (autoAdvanceSeconds > 0) scheduleAutoAdvance(autoAdvanceSeconds, priorTimerSeconds);
+    // May immediately overwrite 'revealed' with 'results' above if this
+    // round just crossed the round-limit — deliberate: the limit is
+    // enforced the moment the round that hits it gets revealed, not
+    // deferred to the next one.
+    checkGameLimit();
+    if (state.roundStatus === 'revealed' && autoAdvanceSeconds > 0) scheduleAutoAdvance(autoAdvanceSeconds, priorTimerSeconds);
 
     broadcast();
   });
@@ -1259,9 +1383,9 @@ io.on('connection', (socket) => {
 
       if (isSteal) {
         state.roundHadMiss = false;
-        io.to('tv').emit('steal', { name: state.players[id].name, speedBonus: isSpeedBonus });
+        io.to('tv').emit('steal', { name: displayName(state.players[id].name), speedBonus: isSpeedBonus });
       } else if (isNaturalCorrectAward) {
-        io.to('tv').emit('correct', { name: state.players[id].name, speedBonus: isSpeedBonus });
+        io.to('tv').emit('correct', { name: displayName(state.players[id].name), speedBonus: isSpeedBonus });
       }
 
       const song = currentSong();
@@ -1291,6 +1415,7 @@ io.on('connection', (socket) => {
         }
       }
 
+      checkGameLimit();
       broadcast();
     }
   });
@@ -1305,6 +1430,20 @@ io.on('connection', (socket) => {
     if (theme !== 'dark' && theme !== 'light') return;
     state.theme = theme;
     broadcast();
+  });
+
+  socket.on('host:setPlayOrder', (order) => {
+    if (order !== 'sequential' && order !== 'random') return;
+    state.playOrder = order;
+    broadcast();
+  });
+
+  // Starts whichever unplayed song pickNextSong() picks next, honoring
+  // state.playOrder — the host-facing way to actually use the order toggle
+  // without waiting on auto-advance. No-ops once every song's been played.
+  socket.on('host:playNext', ({ timerSeconds, snippetSeconds, startOffsetSeconds } = {}) => {
+    const next = pickNextSong();
+    if (next && startRound(next.id, timerSeconds, snippetSeconds, undefined, startOffsetSeconds)) broadcast();
   });
 
   socket.on('host:revealHintLetter', () => {
@@ -1326,7 +1465,12 @@ io.on('connection', (socket) => {
     // Only accept known keys with boolean values — never let an arbitrary
     // client payload widen state.settings beyond DEFAULT_SETTINGS's shape.
     for (const key of Object.keys(patch)) {
-      if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key) && typeof patch[key] === 'boolean') {
+      // Game limit's two numeric fields ride along in the same settings
+      // blob as every boolean toggle (same persistence, same broadcast) —
+      // just validated/clamped instead of type-checked as a boolean.
+      if (key === 'scoreLimitValue' || key === 'roundLimitValue') {
+        state.settings[key] = Math.max(0, Math.floor(Number(patch[key]) || 0));
+      } else if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key) && typeof patch[key] === 'boolean') {
         state.settings[key] = patch[key];
       }
     }
@@ -1434,12 +1578,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('host:showResults', () => {
-    state.roundStatus = 'results';
-    state.currentIndex = -1;
-    state.buzzOrder = [];
-    state.wager = null;
-    clearRoundTimer();
-    clearAutoAdvance();
+    showResults();
     broadcast();
   });
 
@@ -1473,6 +1612,7 @@ io.on('connection', (socket) => {
     state.actionLog = [];
     state.badgeStats = { fastestBuzz: null, steals: {}, correct: {}, everLastPlace: {} };
     state.wager = null;
+    state.roundsPlayed = 0;
     broadcast();
   });
 

@@ -751,6 +751,8 @@
 .panel h1 { font-size: 3.2rem; max-width: 18ch; }
 .panel p { font-size: 1.3rem; }
 
+#buzzed-tease { font-size: 1rem; opacity: 0.75; font-style: italic; }
+
 #reveal-title, #reveal-artist { font-family: var(--font-fun); }
 #reveal-title { color: var(--gold); }
 /* A bright diagonal shine sweeps across the title once as it appears — a
