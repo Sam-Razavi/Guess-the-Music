@@ -34,6 +34,8 @@ const equalizerLeftEl = document.getElementById('equalizer-left');
 const equalizerRightEl = document.getElementById('equalizer-right');
 const ambientGlowEl = document.getElementById('ambient-glow');
 const laserBeamsEl = document.getElementById('laser-beams');
+const grooveDancerLeftEl = document.getElementById('groove-dancer-left');
+const grooveDancerRightEl = document.getElementById('groove-dancer-right');
 const categoryVotePanelEl = document.getElementById('category-vote-panel');
 const idleWaitingBlockEl = document.getElementById('idle-waiting-block');
 const pausedOverlayEl = document.getElementById('paused-overlay');
@@ -497,6 +499,24 @@ function updatePartyOrbs(state) {
   }
 }
 
+// ---- groove dancers ---- same idle/results gate as the party orbs above.
+function updateGrooveDancers(state) {
+  if (!grooveDancerLeftEl || !grooveDancerRightEl) return;
+  const animationsOn = state.settings && state.settings.extraAnimations;
+  const partyTime = state.roundStatus === 'idle' || state.roundStatus === 'results';
+  const visible = animationsOn && partyTime;
+  grooveDancerLeftEl.hidden = !visible;
+  grooveDancerRightEl.hidden = !visible;
+}
+
+// ---- scoreboard party wave ---- same idle/results gate, so the board
+// still feels alive during downtime instead of only reacting mid-round.
+function updateScoreboardWave(state) {
+  const animationsOn = state.settings && state.settings.extraAnimations;
+  const partyTime = state.roundStatus === 'idle' || state.roundStatus === 'results';
+  scoreboardEl.classList.toggle('party-wave', !!(animationsOn && partyTime));
+}
+
 // ---- fireworks ---- a bigger one-shot flourish than confetti, for the
 // results screen specifically. A handful of soft-glowing burst origins,
 // restrained to the brand's own 3 accent colors rather than a scattershot
@@ -671,6 +691,8 @@ socket.on('state', (state) => {
   updateAmbientGlow(state);
   updateLaserBeams(state);
   updatePartyOrbs(state);
+  updateGrooveDancers(state);
+  updateScoreboardWave(state);
   renderCategoryVoteTV(state);
 
   if (state.currentSong && state.currentSong.hint) {

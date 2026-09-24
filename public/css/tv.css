@@ -481,6 +481,116 @@
   100% { transform: translateY(-70vh) scale(1); opacity: 0; }
 }
 
+/* ---- groove dancers (extraAnimations) ---- 2 chunky rounded party-goers,
+   not literal stick figures — same gradient language as the mascot/disco
+   ball (rounded shapes, gold-to-coral fills) so they read as "designed"
+   rather than clip-art. Only during 'idle'/'results' (see tv.js), same
+   far-edge placement as the party orbs so nothing here can ever collide
+   with the centered join QR regardless of panel content height. */
+.groove-dancer {
+  position: absolute;
+  bottom: 4%;
+  width: 46px;
+  height: 84px;
+  pointer-events: none;
+  z-index: 11;
+  animation: groove-bounce 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.groove-dancer-left { left: 13%; }
+.groove-dancer-right { right: 13%; animation-delay: -0.55s; } /* offset so the two don't move in perfect unison */
+@keyframes groove-bounce {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-14px) rotate(4deg); }
+}
+/* A soft ground glow that pulses opposite the bounce (dips as the dancer
+   lifts, brightens as they land) — grounds the character and reads as a
+   little dance-floor spotlight underfoot. */
+.groove-spot {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, var(--gold), transparent 70%);
+  opacity: 0.35;
+  filter: blur(2px);
+  animation: groove-spot-pulse 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes groove-spot-pulse {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
+  50% { opacity: 0.2; transform: translateX(-50%) scale(0.75); }
+}
+.groove-body {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 40px;
+  border-radius: 15px;
+  background: linear-gradient(160deg, var(--coral), var(--gold));
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
+}
+.groove-head {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--gold), var(--coral));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+.groove-eye { width: 3px; height: 3px; border-radius: 50%; background: #21170a; }
+.groove-leg {
+  position: absolute;
+  bottom: 0;
+  width: 7px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--coral);
+  transform-origin: top center;
+  animation-duration: 1.1s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+.groove-leg-l { left: 9px; animation-name: groove-leg-l; }
+.groove-leg-r { right: 9px; animation-name: groove-leg-r; }
+@keyframes groove-leg-l { 0%, 100% { transform: rotate(14deg); } 50% { transform: rotate(-14deg); } }
+@keyframes groove-leg-r { 0%, 100% { transform: rotate(-14deg); } 50% { transform: rotate(14deg); } }
+.groove-arm {
+  position: absolute;
+  top: 32px;
+  width: 6px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--gold);
+  transform-origin: top center;
+  animation-duration: 1.1s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+.groove-arm-l { left: 3px; animation-name: groove-arm-l; }
+.groove-arm-r { right: 3px; animation-name: groove-arm-r; }
+@keyframes groove-arm-l { 0%, 100% { transform: rotate(-65deg); } 50% { transform: rotate(25deg); } }
+@keyframes groove-arm-r { 0%, 100% { transform: rotate(65deg); } 50% { transform: rotate(-25deg); } }
+/* The right-hand dancer's whole body is delayed (see .groove-dancer-right
+   above) — its limbs need the same delay or they'd fall out of sync with
+   their own body's bounce. */
+.groove-dancer-right .groove-spot,
+.groove-dancer-right .groove-leg,
+.groove-dancer-right .groove-arm { animation-delay: -0.55s; }
+@media (prefers-reduced-motion: reduce) {
+  .groove-dancer, .groove-spot, .groove-leg, .groove-arm { animation: none; }
+}
+
 /* ---- fireworks (extraAnimations) ---- a bigger flourish than confetti,
    reserved for the results screen: a few soft-glowing bursts rather than
    the more cartoonish sharp confetti-style dots this started as. Each
@@ -952,6 +1062,24 @@
 }
 .scoreboard .pill { font-size: 1.05rem; }
 .scoreboard .pill.lead { box-shadow: 0 0 0 2px var(--gold) inset; }
+/* Idle/results "party wave" (extraAnimations) — a gentle staggered bob
+   across the scoreboard so the screen still feels alive during downtime,
+   not just when a round is actually live. Class + delays applied from
+   tv.js, only outside an actual round. */
+.scoreboard.party-wave .pill { animation: scoreboard-wave 2.4s ease-in-out infinite; }
+.scoreboard.party-wave .pill:nth-child(2) { animation-delay: 0.15s; }
+.scoreboard.party-wave .pill:nth-child(3) { animation-delay: 0.3s; }
+.scoreboard.party-wave .pill:nth-child(4) { animation-delay: 0.45s; }
+.scoreboard.party-wave .pill:nth-child(5) { animation-delay: 0.6s; }
+.scoreboard.party-wave .pill:nth-child(6) { animation-delay: 0.75s; }
+.scoreboard.party-wave .pill:nth-child(n+7) { animation-delay: 0.9s; }
+@keyframes scoreboard-wave {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scoreboard.party-wave .pill { animation: none; }
+}
 .team-tag { font-size: 0.8em; color: var(--gold); opacity: 0.85; }
 .scoreboard .score { color: var(--gold); font-weight: 700; display: inline-block; }
 .scoreboard .score.score-pulse { animation: score-pulse 0.5s ease; }
