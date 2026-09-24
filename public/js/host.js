@@ -273,9 +273,10 @@ checkPlaylistBtn.addEventListener('click', async () => {
       return;
     }
     renderBrokenVideos(data.broken);
-    checkPlaylistStatus.textContent = data.broken.length
-      ? `Found ${data.broken.length} that won't play.`
-      : 'All songs check out.';
+    let statusMsg = data.broken.length ? `Found ${data.broken.length} that won't play.` : 'All songs check out.';
+    if (data.checkError) statusMsg = `⚠️ ${data.checkError}` + (data.broken.length ? ` (${data.broken.length} confirmed broken so far.)` : '');
+    checkPlaylistStatus.textContent = statusMsg;
+    checkPlaylistStatus.classList.toggle('warn', !!data.checkError);
   } catch (e) {
     checkPlaylistStatus.textContent = 'Could not reach the server — try again.';
   } finally {

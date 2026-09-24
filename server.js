@@ -615,31 +615,50 @@ function extractPlaylistId(input) {
 // player — many official-label uploads have this disabled by the
 // publisher, which is exactly what shows up as "Video unavailable" once
 // a round is already live. Batches in groups of 50 (the API's max per
-// call). Returns a Set of the IDs that ARE embeddable.
+// call). Returns { embeddable: Set of IDs that ARE embeddable, hadApiError:
+// true if any batch's own API call failed (bad key, quota exceeded, network
+// issue) — see the two fail-open/fail-closed notes below for why those are
+// handled differently, and why the caller needs to know which happened.
 async function checkEmbeddable(apiKey, videoIds) {
   const embeddable = new Set();
+  let hadApiError = false;
   for (let i = 0; i < videoIds.length; i += 50) {
     const batch = videoIds.slice(i, i + 50);
+    if (!batch.length) continue;
     try {
       const apiUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
       apiUrl.searchParams.set('part', 'status');
       apiUrl.searchParams.set('id', batch.join(','));
       apiUrl.searchParams.set('key', apiKey);
       const r = await fetch(apiUrl);
-      if (!r.ok) { batch.forEach(id => embeddable.add(id)); continue; } // fail open — never block an import over a failed check
+      if (!r.ok) {
+        // A real API-level failure (bad key, quota exceeded, network issue)
+        // — fail OPEN so a transient hiccup can't wrongly flag good songs as
+        // broken, but remember it happened so the caller can tell the host
+        // the check didn't actually run, instead of silently claiming
+        // everything's fine when nothing was verified at all.
+        hadApiError = true;
+        batch.forEach(id => embeddable.add(id));
+        continue;
+      }
       const data = await r.json();
       const seen = new Set();
       for (const item of data.items || []) {
         seen.add(item.id);
         if (item.status && item.status.embeddable !== false) embeddable.add(item.id);
       }
-      // An id the API didn't return at all (rare) — fail open rather than silently dropping it.
-      batch.forEach(id => { if (!seen.has(id)) embeddable.add(id); });
+      // An id the API didn't return at all means that video is gone —
+      // deleted, made private, or otherwise no longer exists publicly (this
+      // used to fail OPEN here on the theory that a missing id was some rare
+      // fluke, but a missing video is exactly as unplayable as an explicit
+      // embeddable:false one, just for a different reason — leaving it out
+      // of `embeddable` now correctly flags it as broken too).
     } catch (e) {
+      hadApiError = true;
       batch.forEach(id => embeddable.add(id));
     }
   }
-  return embeddable;
+  return { embeddable, hadApiError };
 }
 
 // Looks for a differently-uploaded copy of the same song when the current
@@ -674,7 +693,7 @@ async function findReplacement(apiKey, title, artist) {
     .filter(c => c.youtubeId);
   if (!candidates.length) return null;
 
-  const embeddable = await checkEmbeddable(apiKey, candidates.map(c => c.youtubeId));
+  const { embeddable } = await checkEmbeddable(apiKey, candidates.map(c => c.youtubeId));
   return candidates.find(c => embeddable.has(c.youtubeId)) || null;
 }
 
@@ -737,7 +756,7 @@ app.post('/api/import-playlist', async (req, res) => {
       pageToken = data.nextPageToken || '';
     } while (pageToken && songs.length < 200);
 
-    const embeddable = await checkEmbeddable(apiKey, songs.map(s => s.youtubeId));
+    const { embeddable } = await checkEmbeddable(apiKey, songs.map(s => s.youtubeId));
     const playable = songs.filter(s => embeddable.has(s.youtubeId));
 
     // Auto-category suggestion per song — a small concurrency limit keeps a
@@ -775,11 +794,21 @@ app.post('/api/check-playlist', async (req, res) => {
     });
   }
   try {
-    const embeddable = await checkEmbeddable(apiKey, state.playlist.map(s => s.youtubeId));
+    const { embeddable, hadApiError } = await checkEmbeddable(apiKey, state.playlist.map(s => s.youtubeId));
     const broken = state.playlist
       .filter(s => !embeddable.has(s.youtubeId))
       .map(s => ({ id: s.id, title: s.title, artist: s.artist }));
-    res.json({ broken });
+    // hadApiError means at least one batch's own API call failed (bad key,
+    // quota exceeded, network issue) and that batch was skipped rather than
+    // actually checked — tell the host that plainly instead of letting a
+    // clean "0 broken" reading look like a real all-clear when part of the
+    // playlist was never verified at all.
+    res.json({
+      broken,
+      checkError: hadApiError
+        ? "Some songs couldn't be fully verified — a YouTube API call failed (quota exceeded or a network issue). Results below may be incomplete; try again in a bit."
+        : null,
+    });
   } catch (e) {
     res.status(502).json({ error: 'Could not reach the YouTube API — check your connection and try again.' });
   }
@@ -807,7 +836,7 @@ app.post('/api/preflight', async (req, res) => {
     checks.push({ label: 'No broken videos', ok: null, detail: 'No songs to check' });
   } else {
     try {
-      const embeddable = await checkEmbeddable(apiKey, state.playlist.map(s => s.youtubeId));
+      const { embeddable } = await checkEmbeddable(apiKey, state.playlist.map(s => s.youtubeId));
       const brokenCount = state.playlist.filter(s => !embeddable.has(s.youtubeId)).length;
       checks.push({
         label: 'No broken videos',
@@ -926,7 +955,7 @@ io.on('connection', (socket) => {
     if (apiKey) {
       const id = youtubeId.trim();
       try {
-        const embeddable = await checkEmbeddable(apiKey, [id]);
+        const { embeddable } = await checkEmbeddable(apiKey, [id]);
         if (!embeddable.has(id)) {
           socket.emit('addSongWarning', {
             youtubeId: id,
