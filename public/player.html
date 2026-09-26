@@ -37,6 +37,17 @@
     </header>
 
     <main>
+      <div id="wager-block" hidden>
+        <h2>💰 Daily Double!</h2>
+        <p>You get an exclusive crack at this one — no one else can buzz. How much do you wager?</p>
+        <input type="number" id="wager-input" min="0" step="1" value="0">
+        <p class="muted small" id="wager-max-hint"></p>
+        <button class="primary" id="wager-submit-btn">Lock in wager</button>
+      </div>
+      <div id="wager-waiting-block" hidden>
+        <p class="muted">🎲 <strong id="wager-player-name"></strong> is setting a wager…</p>
+      </div>
+
       <div id="vote-block" hidden>
         <h2 id="vote-heading">🗳️ Vote for the next category!</h2>
         <div id="vote-options-player" class="vote-options-player"></div>

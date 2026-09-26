@@ -21,6 +21,7 @@ const PLAYLIST_FILE = path.join(__dirname, 'playlist.json');
 const PLAYERS_FILE = path.join(__dirname, 'players.json');
 const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 const STATS_FILE = path.join(__dirname, 'stats.json');
+const PRESETS_FILE = path.join(__dirname, 'presets.json');
 const ROUNDSTATE_FILE = path.join(__dirname, 'roundstate.json');
 
 const DEFAULT_STATS = {
@@ -40,6 +41,18 @@ const DEFAULT_SETTINGS = {
   extraAnimations: true,
   mysteryRound: false,
   categoryVoting: false,
+  preflightCheck: false,
+  pauseGame: false,
+  actionLog: false,
+  setlistPresets: false,
+  achievementBadges: false,
+  snippetMode: false,
+  wagerRound: false,
+  startOffset: false,
+  gameLimit: false,
+  scoreLimitValue: 0,    // score at which a player/team ends the game early (0 = off) — see checkGameLimit()
+  roundLimitValue: 0,    // rounds played at which the game ends early (0 = off) — see checkGameLimit()
+  easterEggMahtab: false,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -111,25 +124,43 @@ function saveStats() {
   fs.writeFileSync(STATS_FILE, JSON.stringify(state.stats, null, 2));
 }
 
+function loadPresets() {
+  try {
+    return JSON.parse(fs.readFileSync(PRESETS_FILE, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function savePresets() {
+  fs.writeFileSync(PRESETS_FILE, JSON.stringify(state.presets, null, 2));
+}
+
 // Round-state resume: so a crash + pm2 auto-restart (or any server restart)
 // mid-round comes back exactly where it left off — same song, same buzz
 // order — instead of silently dropping to 'idle' and leaving the host to
 // notice and re-pick the interrupted song by hand. Written on every
 // broadcast() (cheap: a handful of fields, one small file) and read back at
 // startup. Deliberately narrower than a full snapshot of `state`:
-//   - roundTimer / autoAdvance (the live countdowns) are NOT resumed — only
-//     `buzzingLocked` (a static flag) survives. Reconstructing an exact
-//     "seconds remaining" across an unknown-length outage isn't worth the
-//     complexity; buzzing just stays open a bit longer than intended in the
-//     rare case a timer was still ticking when the crash happened, which is
-//     a far smaller loss than the round vanishing outright.
+//   - roundTimer / autoAdvance / pauseRemaining (the live countdowns) are NOT
+//     resumed — only the static `buzzingLocked`/`paused` flags survive.
+//     Reconstructing an exact "seconds remaining" across an unknown-length
+//     outage isn't worth the complexity; buzzing just stays open a bit
+//     longer than intended, or a resumed pause has nothing to re-arm on
+//     unpause — both far smaller losses than the round vanishing outright.
 //   - categoryVote is NOT resumed — it's an idle-only, players-tap-a-button
 //     interaction with no game state riding on it; re-starting a vote after
 //     a crash costs a few seconds, not worth persisting for.
-//   - mysterySongId/mysteryModifier ARE resumed even outside an active round
-//     (any roundStatus), since ensureMysterySong() would otherwise silently
-//     re-roll a different song on every restart, breaking the "one song,
-//     sticky for the whole game" guarantee documented on that function.
+//   - mysterySongId/mysteryModifier/paused/actionLog/badgeStats/roundsPlayed
+//     ARE resumed independent of roundStatus (not just during an active
+//     round) — they're this-game running state with no other persistence
+//     path. ensureMysterySong() would otherwise silently re-roll a
+//     different song on every restart, breaking the "one song, sticky for
+//     the whole game" guarantee; the others would just quietly lose a
+//     dispute log / achievement progress / round count to an unrelated crash.
+//   - wager IS resumed when set: resuming mid-'wagering' with a null wager
+//     would leave player:submitWager permanently rejecting the real
+//     wagering player (it checks state.wager.playerId).
 function loadRoundState() {
   try {
     return JSON.parse(fs.readFileSync(ROUNDSTATE_FILE, 'utf8'));
@@ -149,8 +180,15 @@ function saveRoundState() {
     roundStartedAt: state.roundStartedAt,
     speedBonusPaid: state.speedBonusPaid,
     hintRevealedIndices: state.hintRevealedIndices,
+    snippetSeconds: state.snippetSeconds,
+    startOffsetSeconds: state.startOffsetSeconds,
+    wager: state.wager,
     mysterySongId: state.mysterySongId,
     mysteryModifier: state.mysteryModifier,
+    paused: state.paused,
+    actionLog: state.actionLog,
+    badgeStats: state.badgeStats,
+    roundsPlayed: state.roundsPlayed,
   }, null, 2));
 }
 
@@ -167,10 +205,21 @@ function getLanIp() {
   // VirtualBox's default host-only network (used by e.g. BlueStacks) —
   // phones can never reach this, so never pick it if anything else exists.
   const isVirtualboxDefault = (ip) => ip.startsWith('192.168.56.');
-  const isWifi = (name) => /wi-?fi|wlan/i.test(name);
+  // Carrier-grade NAT range (100.64.0.0/10) — used by VPN clients like
+  // NordVPN/NordLynx and Tailscale, never a real home LAN.
+  const isCgnat = (ip) => {
+    const parts = ip.split('.').map(Number);
+    return parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127;
+  };
+  // VPN clients, Hyper-V/container virtual switches — never the network
+  // a phone is actually joined to, even though they get a real-looking IP.
+  const isVirtualOrVpn = (name) => /vpn|nordlynx|wireguard|tailscale|zerotier|tap-|vethernet|virtual|vswitch|hyper-v|docker|wsl/i.test(name);
+  const isRealLan = (c) => !isVirtualboxDefault(c.address) && !isCgnat(c.address) && !isVirtualOrVpn(c.name);
+  const isWifiOrEthernet = (name) => /^wi-?fi|wlan|^ethernet/i.test(name);
 
   return (
-    candidates.find(c => isWifi(c.name) && !isVirtualboxDefault(c.address)) ||
+    candidates.find(c => isRealLan(c) && isWifiOrEthernet(c.name)) ||
+    candidates.find(c => isRealLan(c)) ||
     candidates.find(c => !isVirtualboxDefault(c.address)) ||
     candidates[0]
   ).address;
@@ -181,10 +230,10 @@ function getLanIp() {
 const initialPlaylist = loadPlaylist();
 const savedRound = loadRoundState();
 // 'idle'/'results' need no current song (currentIndex is legitimately -1 for
-// both); 'playing'/'buzzed'/'revealed' do — if that song can't be found
-// (removed from the playlist during the outage, a rare edge case), fall
-// back to a clean idle state rather than resuming into something broken.
-const roundNeedsSong = savedRound && ['playing', 'buzzed', 'revealed'].includes(savedRound.roundStatus);
+// both); 'playing'/'buzzed'/'revealed'/'wagering' do — if that song can't be
+// found (removed from the playlist during the outage, a rare edge case),
+// fall back to a clean idle state rather than resuming into something broken.
+const roundNeedsSong = savedRound && ['playing', 'buzzed', 'revealed', 'wagering'].includes(savedRound.roundStatus);
 const resumedIndex = roundNeedsSong ? initialPlaylist.findIndex(s => s.id === savedRound.currentSongId) : -1;
 const canResumeRound = !!savedRound && savedRound.roundStatus !== 'idle' && (!roundNeedsSong || resumedIndex !== -1);
 
@@ -197,7 +246,9 @@ const state = {
   roundTimer: null,               // {seconds, endsAt} | null — a soft cutoff; doesn't survive a restart, see saveRoundState()
   buzzingLocked: canResumeRound ? !!savedRound.buzzingLocked : false, // true once the timer expires with no buzz — host still controls reveal/close
   language: 'en',                 // 'en' | 'fa' — TV/player display language, set by the host
-  autoAdvance: null,               // {endsAt} | null — pending auto-start of the next unplayed song; doesn't survive a restart either
+  theme: 'dark',                  // 'dark' | 'light' — TV/player/host display theme, set by the host; same in-memory-only, resets-on-restart treatment as language
+  playOrder: 'sequential',        // 'sequential' | 'random' — order pickNextSong() picks from for auto-advance/host:playNext; same in-memory-only treatment as language/theme. Manually clicking Play on a specific song always ignores this and just plays that song.
+  autoAdvance: null,               // {endsAt} | null — pending auto-start of the next unplayed song; doesn't survive a restart, see saveRoundState()
   settings: loadSettings(),       // host-toggleable game options — see DEFAULT_SETTINGS
   roundHadMiss: canResumeRound ? !!savedRound.roundHadMiss : false, // true once resetBuzzers has fired this round — powers the steal-mechanic bonus
   roundStartedAt: canResumeRound ? savedRound.roundStartedAt : null, // Date.now() when the current round began — powers the speed-bonus window
@@ -207,7 +258,30 @@ const state = {
   mysterySongId: savedRound ? savedRound.mysterySongId : null,     // id of this game's one Mystery Modifier Round song, or null — see ensureMysterySong()
   mysteryModifier: savedRound ? savedRound.mysteryModifier : null, // 'double' | 'noHint' | 'blind' | null — only revealed (via payloadFor) once that song's round starts
   categoryVote: null,              // {options, votes: {playerId: category}, closed, result, endsAt} | null — deliberately not resumed, see saveRoundState()
+  paused: savedRound ? !!savedRound.paused : false, // true between host:togglePause calls — freezes buzzing and any running timers for a break
+  pauseRemaining: null,             // {roundTimerSeconds, autoAdvanceSeconds} snapshotted at pause time; doesn't survive a restart, see saveRoundState()
+  actionLog: savedRound ? (savedRound.actionLog || []) : [], // [{at, text}] most-recent-first, capped — host-only audit trail, see logAction()
+  presets: loadPresets(),          // name -> {playlist, settings, savedAt} — saved setlist+settings combos, see host:savePreset
+  badgeStats: (savedRound && savedRound.badgeStats) || { fastestBuzz: null, steals: {}, correct: {}, everLastPlace: {} }, // THIS GAME's running counters for computeBadges() — reset on resetGame
+  snippetSeconds: canResumeRound ? (Number(savedRound.snippetSeconds) || 0) : 0, // how long the TV plays this round's song before auto-pausing, 0 = off — see host:startRound
+  startOffsetSeconds: canResumeRound ? (Number(savedRound.startOffsetSeconds) || 0) : 0, // how many seconds into the video this round starts playback from, 0 = the beginning — see host:startRound
+  wager: canResumeRound ? (savedRound.wager || null) : null, // {playerId, amount, timerSeconds} | null — Daily-Double-style exclusive round, see host:startRound/player:submitWager
+  knownBroken: {},                 // songId -> {message, at} — songs the TV has *actually* hit a real playback error on, see tv:playerStatus. In-memory only (not persisted, doesn't survive a restart) — it's a live diagnostic, not durable data, same reasoning the original playerStatus relay used for staying out of state/broadcast().
+  roundsPlayed: savedRound ? (Number(savedRound.roundsPlayed) || 0) : 0, // count of rounds revealed this game — powers the gameLimit setting's round-count end condition, reset by host:resetGame
 };
+
+const ACTION_LOG_LIMIT = 50;
+
+// Host-only audit trail for settling "wait, who got that point?" disputes
+// live. Only accumulates while the actionLog setting is on — same opt-in
+// pattern as sessionStats — so there's zero cost when it's off. Never sent
+// to tv/player (see payloadFor's host-only branch), same reasoning as the
+// playlist itself: this is host-management data, not shared game state.
+function logAction(text) {
+  if (!state.settings.actionLog) return;
+  state.actionLog.unshift({ at: Date.now(), text });
+  if (state.actionLog.length > ACTION_LOG_LIMIT) state.actionLog.length = ACTION_LOG_LIMIT;
+}
 
 const SPEED_BONUS_WINDOW_MS = 3000;
 
@@ -228,6 +302,85 @@ function clearAutoAdvance() {
   state.autoAdvance = null;
 }
 
+// Picks which unplayed song plays next, honoring state.playOrder — shared by
+// auto-advance and host:playNext so both respect the same host-chosen order.
+// 'random' never repeats an already-played song within a session, same as
+// 'sequential' — it only ever draws from the unplayed pool. Manually clicking
+// Play/Replay on a specific playlist row bypasses this entirely by design
+// (that's the one place a deliberate repeat is allowed).
+function pickNextSong() {
+  const unplayed = state.playlist.filter(s => !s.played);
+  if (!unplayed.length) return null;
+  if (state.playOrder === 'random') return unplayed[Math.floor(Math.random() * unplayed.length)];
+  return unplayed[0];
+}
+
+// Shared by host:showResults and checkGameLimit() below (an early, automatic
+// game-over hits the exact same end state a host manually clicking "Show
+// results" would).
+function showResults() {
+  state.roundStatus = 'results';
+  state.currentIndex = -1;
+  state.buzzOrder = [];
+  state.wager = null;
+  clearRoundTimer();
+  clearAutoAdvance();
+}
+
+// Game limit: host-toggleable early end condition — the first player (or,
+// in team mode, team) to reach scoreLimitValue points, or roundLimitValue
+// rounds played, jumps straight to results. Checked at the two moments
+// either limit can newly be crossed: right after a score changes
+// (host:awardPoint) and right after a round is revealed (host:revealAnswer,
+// where roundsPlayed increments). No-ops once already at 'results'/'idle' so
+// it can't refire after the host has already moved past it.
+function checkGameLimit() {
+  if (!state.settings.gameLimit || state.roundStatus === 'results' || state.roundStatus === 'idle') return;
+  const { scoreLimitValue, roundLimitValue } = state.settings;
+  let hit = false;
+
+  if (scoreLimitValue > 0) {
+    if (state.settings.teamMode) {
+      const teamTotals = {};
+      Object.values(state.players).forEach(p => {
+        const t = (p.team || '').trim();
+        if (t) teamTotals[t] = (teamTotals[t] || 0) + p.score;
+        else if (p.score >= scoreLimitValue) hit = true; // solo (no-team) player, scored individually
+      });
+      if (Object.values(teamTotals).some(total => total >= scoreLimitValue)) hit = true;
+    } else if (Object.values(state.players).some(p => p.score >= scoreLimitValue)) {
+      hit = true;
+    }
+  }
+  if (!hit && roundLimitValue > 0 && state.roundsPlayed >= roundLimitValue) hit = true;
+
+  if (hit) showResults();
+}
+
+// Shared by host:revealAnswer and the pause/resume flow (host:togglePause) —
+// a resume just re-arms the same countdown with whatever time was left when
+// it got frozen, so both call sites need the exact same "start the next
+// unplayed song" behavior when the countdown elapses.
+function scheduleAutoAdvance(seconds, nextRoundTimerSeconds) {
+  // nextRoundTimerSeconds rides along on state.autoAdvance itself (not just
+  // captured in this closure) so a pause can recover it later — pausing
+  // clears this very timeout via clearAutoAdvance(), which would otherwise
+  // lose the value when host:togglePause re-arms it on resume.
+  state.autoAdvance = { endsAt: Date.now() + seconds * 1000, nextRoundTimerSeconds };
+  autoAdvanceHandle = setTimeout(() => {
+    state.autoAdvance = null;
+    // Only proceed if the host hasn't already moved on manually — any of
+    // resetBuzzers/startRound/closeRound/showResults/resetGame would have
+    // changed roundStatus away from 'revealed' by now. A pause also blocks
+    // it, same as those manual actions would.
+    if (state.roundStatus === 'revealed' && !state.paused) {
+      const next = pickNextSong();
+      if (next) startRound(next.id, nextRoundTimerSeconds);
+    }
+    broadcast();
+  }, seconds * 1000);
+}
+
 function startRoundTimer(seconds) {
   clearTimeout(roundTimerHandle);
   state.roundTimer = { seconds, endsAt: Date.now() + seconds * 1000 };
@@ -242,23 +395,43 @@ function startRoundTimer(seconds) {
   }, seconds * 1000);
 }
 
-function startRound(id, timerSeconds) {
+function startRound(id, timerSeconds, snippetSeconds, wagerPlayerId, startOffsetSeconds) {
   const idx = state.playlist.findIndex(s => s.id === id);
   if (idx === -1) return false;
+  const song = state.playlist[idx];
   state.currentIndex = idx;
-  state.roundStatus = 'playing';
   state.buzzOrder = [];
   state.roundHadMiss = false;
-  state.roundStartedAt = Date.now();
-  state.speedBonusPaid = false;
   state.hintRevealedIndices = [];
+  // Only meaningful with the toggle on — never carries a value in from a
+  // stale client field once the host has switched the setting off.
+  state.snippetSeconds = state.settings.snippetMode ? (Number(snippetSeconds) || 0) : 0;
+  state.startOffsetSeconds = state.settings.startOffset ? Math.max(0, Number(startOffsetSeconds) || 0) : 0;
   // The vote (if any) has done its job of picking a category to play from —
   // clear it so a stale result doesn't linger once the round it fed into begins.
   clearVoteTimer();
   state.categoryVote = null;
   clearRoundTimer();
   clearAutoAdvance();
-  if (timerSeconds > 0) startRoundTimer(timerSeconds);
+
+  // Wager round ("Daily Double"): only when the toggle's on, this specific
+  // song is host-flagged eligible, and the host actually picked someone to
+  // wager. Goes to a 'wagering' holding status first — no video loads, no
+  // buzzing, no round timer yet — until player:submitWager locks in an
+  // amount and flips it over to a normal 'playing' round exclusive to them.
+  const useWager = state.settings.wagerRound && song.wagerEligible && wagerPlayerId && state.players[wagerPlayerId];
+  if (useWager) {
+    state.roundStatus = 'wagering';
+    state.wager = { playerId: wagerPlayerId, amount: null, timerSeconds: Number(timerSeconds) || 0 };
+    state.roundStartedAt = null;
+    state.speedBonusPaid = false;
+  } else {
+    state.roundStatus = 'playing';
+    state.wager = null;
+    state.roundStartedAt = Date.now();
+    state.speedBonusPaid = false;
+    if (timerSeconds > 0) startRoundTimer(timerSeconds);
+  }
   return true;
 }
 
@@ -318,6 +491,44 @@ function buildHintMask(title, revealedIndices) {
   return [...title].map((ch, i) => (/[a-zA-Z0-9]/.test(ch) ? (revealed.has(i) ? ch : '_') : ch)).join(' ');
 }
 
+// "This game" awards computed from state.badgeStats (reset every
+// resetGame) — deliberately server-side rather than reconstructed
+// client-side, since the server already has every counter it needs and
+// this avoids re-implementing the same tie/lead logic in every client.
+// Only ever meaningful once state.roundStatus reaches 'results' (rendered
+// there), but cheap enough to compute unconditionally.
+function computeBadges() {
+  if (!state.settings.achievementBadges) return null;
+  const badges = [];
+  const bs = state.badgeStats;
+
+  if (bs.fastestBuzz && state.players[bs.fastestBuzz.id]) {
+    badges.push({ key: 'fastest', icon: '🏃', label: 'Fastest Buzzer', name: displayName(bs.fastestBuzz.name), detail: `${(bs.fastestBuzz.ms / 1000).toFixed(2)}s` });
+  }
+
+  const stealTop = Object.entries(bs.steals).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1])[0];
+  if (stealTop && state.players[stealTop[0]]) {
+    badges.push({ key: 'steals', icon: '🔥', label: 'Most Steals', name: displayName(state.players[stealTop[0]].name), detail: `${stealTop[1]} steal${stealTop[1] === 1 ? '' : 's'}` });
+  }
+
+  const correctTop = Object.entries(bs.correct).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1])[0];
+  if (correctTop && state.players[correctTop[0]]) {
+    badges.push({ key: 'sharpshooter', icon: '🎯', label: 'Sharpshooter', name: displayName(state.players[correctTop[0]].name), detail: `${correctTop[1]} correct` });
+  }
+
+  // Comeback Kid: ever registered in (sole or shared) last place at some
+  // point this game, and now the sole (non-tied) leader.
+  const entries = Object.entries(state.players);
+  const scores = entries.map(([, p]) => p.score);
+  const max = scores.length ? Math.max(...scores) : 0;
+  const soleLeaders = entries.filter(([, p]) => p.score === max);
+  if (max > 0 && soleLeaders.length === 1 && bs.everLastPlace[soleLeaders[0][0]]) {
+    badges.push({ key: 'comeback', icon: '🔁', label: 'Comeback Kid', name: displayName(soleLeaders[0][1].name), detail: 'came from behind' });
+  }
+
+  return badges;
+}
+
 function currentSong() {
   return state.currentIndex >= 0 ? state.playlist[state.currentIndex] : null;
 }
@@ -331,12 +542,46 @@ function makeSong(youtubeId, title, artist, category) {
     category: (category || '').trim(),
     played: false,
     points: 1,                    // how many points a correct buzz on this song is worth — see host:setSongPoints
+    wagerEligible: false,         // host-flagged "Daily Double" song — see host:setWagerEligible
   };
+}
+
+// ---------- Easter egg: Mahtab ----------
+// A host-toggleable, fun-only joke for a specific friend. Never touches the
+// stored name (state.players[id].name) — only the copy sent out for
+// display — so it doesn't affect team grouping, player lookup, or what's
+// saved to players.json. Off by default; see DEFAULT_SETTINGS.easterEggMahtab.
+function isMahtabName(name) {
+  if (!name) return false;
+  const n = name.trim();
+  if (n.toLowerCase() === 'mahtab') return true;
+  // ي/ك (Arabic forms) vs ی/ک (Persian forms) — normalize so either
+  // keyboard layout still matches "مهتاب".
+  const normalizedFa = n.replace(/[يى]/g, 'ی').replace(/ك/g, 'ک');
+  return normalizedFa === 'مهتاب';
+}
+
+const MAHTAB_TEASES = {
+  en: ['😏 uh oh…', '👀 here we go', '💍 the usual suspect', '😂 called it', '🙄 again?'],
+  fa: ['😏 اوه اوه…', '👀 بازم این یکی', '💍 بازم همون داستان', '😂 حدس زده بودیم', '🙄 بازم؟'],
+};
+
+// Applied only at display time — the suffix follows whichever language the
+// host currently has selected (shared state.language, same as every other
+// TV/player-facing string), not the viewer's own device.
+function displayName(name) {
+  if (!state.settings.easterEggMahtab || !isMahtabName(name)) return name;
+  return `${name} ${state.language === 'fa' ? 'شوهری' : 'Shohari'}`;
+}
+
+function mahtabTease() {
+  const list = MAHTAB_TEASES[state.language === 'fa' ? 'fa' : 'en'];
+  return list[Math.floor(Math.random() * list.length)];
 }
 
 function publicPlayers() {
   return Object.entries(state.players).map(([id, p]) => ({
-    id, name: p.name, score: p.score, connected: p.connected, team: p.team || '',
+    id, name: displayName(p.name), score: p.score, connected: p.connected, team: p.team || '',
   }));
 }
 
@@ -361,14 +606,23 @@ function payloadFor(role) {
 
   const base = {
     roundStatus: state.roundStatus,
-    buzzOrder: state.buzzOrder.map(b => ({ id: b.id, name: b.name })),
+    buzzOrder: state.buzzOrder.map(b => ({ id: b.id, name: displayName(b.name), tease: b.tease || null })),
+    roundsPlayed: state.roundsPlayed,
     players: publicPlayers(),
     roundTimer: state.roundTimer,
     buzzingLocked: state.buzzingLocked,
     language: state.language,
+    theme: state.theme,
     autoAdvance: state.autoAdvance,
     settings: state.settings,
+    paused: state.paused,
     stats: state.stats,
+    badges: computeBadges(),
+    snippetSeconds: state.settings.snippetMode ? state.snippetSeconds : 0,
+    startOffsetSeconds: state.settings.startOffset ? state.startOffsetSeconds : 0,
+    wager: state.wager
+      ? { playerId: state.wager.playerId, playerName: (state.players[state.wager.playerId] || {}).name || '', amount: state.wager.amount }
+      : null,
     mysteryRound: mysteryModifier ? { modifier: mysteryModifier, label: MYSTERY_LABELS[mysteryModifier] } : null,
     categoryVote: state.categoryVote
       ? {
@@ -387,10 +641,15 @@ function payloadFor(role) {
       ...base,
       playlist: state.playlist,
       currentIndex: state.currentIndex,
+      playOrder: state.playOrder,
       // "Double points" reuses the points-per-song pipeline exactly — just
       // overriding the runtime value shown/awarded for this one round. The
       // song's own stored points field never changes.
       currentSong: song && mysteryModifier === 'double' ? { ...song, points: (song.points || 1) * 2 } : song,
+      actionLog: state.actionLog,
+      presets: Object.entries(state.presets).map(([name, p]) => ({
+        name, songCount: p.playlist.length, savedAt: p.savedAt,
+      })),
       // Which unplayed song is this game's mystery song — shown as a badge
       // in the host's playlist so they can choose when to play it. The
       // MODIFIER itself is still withheld (via mysteryRound above) until
@@ -411,11 +670,16 @@ function payloadFor(role) {
     const isMysteryBlindLive = mysteryModifier === 'blind' && (state.roundStatus === 'playing' || state.roundStatus === 'buzzed');
     const hideScores = (state.settings.blindMode && state.roundStatus !== 'results') || isMysteryBlindLive;
     const showHint = state.settings.karaokeHint && state.roundStatus === 'playing' && song && mysteryModifier !== 'noHint';
+    // A wager round withholds the song entirely (no video loads, no title
+    // leak) while the chosen player is still deciding their amount — nobody
+    // should be able to size up the clue before the stakes are locked in.
+    const wageringHidden = state.roundStatus === 'wagering';
     return {
       ...base,
       players: hideScores ? base.players.map(p => ({ ...p, score: null })) : base.players,
-      currentSong: song
+      currentSong: song && !wageringHidden
         ? {
+            id: song.id, // lets tv.js attribute a real playback error to this specific song — see tv:playerStatus
             youtubeId: song.youtubeId,
             title: revealed ? song.title : null,
             artist: revealed ? song.artist : null,
@@ -534,31 +798,50 @@ function extractPlaylistId(input) {
 // player — many official-label uploads have this disabled by the
 // publisher, which is exactly what shows up as "Video unavailable" once
 // a round is already live. Batches in groups of 50 (the API's max per
-// call). Returns a Set of the IDs that ARE embeddable.
+// call). Returns { embeddable: Set of IDs that ARE embeddable, hadApiError:
+// true if any batch's own API call failed (bad key, quota exceeded, network
+// issue) — see the two fail-open/fail-closed notes below for why those are
+// handled differently, and why the caller needs to know which happened.
 async function checkEmbeddable(apiKey, videoIds) {
   const embeddable = new Set();
+  let hadApiError = false;
   for (let i = 0; i < videoIds.length; i += 50) {
     const batch = videoIds.slice(i, i + 50);
+    if (!batch.length) continue;
     try {
       const apiUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
       apiUrl.searchParams.set('part', 'status');
       apiUrl.searchParams.set('id', batch.join(','));
       apiUrl.searchParams.set('key', apiKey);
       const r = await fetch(apiUrl);
-      if (!r.ok) { batch.forEach(id => embeddable.add(id)); continue; } // fail open — never block an import over a failed check
+      if (!r.ok) {
+        // A real API-level failure (bad key, quota exceeded, network issue)
+        // — fail OPEN so a transient hiccup can't wrongly flag good songs as
+        // broken, but remember it happened so the caller can tell the host
+        // the check didn't actually run, instead of silently claiming
+        // everything's fine when nothing was verified at all.
+        hadApiError = true;
+        batch.forEach(id => embeddable.add(id));
+        continue;
+      }
       const data = await r.json();
       const seen = new Set();
       for (const item of data.items || []) {
         seen.add(item.id);
         if (item.status && item.status.embeddable !== false) embeddable.add(item.id);
       }
-      // An id the API didn't return at all (rare) — fail open rather than silently dropping it.
-      batch.forEach(id => { if (!seen.has(id)) embeddable.add(id); });
+      // An id the API didn't return at all means that video is gone —
+      // deleted, made private, or otherwise no longer exists publicly (this
+      // used to fail OPEN here on the theory that a missing id was some rare
+      // fluke, but a missing video is exactly as unplayable as an explicit
+      // embeddable:false one, just for a different reason — leaving it out
+      // of `embeddable` now correctly flags it as broken too).
     } catch (e) {
+      hadApiError = true;
       batch.forEach(id => embeddable.add(id));
     }
   }
-  return embeddable;
+  return { embeddable, hadApiError };
 }
 
 // Looks for a differently-uploaded copy of the same song when the current
@@ -593,7 +876,7 @@ async function findReplacement(apiKey, title, artist) {
     .filter(c => c.youtubeId);
   if (!candidates.length) return null;
 
-  const embeddable = await checkEmbeddable(apiKey, candidates.map(c => c.youtubeId));
+  const { embeddable } = await checkEmbeddable(apiKey, candidates.map(c => c.youtubeId));
   return candidates.find(c => embeddable.has(c.youtubeId)) || null;
 }
 
@@ -656,7 +939,7 @@ app.post('/api/import-playlist', async (req, res) => {
       pageToken = data.nextPageToken || '';
     } while (pageToken && songs.length < 200);
 
-    const embeddable = await checkEmbeddable(apiKey, songs.map(s => s.youtubeId));
+    const { embeddable } = await checkEmbeddable(apiKey, songs.map(s => s.youtubeId));
     const playable = songs.filter(s => embeddable.has(s.youtubeId));
 
     // Auto-category suggestion per song — a small concurrency limit keeps a
@@ -688,20 +971,87 @@ app.post('/api/import-playlist', async (req, res) => {
 // touch state — removal is a separate, explicit host action.
 app.post('/api/check-playlist', async (req, res) => {
   const apiKey = process.env.YOUTUBE_API_KEY;
+  // Real-playback failures the TV has actually hit (see tv:playerStatus) are
+  // ground truth regardless of whether a YOUTUBE_API_KEY is even configured
+  // — never gate those behind the optional key the way the Data-API check
+  // below is.
+  const knownBrokenIds = new Set(Object.keys(state.knownBroken));
+
   if (!apiKey) {
-    return res.status(400).json({
-      error: "YouTube checks aren't configured — add YOUTUBE_API_KEY to your .env file (see README).",
+    const broken = state.playlist
+      .filter(s => knownBrokenIds.has(s.id))
+      .map(s => ({ id: s.id, title: s.title, artist: s.artist }));
+    return res.json({
+      broken,
+      checkError: "Full playlist scan isn't configured — add YOUTUBE_API_KEY to your .env file (see README). Showing only songs with a confirmed real playback failure so far.",
     });
   }
   try {
-    const embeddable = await checkEmbeddable(apiKey, state.playlist.map(s => s.youtubeId));
+    const { embeddable, hadApiError } = await checkEmbeddable(apiKey, state.playlist.map(s => s.youtubeId));
     const broken = state.playlist
-      .filter(s => !embeddable.has(s.youtubeId))
+      .filter(s => !embeddable.has(s.youtubeId) || knownBrokenIds.has(s.id))
       .map(s => ({ id: s.id, title: s.title, artist: s.artist }));
-    res.json({ broken });
+    // hadApiError means at least one batch's own API call failed (bad key,
+    // quota exceeded, network issue) and that batch was skipped rather than
+    // actually checked — tell the host that plainly instead of letting a
+    // clean "0 broken" reading look like a real all-clear when part of the
+    // playlist was never verified at all.
+    res.json({
+      broken,
+      checkError: hadApiError
+        ? "Some songs couldn't be fully verified — a YouTube API call failed (quota exceeded or a network issue). Results below may be incomplete; try again in a bit."
+        : null,
+    });
   } catch (e) {
     res.status(502).json({ error: 'Could not reach the YouTube API — check your connection and try again.' });
   }
+});
+
+// Read-only "ready to go?" gate the host can run right before the party
+// starts — bundles a few checks that would otherwise only surface one at a
+// time, mid-party, as separate surprises (an empty playlist, a broken video
+// discovered live, nobody's joined yet). Reuses checkEmbeddable() exactly
+// like /api/check-playlist; degrades gracefully (a skipped check, not an
+// error) when YOUTUBE_API_KEY isn't configured, same as everywhere else this
+// app treats that key as optional.
+app.post('/api/preflight', async (req, res) => {
+  const checks = [];
+  checks.push({
+    label: 'Playlist has songs',
+    ok: state.playlist.length > 0,
+    detail: `${state.playlist.length} song${state.playlist.length === 1 ? '' : 's'}`,
+  });
+
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) {
+    checks.push({ label: 'No broken videos', ok: null, detail: 'YOUTUBE_API_KEY not set — skipped' });
+  } else if (!state.playlist.length) {
+    checks.push({ label: 'No broken videos', ok: null, detail: 'No songs to check' });
+  } else {
+    try {
+      const { embeddable } = await checkEmbeddable(apiKey, state.playlist.map(s => s.youtubeId));
+      const brokenCount = state.playlist.filter(s => !embeddable.has(s.youtubeId)).length;
+      checks.push({
+        label: 'No broken videos',
+        ok: brokenCount === 0,
+        detail: brokenCount ? `${brokenCount} won't play` : 'All songs check out',
+      });
+    } catch (e) {
+      checks.push({ label: 'No broken videos', ok: null, detail: 'Could not reach YouTube — try again' });
+    }
+  }
+
+  const playerCount = Object.keys(state.players).length;
+  checks.push({
+    label: 'At least one player joined',
+    ok: playerCount > 0,
+    detail: `${playerCount} player${playerCount === 1 ? '' : 's'}`,
+  });
+
+  // Only an explicit false blocks readiness — a skipped (null) check (no API
+  // key configured) shouldn't stop the host from starting.
+  const ready = checks.every(c => c.ok !== false);
+  res.json({ ready, checks });
 });
 
 // ---------- sockets ----------
@@ -709,6 +1059,20 @@ app.post('/api/check-playlist', async (req, res) => {
 io.on('connection', (socket) => {
   let role = null;
   let playerId = null;
+
+  // A single malformed payload (e.g. null where a handler destructures an
+  // object) used to throw straight out of the handler and crash the whole
+  // process mid-game. Every handler below is registered through this guard,
+  // so a bad event is logged and dropped instead of taking the server down.
+  const rawOn = socket.on.bind(socket);
+  socket.on = (event, handler) => rawOn(event, (...args) => {
+    try {
+      const result = handler(...args);
+      if (result && typeof result.catch === 'function') result.catch(e => console.error(`[socket ${event}]`, e));
+    } catch (e) {
+      console.error(`[socket ${event}]`, e);
+    }
+  });
 
   socket.on('register', ({ role: r, id, name, team }) => {
     role = r;
@@ -741,7 +1105,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('player:buzz', () => {
-    if (!playerId || state.roundStatus !== 'playing' || state.buzzingLocked) return;
+    if (!playerId || state.roundStatus !== 'playing' || state.buzzingLocked || state.paused) return;
+    // Wager round: exclusive to whoever placed the wager — nobody else gets
+    // to race for the buzzer on a Daily Double.
+    if (state.wager && playerId !== state.wager.playerId) return;
     if (state.buzzOrder.find(b => b.id === playerId)) return;
     // Team mode: a buzz locks out the whole team, not just the one player —
     // teammates share the buzz-in the same way an individual player does.
@@ -755,7 +1122,10 @@ io.on('connection', (socket) => {
     // a host:resetBuzzers reopened things.
     const buzzTime = Date.now();
     const isFirstBuzzOfRound = state.buzzOrder.length === 0;
-    state.buzzOrder.push({ id: playerId, name: state.players[playerId].name, time: buzzTime });
+    // Tease is rolled once, right at buzz time, so it stays the same across
+    // every re-broadcast of this round instead of changing on every render.
+    const tease = state.settings.easterEggMahtab && isMahtabName(state.players[playerId].name) ? mahtabTease() : null;
+    state.buzzOrder.push({ id: playerId, name: state.players[playerId].name, time: buzzTime, tease });
     state.roundStatus = 'buzzed';
 
     // Fastest-buzz record only counts the round's actual first reaction —
@@ -766,6 +1136,16 @@ io.on('connection', (socket) => {
       if (!state.stats.fastestBuzz || ms < state.stats.fastestBuzz.ms) {
         state.stats.fastestBuzz = { name: state.players[playerId].name, ms, at: buzzTime };
         saveStats();
+      }
+    }
+    // Achievement badges track THIS game only (reset every resetGame), unlike
+    // the all-time record book above — a badge is "best of tonight", not a
+    // permanent record, so these are two genuinely separate counters even
+    // though they're computed from the exact same buzz.
+    if (state.settings.achievementBadges && isFirstBuzzOfRound && state.roundStartedAt) {
+      const ms = buzzTime - state.roundStartedAt;
+      if (!state.badgeStats.fastestBuzz || ms < state.badgeStats.fastestBuzz.ms) {
+        state.badgeStats.fastestBuzz = { id: playerId, name: state.players[playerId].name, ms };
       }
     }
 
@@ -785,7 +1165,7 @@ io.on('connection', (socket) => {
     if (apiKey) {
       const id = youtubeId.trim();
       try {
-        const embeddable = await checkEmbeddable(apiKey, [id]);
+        const { embeddable } = await checkEmbeddable(apiKey, [id]);
         if (!embeddable.has(id)) {
           socket.emit('addSongWarning', {
             youtubeId: id,
@@ -829,6 +1209,7 @@ io.on('connection', (socket) => {
       state.roundStatus = 'idle';
       clearRoundTimer();
     }
+    delete state.knownBroken[id];
     savePlaylist();
     broadcast();
   });
@@ -854,6 +1235,7 @@ io.on('connection', (socket) => {
     const song = state.playlist.find(s => s.id === id);
     if (!song || !youtubeId || !/^[\w-]{11}$/.test(youtubeId)) return;
     song.youtubeId = youtubeId;
+    delete state.knownBroken[id]; // fresh video — give it a clean slate rather than carrying over the old one's failure
     savePlaylist();
     broadcast();
   });
@@ -865,13 +1247,95 @@ io.on('connection', (socket) => {
     // Only accept it if it's a true reordering (same songs, new order) —
     // a stale/partial list from a slow client shouldn't drop songs.
     if (reordered.length !== state.playlist.length) return;
+    // currentIndex is a position, not a song identity — reordering while a
+    // round is live (or just closed) must re-find the same song by id, or
+    // it silently points at whatever song now sits at the old position.
+    // That bug used to make revealAnswer mark the WRONG song as played,
+    // leaving the actually-played one eligible to be picked again later —
+    // a repeat within the same session.
+    const playingId = state.currentIndex >= 0 ? state.playlist[state.currentIndex].id : null;
     state.playlist = reordered;
+    state.currentIndex = playingId !== null ? state.playlist.findIndex(s => s.id === playingId) : -1;
     savePlaylist();
     broadcast();
   });
 
-  socket.on('host:startRound', ({ id, timerSeconds }) => {
-    if (startRound(id, timerSeconds)) broadcast();
+  // Setlist presets: save/load a whole playlist+settings combo under a name
+  // (e.g. "80s night", "Kids party") so a host doesn't have to rebuild the
+  // playlist from scratch each game night. Mirrors the playlist/settings
+  // persistence pattern exactly (presets.json). Deliberately doesn't touch
+  // players/scores — a preset is about songs+rules, not who's currently
+  // playing. Loading is idle-only, same reasoning as category voting: never
+  // let it compete with or corrupt a round that's actually in progress.
+  socket.on('host:savePreset', ({ name } = {}) => {
+    if (!state.settings.setlistPresets) return;
+    const clean = (name || '').trim().slice(0, 40);
+    if (!clean) return;
+    // Deep-copy, not a reference — state.playlist/state.settings keep
+    // mutating after this (new songs, toggles), and a saved preset must be a
+    // frozen snapshot from this exact moment, not a window onto live state.
+    state.presets[clean] = {
+      playlist: state.playlist.map(s => ({ ...s })),
+      settings: { ...state.settings },
+      savedAt: Date.now(),
+    };
+    savePresets();
+    broadcast();
+  });
+
+  socket.on('host:loadPreset', ({ name } = {}) => {
+    if (!state.settings.setlistPresets || state.roundStatus !== 'idle') return;
+    const preset = state.presets[name];
+    if (!preset) return;
+    state.playlist = preset.playlist.map(s => ({ ...s }));
+    // setlistPresets itself always stays on after a load — otherwise loading
+    // a preset saved before this toggle existed (or saved with it off) would
+    // instantly hide the very card the host just used to load it.
+    state.settings = { ...DEFAULT_SETTINGS, ...preset.settings, setlistPresets: true };
+    state.mysterySongId = null;
+    state.mysteryModifier = null;
+    clearVoteTimer();
+    state.categoryVote = null;
+    savePlaylist();
+    saveSettings();
+    broadcast();
+  });
+
+  socket.on('host:deletePreset', ({ name } = {}) => {
+    if (!state.settings.setlistPresets) return;
+    if (!state.presets[name]) return;
+    delete state.presets[name];
+    savePresets();
+    broadcast();
+  });
+
+  socket.on('host:startRound', ({ id, timerSeconds, snippetSeconds, wagerPlayerId, startOffsetSeconds }) => {
+    if (startRound(id, timerSeconds, snippetSeconds, wagerPlayerId, startOffsetSeconds)) broadcast();
+  });
+
+  socket.on('host:setWagerEligible', ({ id, eligible } = {}) => {
+    const song = state.playlist.find(s => s.id === id);
+    if (!song) return;
+    song.wagerEligible = !!eligible;
+    savePlaylist();
+    broadcast();
+  });
+
+  // The wagering player locks in how much of their own score to risk —
+  // roundStartedAt/round timer deliberately don't start until this happens,
+  // so the "get ready" thinking time isn't eaten by a running clock.
+  socket.on('player:submitWager', ({ amount } = {}) => {
+    if (!playerId || !state.wager || state.wager.playerId !== playerId || state.wager.amount !== null) return;
+    if (state.roundStatus !== 'wagering') return;
+    const player = state.players[playerId];
+    const n = Math.round(Number(amount));
+    if (!player || !Number.isFinite(n) || n < 0 || n > player.score) return;
+    state.wager.amount = n;
+    state.roundStatus = 'playing';
+    state.roundStartedAt = Date.now();
+    state.speedBonusPaid = false;
+    if (state.wager.timerSeconds > 0) startRoundTimer(state.wager.timerSeconds);
+    broadcast();
   });
 
   socket.on('host:resetBuzzers', () => {
@@ -887,6 +1351,10 @@ io.on('connection', (socket) => {
     // Marks this round as "had a miss" — powers the steal-mechanic bonus if
     // whoever buzzes in next actually gets it right (see host:awardPoint).
     if (current) state.roundHadMiss = true;
+    if (current) {
+      const song = currentSong();
+      logAction(`❌ ${current.name} answered wrong${song ? ` on "${song.title}"` : ''}`);
+    }
     const priorTimerSeconds = state.roundTimer ? state.roundTimer.seconds : 0;
     state.roundStatus = 'playing';
     clearRoundTimer();
@@ -899,6 +1367,36 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
+  // Pause/resume: freezes buzzing and any running countdowns for a break
+  // (bathroom, food) without resetting anything. A running round timer or
+  // auto-advance countdown is stopped and its remaining seconds snapshotted,
+  // then re-armed with that same remaining time on resume — not restarted
+  // from full, and not left silently ticking in the background while paused.
+  socket.on('host:togglePause', () => {
+    if (!state.settings.pauseGame) return;
+    if (state.paused) {
+      state.paused = false;
+      const snap = state.pauseRemaining;
+      state.pauseRemaining = null;
+      if (snap) {
+        if (snap.roundTimerSeconds > 0) startRoundTimer(snap.roundTimerSeconds);
+        if (snap.autoAdvanceSeconds > 0) scheduleAutoAdvance(snap.autoAdvanceSeconds, snap.nextRoundTimerSeconds);
+      }
+    } else {
+      const roundTimerSeconds = state.roundTimer ? Math.max(1, Math.ceil((state.roundTimer.endsAt - Date.now()) / 1000)) : 0;
+      const autoAdvanceSeconds = state.autoAdvance ? Math.max(1, Math.ceil((state.autoAdvance.endsAt - Date.now()) / 1000)) : 0;
+      state.pauseRemaining = {
+        roundTimerSeconds,
+        autoAdvanceSeconds,
+        nextRoundTimerSeconds: state.autoAdvance ? state.autoAdvance.nextRoundTimerSeconds : 0,
+      };
+      clearRoundTimer();
+      clearAutoAdvance();
+      state.paused = true;
+    }
+    broadcast();
+  });
+
   socket.on('host:revealAnswer', ({ autoAdvanceSeconds } = {}) => {
     // Snapshot the round timer that was active for the song just revealed,
     // so an auto-started next round can reuse the same duration — not
@@ -908,25 +1406,18 @@ io.on('connection', (socket) => {
     clearAutoAdvance();
     if (state.currentIndex >= 0) {
       state.playlist[state.currentIndex].played = true;
+      state.roundsPlayed += 1;
       savePlaylist();
     }
     state.roundStatus = 'revealed';
     clearRoundTimer();
 
-    if (autoAdvanceSeconds > 0) {
-      state.autoAdvance = { endsAt: Date.now() + autoAdvanceSeconds * 1000 };
-      autoAdvanceHandle = setTimeout(() => {
-        state.autoAdvance = null;
-        // Only proceed if the host hasn't already moved on manually —
-        // any of resetBuzzers/startRound/closeRound/showResults/resetGame
-        // would have changed roundStatus away from 'revealed' by now.
-        if (state.roundStatus === 'revealed') {
-          const next = state.playlist.find(s => !s.played);
-          if (next) startRound(next.id, priorTimerSeconds);
-        }
-        broadcast();
-      }, autoAdvanceSeconds * 1000);
-    }
+    // May immediately overwrite 'revealed' with 'results' above if this
+    // round just crossed the round-limit — deliberate: the limit is
+    // enforced the moment the round that hits it gets revealed, not
+    // deferred to the next one.
+    checkGameLimit();
+    if (state.roundStatus === 'revealed' && autoAdvanceSeconds > 0) scheduleAutoAdvance(autoAdvanceSeconds, priorTimerSeconds);
 
     broadcast();
   });
@@ -944,12 +1435,12 @@ io.on('connection', (socket) => {
       // whoever buzzed in after that miss just got it right — bonus point
       // on top of the normal award. Only one bonus per steal opportunity,
       // so a second manual +1 on the same buzzer doesn't re-trigger it.
-      const isSteal = isNaturalCorrectAward && state.settings.stealMechanic && state.roundHadMiss;
+      const isSteal = isNaturalCorrectAward && state.settings.stealMechanic && state.roundHadMiss && !state.wager;
       // Speed bonus: buzzed in within the first few seconds of the round
       // actually starting (not of the reveal, or of this award — the buzz
       // timestamp itself). One bonus per round, same one-shot guard pattern
       // as the steal bonus above.
-      const isSpeedBonus = isNaturalCorrectAward && state.settings.speedBonus && !state.speedBonusPaid
+      const isSpeedBonus = isNaturalCorrectAward && state.settings.speedBonus && !state.speedBonusPaid && !state.wager
         && state.roundStartedAt && (currentBuzzer.time - state.roundStartedAt) <= SPEED_BONUS_WINDOW_MS;
 
       const totalAwarded = delta + (isSteal ? 1 : 0) + (isSpeedBonus ? 1 : 0);
@@ -974,10 +1465,39 @@ io.on('connection', (socket) => {
 
       if (isSteal) {
         state.roundHadMiss = false;
-        io.to('tv').emit('steal', { name: state.players[id].name, speedBonus: isSpeedBonus });
+        io.to('tv').emit('steal', { name: displayName(state.players[id].name), speedBonus: isSpeedBonus });
       } else if (isNaturalCorrectAward) {
-        io.to('tv').emit('correct', { name: state.players[id].name, speedBonus: isSpeedBonus });
+        io.to('tv').emit('correct', { name: displayName(state.players[id].name), speedBonus: isSpeedBonus });
       }
+
+      const song = currentSong();
+      const bonusTags = [isSteal ? '🔥 steal' : null, isSpeedBonus ? '⚡ speed' : null].filter(Boolean);
+      const bonusNote = bonusTags.length ? ` (${bonusTags.join(', ')})` : '';
+      const recipientNote = recipients.length > 1 ? ` [+${recipients.length - 1} teammate${recipients.length > 2 ? 's' : ''}]` : '';
+      const context = isNaturalCorrectAward && song ? ` — "${song.title}"` : ' (manual)';
+      logAction(`${totalAwarded >= 0 ? '+' : ''}${totalAwarded} ${state.players[id].name}${recipientNote}${bonusNote}${context}`);
+
+      if (state.settings.achievementBadges) {
+        if (isNaturalCorrectAward) {
+          state.badgeStats.correct[id] = (state.badgeStats.correct[id] || 0) + 1;
+          if (isSteal) state.badgeStats.steals[id] = (state.badgeStats.steals[id] || 0) + 1;
+        }
+        // Comeback Kid: was any player in sole/shared last place just now?
+        // Checked after every award (not just this one) so it catches a
+        // player being knocked into last by someone ELSE'S point too.
+        const scores = Object.values(state.players).map(p => p.score);
+        if (scores.length >= 2) {
+          const min = Math.min(...scores);
+          const max = Math.max(...scores);
+          if (min < max) {
+            Object.entries(state.players).forEach(([pid, p]) => {
+              if (p.score === min) state.badgeStats.everLastPlace[pid] = true;
+            });
+          }
+        }
+      }
+
+      checkGameLimit();
       broadcast();
     }
   });
@@ -986,6 +1506,26 @@ io.on('connection', (socket) => {
     if (lang !== 'en' && lang !== 'fa') return;
     state.language = lang;
     broadcast();
+  });
+
+  socket.on('host:setTheme', (theme) => {
+    if (theme !== 'dark' && theme !== 'light') return;
+    state.theme = theme;
+    broadcast();
+  });
+
+  socket.on('host:setPlayOrder', (order) => {
+    if (order !== 'sequential' && order !== 'random') return;
+    state.playOrder = order;
+    broadcast();
+  });
+
+  // Starts whichever unplayed song pickNextSong() picks next, honoring
+  // state.playOrder — the host-facing way to actually use the order toggle
+  // without waiting on auto-advance. No-ops once every song's been played.
+  socket.on('host:playNext', ({ timerSeconds, snippetSeconds, startOffsetSeconds } = {}) => {
+    const next = pickNextSong();
+    if (next && startRound(next.id, timerSeconds, snippetSeconds, undefined, startOffsetSeconds)) broadcast();
   });
 
   socket.on('host:revealHintLetter', () => {
@@ -1007,7 +1547,12 @@ io.on('connection', (socket) => {
     // Only accept known keys with boolean values — never let an arbitrary
     // client payload widen state.settings beyond DEFAULT_SETTINGS's shape.
     for (const key of Object.keys(patch)) {
-      if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key) && typeof patch[key] === 'boolean') {
+      // Game limit's two numeric fields ride along in the same settings
+      // blob as every boolean toggle (same persistence, same broadcast) —
+      // just validated/clamped instead of type-checked as a boolean.
+      if (key === 'scoreLimitValue' || key === 'roundLimitValue') {
+        state.settings[key] = Math.max(0, Math.floor(Number(patch[key]) || 0));
+      } else if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key) && typeof patch[key] === 'boolean') {
         state.settings[key] = patch[key];
       }
     }
@@ -1061,10 +1606,26 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  // Relay only — TV-local playback monitoring for the host's benefit, not
-  // shared game state, so it deliberately bypasses state/broadcast().
+  // Relay to the host (unchanged — TV-local monitoring info, not shared
+  // game state, deliberately bypasses state/broadcast() same as always).
+  // Also the one place this app learns the GROUND TRUTH about a video: the
+  // YouTube Data API's status.embeddable flag can say true for a video that
+  // still fails at actual iframe playback time (a real, documented quirk —
+  // Content-ID-claimed major-label uploads in particular can block
+  // embedding in a way that only shows up as an onError from the real
+  // player, never as an API field) — so a confirmed real failure here is
+  // recorded and fed into /api/check-playlist's broken-video scan too,
+  // catching exactly the case the Data-API-only check can miss.
   socket.on('tv:playerStatus', (payload) => {
     io.to('host').emit('playerStatus', payload);
+    if (!payload || !payload.songId) return;
+    if (payload.status === 'error') {
+      state.knownBroken[payload.songId] = { message: payload.message || 'Playback error', at: Date.now() };
+    } else if (payload.status === 'playing' || payload.status === 'buffering') {
+      // A real success for this song (this attempt, or after a replacement
+      // was applied) — the earlier failure no longer applies.
+      delete state.knownBroken[payload.songId];
+    }
   });
 
   // Manual fallback for videos with embedding disabled (no client fix exists
@@ -1084,6 +1645,7 @@ io.on('connection', (socket) => {
 
   socket.on('host:removePlayer', ({ id }) => {
     if (!state.players[id]) return;
+    logAction(`🗑️ ${state.players[id].name} removed from the game`);
     delete state.players[id];
     const hadBuzzed = state.buzzOrder.some(b => b.id === id);
     state.buzzOrder = state.buzzOrder.filter(b => b.id !== id);
@@ -1098,11 +1660,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('host:showResults', () => {
-    state.roundStatus = 'results';
-    state.currentIndex = -1;
-    state.buzzOrder = [];
-    clearRoundTimer();
-    clearAutoAdvance();
+    showResults();
     broadcast();
   });
 
@@ -1110,6 +1668,7 @@ io.on('connection', (socket) => {
     state.roundStatus = 'idle';
     state.currentIndex = -1;
     state.buzzOrder = [];
+    state.wager = null;
     clearRoundTimer();
     clearAutoAdvance();
     broadcast();
@@ -1130,6 +1689,17 @@ io.on('connection', (socket) => {
     state.categoryVote = null;
     clearRoundTimer();
     clearAutoAdvance();
+    state.paused = false;
+    state.pauseRemaining = null;
+    state.actionLog = [];
+    state.badgeStats = { fastestBuzz: null, steals: {}, correct: {}, everLastPlace: {} };
+    state.wager = null;
+    state.roundsPlayed = 0;
+    broadcast();
+  });
+
+  socket.on('host:clearActionLog', () => {
+    state.actionLog = [];
     broadcast();
   });
 

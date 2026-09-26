@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Guess the Music — Host</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -27,6 +27,11 @@
           <button data-lang="en" class="active">EN</button>
           <button data-lang="fa">فارسی</button>
         </div>
+        <div class="lang-toggle" id="theme-toggle" title="Changes the TV, player, and host screens together — same shared setting as the language toggle.">
+          <button data-theme="dark" class="active">🌙 Dark</button>
+          <button data-theme="light">☀️ Light</button>
+        </div>
+        <button class="pill" id="mc-mode-toggle" title="Simplified view for a guest MC — hides playlist/settings, keeps just the round controls and scoreboard. Stays local to this device.">🎤 MC Mode</button>
         <div class="pill" id="conn-pill">connecting…</div>
       </div>
     </header>
@@ -41,10 +46,18 @@
         <span class="pill" id="timer-pill" hidden></span>
         <span class="pill" id="auto-advance-pill" hidden></span>
         <span class="pill gold" id="mystery-pill" hidden></span>
+        <span class="pill" id="snippet-pill" hidden></span>
+        <span class="pill" id="start-offset-pill" hidden></span>
+        <span class="pill gold" id="wager-pill" hidden></span>
+        <span class="pill" id="game-limit-pill" hidden></span>
+        <button id="pause-btn" hidden>⏸ Pause game</button>
+        <span class="pill" id="paused-pill" hidden>⏸ Paused</span>
         <div id="find-replacement-live-result"></div>
         <div id="current-song-info" class="song-info muted">No round started.</div>
         <div id="buzz-order-list" class="buzz-list"></div>
         <div class="round-actions">
+          <button id="prev-song-btn" title="Start the previous song in the playlist">⏮ Previous</button>
+          <button id="next-song-btn" title="Start the next song in the playlist">⏭ Next</button>
           <button id="reveal-btn" class="primary">Reveal answer</button>
           <button id="reset-buzzers-btn">Reset buzzers</button>
           <button id="close-round-btn">Close round</button>
@@ -77,11 +90,27 @@
         </div>
       </section>
 
-      <section class="card">
+      <section class="card" id="playlist-card">
         <h2>Playlist</h2>
+        <div class="timer-row" id="play-order-row">
+          <label>Play order</label>
+          <div class="lang-toggle" id="play-order-toggle">
+            <button type="button" data-order="sequential" class="active">▶️ Sequential</button>
+            <button type="button" data-order="random">🔀 Random</button>
+          </div>
+          <button type="button" id="play-next-btn" title="Starts whichever unplayed song is next in the order above.">⏭ Play next</button>
+        </div>
         <div class="timer-row">
           <label for="timer-input">Round timer (sec, 0 = off)</label>
           <input id="timer-input" type="number" min="0" step="5" value="0">
+        </div>
+        <div class="timer-row" id="snippet-row" hidden>
+          <label for="snippet-input">Snippet length (sec, 0 = off)</label>
+          <input id="snippet-input" type="number" min="0" step="1" value="0">
+        </div>
+        <div class="timer-row" id="start-offset-row" hidden>
+          <label for="start-offset-input">Start at (sec, 0 = beginning)</label>
+          <input id="start-offset-input" type="number" min="0" step="1" value="0">
         </div>
         <input id="playlist-search" type="text" class="playlist-search" placeholder="🔍 Search songs or artists…">
         <div id="category-filter" class="category-filter"></div>
@@ -99,7 +128,7 @@
       </section>
 
       <section class="card" id="options-card">
-        <h2>Game options</h2>
+        <h2 id="options-toggle">Game options <span class="chevron">▾</span></h2>
         <div class="options-list">
           <label class="option-row">
             <input type="checkbox" data-setting="stealMechanic">
@@ -107,7 +136,7 @@
           </label>
           <label class="option-row">
             <input type="checkbox" data-setting="extraAnimations">
-            <span><strong>Extra animations</strong><br><span class="muted small">Bonus TV flourishes on top of the base animations — steal/lead banners, the 3-2-1-GO flash, and a cartoon mascot companion that reacts to buzzes, right/wrong answers, and the final results.</span></span>
+            <span><strong>Extra animations</strong><br><span class="muted small">Bonus TV flourishes — steal/lead banners, the 3-2-1-GO flash, a cartoon mascot, dancing characters and a bouncing scoreboard between rounds, a disco ball hanging overhead, sweeping laser beams, glowing equalizer bars, bright ambient light, a shimmering reveal title, a glowing winner spotlight, and fireworks on the big moments.</span></span>
           </label>
           <label class="option-row">
             <input type="checkbox" data-setting="speedBonus">
@@ -145,6 +174,52 @@
             <input type="checkbox" data-setting="categoryVoting">
             <span><strong>Category voting</strong><br><span class="muted small">Let players vote on which category the next song comes from. Start a vote from the new card below while the round is idle.</span></span>
           </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="pauseGame">
+            <span><strong>Pause game</strong><br><span class="muted small">A Pause button that freezes buzzing and any running timers for a bathroom/food break — resumes exactly where it left off.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="actionLog">
+            <span><strong>Action log</strong><br><span class="muted small">A running list of every point awarded, wrong answer, and player removal — settles "wait, who got that point?" disputes.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="wagerRound">
+            <span><strong>Wager round (Daily Double)</strong><br><span class="muted small">Flag a song as wager-eligible in the playlist, then pick a player to risk some of their own score on it — exclusive buzz, no race.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="snippetMode">
+            <span><strong>Snippet mode</strong><br><span class="muted small">The TV auto-pauses the song after a set number of seconds — guessing happens from a short hook instead of the whole track. Resumes full playback on reveal.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="startOffset">
+            <span><strong>Start offset</strong><br><span class="muted small">Skip a set number of seconds at the start of the video before playing — jump past a long intro straight to the hook.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="achievementBadges">
+            <span><strong>Achievement badges</strong><br><span class="muted small">Fun awards on the results screen — Fastest Buzzer, Most Steals, Sharpshooter, Comeback Kid — computed from this game only.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="setlistPresets">
+            <span><strong>Setlist presets</strong><br><span class="muted small">Save the current playlist + game options as a named preset ("80s night", "Kids party") and load it back later instead of rebuilding it.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="preflightCheck">
+            <span><strong>Pre-flight check</strong><br><span class="muted small">A "ready to go?" button that scans the whole playlist for broken videos and confirms players have joined, before the party starts.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="gameLimit" id="game-limit-toggle">
+            <span><strong>Game limit</strong><br><span class="muted small">End the game early and jump straight to results once a player (or team) reaches a score, or once a number of rounds have been played — whichever comes first.</span></span>
+          </label>
+          <div id="game-limit-inputs" class="timer-row" hidden>
+            <label for="score-limit-input">Score limit (0 = off)</label>
+            <input id="score-limit-input" type="number" min="0" step="1" value="0">
+            <label for="round-limit-input">Round limit (0 = off)</label>
+            <input id="round-limit-input" type="number" min="0" step="1" value="0">
+          </div>
+          <label class="option-row">
+            <input type="checkbox" data-setting="easterEggMahtab">
+            <span><strong>🎉 Easter egg: Mahtab</strong><br><span class="muted small">Fun-only. Adds a teasing suffix to a player named "Mahtab"/"مهتاب" wherever their name is shown, plus a little tease when they buzz in.</span></span>
+          </label>
         </div>
       </section>
 
@@ -168,6 +243,26 @@
           <p>🏆 Winner: <strong id="vote-winner-text"></strong></p>
           <button id="apply-vote-filter-btn">Filter playlist to this category</button>
         </div>
+      </section>
+
+      <section class="card" id="setlist-presets-card" hidden>
+        <h2>Setlist presets</h2>
+        <div class="stack">
+          <input id="preset-name-input" type="text" maxlength="40" placeholder="Preset name, e.g. 80s night">
+          <button id="save-preset-btn">💾 Save current setlist as…</button>
+        </div>
+        <div id="preset-list" class="preset-list"></div>
+      </section>
+
+      <section class="card" id="action-log-card" hidden>
+        <h2>Action log <button id="clear-action-log-btn" class="small-link">Clear</button></h2>
+        <div id="action-log-list" class="action-log"></div>
+      </section>
+
+      <section class="card" id="preflight-card" hidden>
+        <h2>Ready to go?</h2>
+        <button id="preflight-btn" class="primary">🚦 Run pre-flight check</button>
+        <div id="preflight-results"></div>
       </section>
 
       <section class="card join-card">

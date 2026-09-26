@@ -40,6 +40,7 @@ const translations = {
     gameOver: '🏆 Game over!',
     yourFinalScore: 'Your final score: {n}',
     nextSongIn: '⏭ Next song in {s}s…',
+    gamePaused: '⏸ Game paused — back in a moment!',
   },
   fa: {
     brand: 'حدس آهنگ',
@@ -82,6 +83,7 @@ const translations = {
     gameOver: '🏆 بازی تمام شد!',
     yourFinalScore: 'امتیاز نهایی‌ات: {n}',
     nextSongIn: '⏭ آهنگ بعدی تا {s} ثانیه دیگر…',
+    gamePaused: '⏸ بازی متوقف شد — به‌زودی برمی‌گردیم!',
   },
 };
 

@@ -28,6 +28,32 @@ html[dir="rtl"] {
   --font-fun: "Vazirmatn", var(--font-body);
 }
 
+/* Light theme (host:setTheme, mirrors the language toggle exactly — a
+   shared state.theme broadcast to host/tv/player alike, same "in-memory
+   only, defaults fresh on restart" treatment as state.language). Same
+   attribute-selector-overrides-:root technique as the RTL block above, so
+   it cleanly wins everywhere a token is used via var() with zero changes
+   needed in host.css/tv.css/player.css themselves.
+   --gold/--good/--coral are darkened here, not left as-is: they're used as
+   plain TEXT color in dozens of places (scores, pills, titles) sitting on
+   a neutral/tinted-neutral surface, and the bright dark-mode versions have
+   under 2:1 contrast against white — nowhere near readable. A handful of
+   TV elements intentionally keep a fixed dark backdrop regardless of theme
+   (the paused overlay, the reveal caption, the auto-advance hint) — those
+   pin their own text to fixed colors instead of these tokens, see tv.css. */
+html[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: #f5f2ea;
+  --surface-2: #eae4d5;
+  --text: #1e1832;
+  --text-muted: #6b6478;
+  --gold: #9c6b00;
+  --coral: #c9432f;
+  --good: #1f8a5c;
+  --bad: #c62828;
+  color-scheme: light;
+}
+
 * { box-sizing: border-box; }
 
 /* Any element using the `hidden` attribute must actually hide, regardless
@@ -43,7 +69,14 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
-  height: 100%;
+  /* min-height, not height — a fixed height:100% on both html and body is
+     the classic cause of "content below the fold is unreachable" on a
+     standalone-display PWA (host.html installs as one — see
+     manifest-host.json): the page still needs to grow taller than one
+     viewport and stay scrollable once its content (now several long cards
+     deep on the host page) exceeds it, which a bare height doesn't
+     guarantee the way min-height does. */
+  min-height: 100%;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -85,14 +118,19 @@ button.danger { background: var(--bad); color: #2a0d0e; }
 button.danger:hover { background: #ff6a6d; }
 button.good { background: var(--good); color: #0d2417; }
 
-input[type="text"], input[type="url"] {
+/* type="number" was missing here entirely — every number field (round
+   timer, snippet length, auto-advance, vote duration, per-song points, the
+   player's wager amount) fell back to the browser's raw unstyled control:
+   no dark background, no border-radius, a tiny default font. 16px is also
+   the minimum to stop iOS Safari auto-zooming the page in on focus. */
+input[type="text"], input[type="url"], input[type="number"] {
   font-family: var(--font-body);
   background: var(--surface);
   border: 1px solid var(--surface-2);
   color: var(--text);
   border-radius: 10px;
   padding: 0.65em 0.9em;
-  font-size: 1rem;
+  font-size: 16px;
 }
 input::placeholder { color: var(--text-muted); }
 
@@ -100,6 +138,13 @@ input::placeholder { color: var(--text-muted); }
   background: var(--surface);
   border-radius: var(--radius);
   padding: 1.2rem;
+  /* Grid items default to min-width: auto, which refuses to shrink below
+     the content's min-content size — on a narrow phone that blows the
+     whole card (and the page) out wider than the viewport instead of
+     letting the content wrap/scroll/ellipsis inside it like it's supposed
+     to. Same fix already used locally for .playlist-row .info etc., just
+     needed at this top level too. */
+  min-width: 0;
 }
 
 .pill {

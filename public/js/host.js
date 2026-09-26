@@ -24,6 +24,17 @@ const importCategoryInput = document.getElementById('import-category-input');
 const importBtn = document.getElementById('import-btn');
 const importStatus = document.getElementById('import-status');
 const timerInput = document.getElementById('timer-input');
+const snippetRow = document.getElementById('snippet-row');
+const snippetInput = document.getElementById('snippet-input');
+const snippetPill = document.getElementById('snippet-pill');
+const startOffsetRow = document.getElementById('start-offset-row');
+const startOffsetInput = document.getElementById('start-offset-input');
+const startOffsetPill = document.getElementById('start-offset-pill');
+const gameLimitInputs = document.getElementById('game-limit-inputs');
+const scoreLimitInput = document.getElementById('score-limit-input');
+const roundLimitInput = document.getElementById('round-limit-input');
+const prevSongBtn = document.getElementById('prev-song-btn');
+const nextSongBtn = document.getElementById('next-song-btn');
 const categoryFilterEl = document.getElementById('category-filter');
 const playlistSearchInput = document.getElementById('playlist-search');
 const checkPlaylistBtn = document.getElementById('check-playlist-btn');
@@ -32,6 +43,10 @@ const brokenVideosList = document.getElementById('broken-videos-list');
 const addSongCard = document.getElementById('add-song-card');
 const addSongCollapsedHint = document.getElementById('add-song-collapsed-hint');
 const mysteryPill = document.getElementById('mystery-pill');
+const wagerPill = document.getElementById('wager-pill');
+const gameLimitPill = document.getElementById('game-limit-pill');
+const pauseBtn = document.getElementById('pause-btn');
+const pausedPill = document.getElementById('paused-pill');
 const categoryVoteCard = document.getElementById('category-vote-card');
 const voteSetupEl = document.getElementById('vote-setup');
 const voteCategoryChecksEl = document.getElementById('vote-category-checks');
@@ -43,6 +58,16 @@ const voteCountdownEl = document.getElementById('vote-countdown');
 const voteTallyEl = document.getElementById('vote-tally');
 const voteResultEl = document.getElementById('vote-result');
 const voteWinnerTextEl = document.getElementById('vote-winner-text');
+const setlistPresetsCard = document.getElementById('setlist-presets-card');
+const presetNameInput = document.getElementById('preset-name-input');
+const savePresetBtn = document.getElementById('save-preset-btn');
+const presetList = document.getElementById('preset-list');
+const actionLogCard = document.getElementById('action-log-card');
+const actionLogList = document.getElementById('action-log-list');
+const clearActionLogBtn = document.getElementById('clear-action-log-btn');
+const preflightCard = document.getElementById('preflight-card');
+const preflightBtn = document.getElementById('preflight-btn');
+const preflightResults = document.getElementById('preflight-results');
 
 let latestState = null;
 let categoryFilter = 'All';
@@ -70,11 +95,27 @@ socket.on('addSongWarning', ({ message }) => {
   addError.classList.add('warn');
 });
 
+// Auto-search once per distinct error occurrence — saves the host a click
+// at exactly the moment it matters most (a song just failed mid-party),
+// without silently re-spending quota on every repeated error event for the
+// same song (onError/onStateChange can both fire for one real failure).
+let lastAutoSearchedErrorSongId = null;
+
 socket.on('playerStatus', ({ status, message }) => {
   openYoutubeFallbackBtn.hidden = status !== 'error';
   findReplacementLiveBtn.hidden = status !== 'error';
-  if (status !== 'error') findReplacementLiveResult.innerHTML = '';
-  if (status === 'error') setPlaybackPill('❌ ' + (message || 'Playback error'), 'error');
+  if (status !== 'error') {
+    findReplacementLiveResult.innerHTML = '';
+    lastAutoSearchedErrorSongId = null; // a later, separate failure should be free to auto-search again
+  }
+  if (status === 'error') {
+    setPlaybackPill('❌ ' + (message || 'Playback error'), 'error');
+    const songId = latestState && latestState.currentSong && latestState.currentSong.id;
+    if (songId && lastAutoSearchedErrorSongId !== songId) {
+      lastAutoSearchedErrorSongId = songId;
+      runFindReplacement(songId, findReplacementLiveResult);
+    }
+  }
   else if (status === 'playing') setPlaybackPill('🔊 Playing', 'ok');
   else if (status === 'buffering') setPlaybackPill('⏳ Buffering…', 'pending');
   else if (status === 'paused') setPlaybackPill('⏸ Paused', 'pending');
@@ -132,6 +173,32 @@ findReplacementLiveBtn.addEventListener('click', () => {
   runFindReplacement(latestState.currentSong.id, findReplacementLiveResult);
 });
 
+// ---------- MC mode ----------
+// A per-device DISPLAY preference, not a shared game rule — deliberately
+// local (localStorage), not state.settings/host:updateSettings, so handing
+// a guest a simplified phone doesn't also simplify the primary host's own
+// screen elsewhere. Still a toggle right here in the host panel, per the
+// ask — it just doesn't sync.
+const mcModeToggleBtn = document.getElementById('mc-mode-toggle');
+function applyMcMode(on) {
+  document.body.classList.toggle('mc-mode', on);
+  mcModeToggleBtn.classList.toggle('active', on);
+  mcModeToggleBtn.textContent = on ? '🎤 Exit MC Mode' : '🎤 MC Mode';
+}
+let mcModeOn = false;
+try { mcModeOn = localStorage.getItem('gtm_mc_mode') === '1'; } catch (e) { /* private browsing etc — just default off */ }
+applyMcMode(mcModeOn);
+mcModeToggleBtn.addEventListener('click', () => {
+  mcModeOn = !mcModeOn;
+  try { localStorage.setItem('gtm_mc_mode', mcModeOn ? '1' : '0'); } catch (e) { /* non-fatal — just won't persist */ }
+  applyMcMode(mcModeOn);
+  // Turning MC mode off re-reveals #options-card (display: none while MC
+  // mode is on collapses its scrollHeight to 0 at measurement time) —
+  // re-measure so a stale 0px max-height doesn't hide every option. See
+  // applyOptionsCollapse()/measureOptionsHeight() further down this file.
+  if (!mcModeOn && !optionsCollapsed) optionsListEl.style.maxHeight = measureOptionsHeight() + 'px';
+});
+
 // ---------- language toggle ----------
 document.querySelectorAll('#lang-toggle [data-lang]').forEach(btn => {
   btn.addEventListener('click', () => socket.emit('host:setLanguage', btn.dataset.lang));
@@ -142,6 +209,44 @@ function renderLangToggle(state) {
     btn.classList.toggle('active', btn.dataset.lang === state.language);
   });
 }
+
+// ---------- theme toggle ---------- shared with tv/player (host:setTheme,
+// mirrors host:setLanguage exactly) — the host's own page follows it too,
+// for the same reason MC mode doesn't: unlike MC mode this is a shared
+// look for the whole game, not a per-device layout choice.
+document.querySelectorAll('#theme-toggle [data-theme]').forEach(btn => {
+  btn.addEventListener('click', () => socket.emit('host:setTheme', btn.dataset.theme));
+});
+
+function renderThemeToggle(state) {
+  const theme = state.theme || 'dark';
+  document.documentElement.dataset.theme = theme;
+  document.querySelectorAll('#theme-toggle [data-theme]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+}
+
+// ---------- play order ---------- which unplayed song auto-advance/Play
+// next picks: sequential (playlist order, same as before this existed) or
+// random. Neither ever repeats an already-played song — manually clicking
+// Play/Replay on a specific row is the only way to intentionally replay one.
+document.querySelectorAll('#play-order-toggle [data-order]').forEach(btn => {
+  btn.addEventListener('click', () => socket.emit('host:setPlayOrder', btn.dataset.order));
+});
+
+function renderPlayOrderToggle(state) {
+  const order = state.playOrder || 'sequential';
+  document.querySelectorAll('#play-order-toggle [data-order]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.order === order);
+  });
+}
+
+document.getElementById('play-next-btn').addEventListener('click', () => {
+  const timerSeconds = Number(timerInput.value) || 0;
+  const snippetSeconds = Number(snippetInput.value) || 0;
+  const startOffsetSeconds = Number(startOffsetInput.value) || 0;
+  socket.emit('host:playNext', { timerSeconds, snippetSeconds, startOffsetSeconds });
+});
 
 // ---------- join info ----------
 fetch('/join-info').then(r => r.json()).then(({ url, mdnsUrl }) => {
@@ -236,9 +341,10 @@ checkPlaylistBtn.addEventListener('click', async () => {
       return;
     }
     renderBrokenVideos(data.broken);
-    checkPlaylistStatus.textContent = data.broken.length
-      ? `Found ${data.broken.length} that won't play.`
-      : 'All songs check out.';
+    let statusMsg = data.broken.length ? `Found ${data.broken.length} that won't play.` : 'All songs check out.';
+    if (data.checkError) statusMsg = `⚠️ ${data.checkError}` + (data.broken.length ? ` (${data.broken.length} confirmed broken so far.)` : '');
+    checkPlaylistStatus.textContent = statusMsg;
+    checkPlaylistStatus.classList.toggle('warn', !!data.checkError);
   } catch (e) {
     checkPlaylistStatus.textContent = 'Could not reach the server — try again.';
   } finally {
@@ -255,7 +361,10 @@ function renderBrokenVideos(broken) {
     <div class="broken-videos">
       <div class="broken-header">
         <strong>❌ ${broken.length} won't play (embedding disabled)</strong>
-        <button class="danger" id="remove-all-broken-btn">Remove all</button>
+        <div class="broken-header-actions">
+          <button id="find-all-replacements-btn">🔁 Find replacements for all</button>
+          <button class="danger" id="remove-all-broken-btn">Remove all</button>
+        </div>
       </div>
       ${broken.map(s => `
         <div class="broken-row" data-id="${s.id}">
@@ -293,14 +402,89 @@ function renderBrokenVideos(broken) {
       checkPlaylistStatus.textContent = 'Removed.';
     });
   }
+  const findAllBtn = document.getElementById('find-all-replacements-btn');
+  if (findAllBtn) {
+    findAllBtn.addEventListener('click', async () => {
+      // Each search is its own YouTube search.list call (~100 quota units,
+      // same cost as the single-song button) — worth a clear heads-up before
+      // firing N of them at once, especially since quota exhaustion is
+      // exactly what can make the scanner itself look unreliable.
+      if (!confirm(`Search for replacements for all ${broken.length} broken videos? This uses about ${broken.length * 100} YouTube API quota units (roughly ${broken.length}% of the free daily default).`)) return;
+      findAllBtn.disabled = true;
+      // Sequential, not concurrent — keeps quota usage visible/predictable
+      // one result at a time rather than firing everything at once.
+      for (const s of broken) {
+        const container = brokenVideosList.querySelector(`[data-replacement-result="${s.id}"]`);
+        if (container) await runFindReplacement(s.id, container);
+      }
+      findAllBtn.disabled = false;
+    });
+  }
 }
 
+// ---------- pre-flight check ----------
+preflightBtn.addEventListener('click', async () => {
+  preflightBtn.disabled = true;
+  preflightResults.innerHTML = '<p class="muted small">Checking…</p>';
+  try {
+    const r = await fetch('/api/preflight', { method: 'POST' });
+    const data = await r.json();
+    preflightResults.innerHTML = `
+      <p class="preflight-verdict ${data.ready ? 'ok' : 'bad'}">${data.ready ? '✅ Ready to go!' : '⚠️ Not quite ready'}</p>
+      <ul class="preflight-checks">
+        ${data.checks.map(c => `
+          <li class="${c.ok === true ? 'ok' : c.ok === false ? 'bad' : 'skip'}">
+            <span class="icon">${c.ok === true ? '✅' : c.ok === false ? '❌' : '➖'}</span>
+            <span>${escapeHtml(c.label)} — <span class="muted small">${escapeHtml(c.detail)}</span></span>
+          </li>
+        `).join('')}
+      </ul>
+    `;
+  } catch (e) {
+    preflightResults.innerHTML = '<p class="muted small">Could not reach the server — try again.</p>';
+  } finally {
+    preflightBtn.disabled = false;
+  }
+});
+
 // ---------- round controls ----------
+
+// Shared by the playlist's own Play/wager-start buttons and the Next/
+// Previous buttons below — one place reading the round-start options
+// (round timer, snippet length, start offset) currently set in the inputs,
+// so all four ways to start a round apply them consistently.
+function startRoundWithCurrentOptions(id, wagerPlayerId) {
+  const timerSeconds = Number(timerInput.value) || 0;
+  const snippetSeconds = Number(snippetInput.value) || 0;
+  const startOffsetSeconds = Number(startOffsetInput.value) || 0;
+  const payload = { id, timerSeconds, snippetSeconds, startOffsetSeconds };
+  if (wagerPlayerId) payload.wagerPlayerId = wagerPlayerId;
+  socket.emit('host:startRound', payload);
+}
+
+// Next/Previous: jump to the adjacent song in the playlist's current order
+// (not "next unplayed" — this is a quick DJ-style skip control tied to the
+// visible list order the host already controls via drag-to-reorder), same
+// round-start options as the Play button. Wraps around at either end.
+// Deliberately never triggers wager mode even for a wager-eligible song —
+// that needs the host to explicitly pick who's wagering via its own picker,
+// which a quick skip button can't do; it just plays normally instead.
+function stepToAdjacentSong(delta) {
+  if (!latestState || !latestState.playlist.length) return;
+  const playlist = latestState.playlist;
+  const from = latestState.currentIndex >= 0 ? latestState.currentIndex : (delta > 0 ? -1 : 0);
+  const to = (from + delta + playlist.length) % playlist.length;
+  startRoundWithCurrentOptions(playlist[to].id);
+}
+prevSongBtn.addEventListener('click', () => stepToAdjacentSong(-1));
+nextSongBtn.addEventListener('click', () => stepToAdjacentSong(1));
+
 document.getElementById('reveal-btn').addEventListener('click', () => {
   const autoAdvanceSeconds = Number(autoAdvanceInput.value) || 0;
   socket.emit('host:revealAnswer', { autoAdvanceSeconds });
 });
 document.getElementById('reset-buzzers-btn').addEventListener('click', () => socket.emit('host:resetBuzzers'));
+pauseBtn.addEventListener('click', () => socket.emit('host:togglePause'));
 document.getElementById('close-round-btn').addEventListener('click', () => socket.emit('host:closeRound'));
 const revealHintBtn = document.getElementById('reveal-hint-btn');
 revealHintBtn.addEventListener('click', () => socket.emit('host:revealHintLetter'));
@@ -400,16 +584,67 @@ function renderRound(state) {
   revealHintBtn.hidden = !(state.settings && state.settings.karaokeHint && state.roundStatus === 'playing')
     || (state.mysteryRound && state.mysteryRound.modifier === 'noHint');
 
+  if (state.wager) {
+    wagerPill.hidden = false;
+    wagerPill.textContent = state.wager.amount == null
+      ? `💰 Waiting for ${state.wager.playerName || 'them'} to wager…`
+      : `💰 ${state.wager.playerName || 'They'} wagered ${state.wager.amount}`;
+  } else {
+    wagerPill.hidden = true;
+  }
+
+  if (state.snippetSeconds > 0 && (state.roundStatus === 'playing' || state.roundStatus === 'buzzed')) {
+    snippetPill.hidden = false;
+    snippetPill.textContent = `✂️ Snippet: ${state.snippetSeconds}s`;
+  } else {
+    snippetPill.hidden = true;
+  }
+
+  if (state.startOffsetSeconds > 0 && (state.roundStatus === 'playing' || state.roundStatus === 'buzzed' || state.roundStatus === 'revealed')) {
+    startOffsetPill.hidden = false;
+    startOffsetPill.textContent = `⏩ Starts at ${state.startOffsetSeconds}s`;
+  } else {
+    startOffsetPill.hidden = true;
+  }
+
+  if (state.settings && state.settings.gameLimit && (state.settings.scoreLimitValue > 0 || state.settings.roundLimitValue > 0)) {
+    const bits = [];
+    if (state.settings.scoreLimitValue > 0) {
+      const highScore = Math.max(0, ...(state.players || []).map(p => p.score));
+      bits.push(`🏁 ${highScore}/${state.settings.scoreLimitValue} pts`);
+    }
+    if (state.settings.roundLimitValue > 0) bits.push(`🎯 round ${state.roundsPlayed || 0}/${state.settings.roundLimitValue}`);
+    gameLimitPill.hidden = false;
+    gameLimitPill.textContent = bits.join(' · ');
+  } else {
+    gameLimitPill.hidden = true;
+  }
+
+  prevSongBtn.disabled = !state.playlist.length;
+  nextSongBtn.disabled = !state.playlist.length;
+
+  pauseBtn.hidden = !(state.settings && state.settings.pauseGame);
+  pauseBtn.textContent = state.paused ? '▶ Resume game' : '⏸ Pause game';
+  pausedPill.hidden = !state.paused;
+  // Freeze every other round control while paused — the whole point is a
+  // clean break, not a state where a stray tap can still change anything.
+  ['reveal-btn', 'reset-buzzers-btn', 'close-round-btn', 'reveal-hint-btn'].forEach(id => {
+    document.getElementById(id).disabled = state.paused;
+  });
+
   // With "Point values per song" on, awarding a correct buzz gives that
   // song's assigned value instead of a flat point — defaults to 1, so this
-  // is a no-op when the setting's off or a song has no value set.
-  const songPoints = (state.currentSong && state.currentSong.points) || 1;
+  // is a no-op when the setting's off or a song has no value set. A wager
+  // round overrides this entirely: the award is whatever was risked.
+  const songPoints = state.wager && state.wager.amount != null
+    ? state.wager.amount
+    : (state.currentSong && state.currentSong.points) || 1;
   buzzOrderList.innerHTML = state.buzzOrder.map((b, i) => `
     <div class="buzz-row">
-      <div><span class="order">#${i + 1}</span>${escapeHtml(b.name)}</div>
+      <div><span class="order">#${i + 1}</span>${escapeHtml(b.name)}${b.tease ? ` <span class="muted small">${escapeHtml(b.tease)}</span>` : ''}</div>
       <div class="actions">
-        <button class="good" data-award="${b.id}:${songPoints}">+${songPoints}</button>
-        <button data-award="${b.id}:${-songPoints}">-${songPoints}</button>
+        <button class="good" data-award="${b.id}:${songPoints}" ${state.paused ? 'disabled' : ''}>+${songPoints}</button>
+        <button data-award="${b.id}:${-songPoints}" ${state.paused ? 'disabled' : ''}>-${songPoints}</button>
       </div>
     </div>
   `).join('');
@@ -443,34 +678,63 @@ function renderCategoryFilter(state) {
 }
 
 function renderPlaylist(state) {
+  snippetRow.hidden = !(state.settings && state.settings.snippetMode);
+  startOffsetRow.hidden = !(state.settings && state.settings.startOffset);
   let songs = categoryFilter === 'All' ? state.playlist : state.playlist.filter(s => s.category === categoryFilter);
   if (searchQuery) {
     songs = songs.filter(s =>
       s.title.toLowerCase().includes(searchQuery) || (s.artist || '').toLowerCase().includes(searchQuery));
   }
   const pointValuesOn = state.settings && state.settings.pointValues;
-  playlistList.innerHTML = songs.map(song => `
+  const wagerRoundOn = state.settings && state.settings.wagerRound;
+  playlistList.innerHTML = songs.map(song => {
+    const isCurrent = state.currentIndex >= 0 && state.playlist[state.currentIndex].id === song.id;
+    // A wager-eligible song (with the toggle on) swaps the normal Play
+    // button for a "pick who wagers" chooser right in the row — starting it
+    // needs a player picked first, there's no plain "just play it" path.
+    const showWagerPicker = wagerRoundOn && song.wagerEligible && !isCurrent;
+    const playOrWagerControl = showWagerPicker
+      ? `<div class="wager-picker" data-wager-picker="${song.id}">
+          ${state.players.length
+            ? `<select data-wager-select="${song.id}">
+                ${state.players.map(p => `<option value="${p.id}">${escapeHtml(p.name)} (${p.score} pts)</option>`).join('')}
+              </select>
+              <button class="primary" data-wager-start="${song.id}">🎲 Start Daily Double</button>`
+            : `<span class="muted small">Need a player to wager first</span>`}
+        </div>`
+      : `<button class="primary" data-play="${song.id}" ${isCurrent ? 'disabled' : ''}>${song.played ? 'Replay' : 'Play'}</button>`;
+    return `
     <div class="playlist-row ${song.played ? 'played' : ''}" data-id="${song.id}">
       <span class="grip" title="Drag to reorder">⠿</span>
       <div class="info">
-        <div class="t">${song.id === state.mysterySongId ? '<span class="mystery-badge" title="This game\'s Mystery Round song — modifier stays secret until it plays">🎭</span> ' : ''}${escapeHtml(song.title)}</div>
+        <div class="t">${song.id === state.mysterySongId ? '<span class="mystery-badge" title="This game\'s Mystery Round song — modifier stays secret until it plays">🎭</span> ' : ''}${wagerRoundOn && song.wagerEligible ? '<span title="Daily Double eligible">💰</span> ' : ''}${escapeHtml(song.title)}</div>
         <div class="a">${escapeHtml(song.artist || '')}</div>
         ${song.category ? `<span class="cat">${escapeHtml(song.category)}</span>` : ''}
       </div>
       <div class="actions">
         ${pointValuesOn ? `<input type="number" class="points-input" min="1" step="1" value="${song.points || 1}" data-points="${song.id}" title="Points this song is worth">` : ''}
-        <button class="primary" data-play="${song.id}" ${state.currentIndex >= 0 && state.playlist[state.currentIndex].id === song.id ? 'disabled' : ''}>
-          ${song.played ? 'Replay' : 'Play'}
-        </button>
+        ${wagerRoundOn ? `<button class="wager-toggle ${song.wagerEligible ? 'active' : ''}" data-wager-toggle="${song.id}" title="Mark as Daily Double eligible">💰</button>` : ''}
+        ${playOrWagerControl}
         <button class="danger" data-remove="${song.id}">✕</button>
       </div>
     </div>
-  `).join('') || `<p class="muted">${state.playlist.length ? 'No songs match.' : 'No songs yet — add one above.'}</p>`;
+  `;
+  }).join('') || `<p class="muted">${state.playlist.length ? 'No songs match.' : 'No songs yet — add one above.'}</p>`;
 
   playlistList.querySelectorAll('[data-play]').forEach(btn => {
+    btn.addEventListener('click', () => startRoundWithCurrentOptions(btn.dataset.play));
+  });
+  playlistList.querySelectorAll('[data-wager-start]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const timerSeconds = Number(timerInput.value) || 0;
-      socket.emit('host:startRound', { id: btn.dataset.play, timerSeconds });
+      const select = playlistList.querySelector(`[data-wager-select="${btn.dataset.wagerStart}"]`);
+      if (!select || !select.value) return;
+      startRoundWithCurrentOptions(btn.dataset.wagerStart, select.value);
+    });
+  });
+  playlistList.querySelectorAll('[data-wager-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const song = latestState.playlist.find(s => s.id === btn.dataset.wagerToggle);
+      socket.emit('host:setWagerEligible', { id: btn.dataset.wagerToggle, eligible: !(song && song.wagerEligible) });
     });
   });
   playlistList.querySelectorAll('[data-remove]').forEach(btn => {
@@ -580,6 +844,55 @@ function renderScoreboard(state) {
 }
 
 // ---------- game options ----------
+// Collapsible — the list has grown long (20+ toggles), and most of them get
+// set once per game night rather than looked at every visit. Remembered
+// per-device via localStorage, same pattern as MC mode, defaulting to open
+// so nothing changes for a host who's never touched the toggle.
+//
+// The expand/collapse animation needs an actual max-height to transition
+// to/from (max-height: none doesn't animate) — this used to be a hardcoded
+// 2000px in host.css. That silently clipped the bottom of the list once
+// enough options were added to exceed it (with overflow: hidden and no
+// scrollbar, those options became completely unreachable, not just
+// visually cut off). Measuring the real content height in JS instead means
+// this can never happen again regardless of how many options get added in
+// future phases.
+const optionsCard = document.getElementById('options-card');
+const optionsToggle = document.getElementById('options-toggle');
+const optionsListEl = optionsCard.querySelector('.options-list');
+let optionsCollapsed = false;
+try { optionsCollapsed = localStorage.getItem('gtm_options_collapsed') === '1'; } catch (e) { /* private browsing etc */ }
+
+function measureOptionsHeight() {
+  const prevMaxHeight = optionsListEl.style.maxHeight;
+  optionsListEl.style.maxHeight = 'none'; // unclip momentarily to get the true content height
+  const height = optionsListEl.scrollHeight;
+  optionsListEl.style.maxHeight = prevMaxHeight;
+  return height;
+}
+
+function applyOptionsCollapse() {
+  optionsCard.classList.toggle('collapsed', optionsCollapsed);
+  optionsListEl.style.maxHeight = optionsCollapsed ? '0px' : measureOptionsHeight() + 'px';
+}
+applyOptionsCollapse();
+
+optionsToggle.addEventListener('click', () => {
+  optionsCollapsed = !optionsCollapsed;
+  try { localStorage.setItem('gtm_options_collapsed', optionsCollapsed ? '1' : '0'); } catch (e) { /* non-fatal */ }
+  applyOptionsCollapse();
+});
+
+// Re-measure on resize (debounced) — rotating a phone or resizing the
+// window reflows the option descriptions onto a different number of lines,
+// which changes the real content height.
+let optionsResizeTimer = null;
+window.addEventListener('resize', () => {
+  if (optionsCollapsed) return; // nothing visible to re-measure
+  clearTimeout(optionsResizeTimer);
+  optionsResizeTimer = setTimeout(() => { optionsListEl.style.maxHeight = measureOptionsHeight() + 'px'; }, 150);
+});
+
 document.querySelectorAll('#options-card [data-setting]').forEach(input => {
   input.addEventListener('change', () => {
     socket.emit('host:updateSettings', { [input.dataset.setting]: input.checked });
@@ -591,7 +904,26 @@ function renderSettings(state) {
     const key = input.dataset.setting;
     if (state.settings && key in state.settings) input.checked = state.settings[key];
   });
+  const gameLimitInputsWereHidden = gameLimitInputs.hidden;
+  gameLimitInputs.hidden = !(state.settings && state.settings.gameLimit);
+  // Only sync from server state when the host isn't actively typing in it —
+  // a value blindly overwritten on every broadcast would fight the cursor.
+  if (document.activeElement !== scoreLimitInput) scoreLimitInput.value = (state.settings && state.settings.scoreLimitValue) || 0;
+  if (document.activeElement !== roundLimitInput) roundLimitInput.value = (state.settings && state.settings.roundLimitValue) || 0;
+  // Showing/hiding that row changes the options list's real content height —
+  // re-measure so the collapse animation's max-height stays accurate (see
+  // applyOptionsCollapse() above).
+  if (gameLimitInputsWereHidden !== gameLimitInputs.hidden && !optionsCollapsed) {
+    optionsListEl.style.maxHeight = measureOptionsHeight() + 'px';
+  }
 }
+
+scoreLimitInput.addEventListener('change', () => {
+  socket.emit('host:updateSettings', { scoreLimitValue: Number(scoreLimitInput.value) || 0 });
+});
+roundLimitInput.addEventListener('change', () => {
+  socket.emit('host:updateSettings', { roundLimitValue: Number(roundLimitInput.value) || 0 });
+});
 
 // ---------- category vote ----------
 startVoteBtn.addEventListener('click', () => {
@@ -661,6 +993,74 @@ function renderCategoryVote(state) {
   }
 }
 
+// ---------- setlist presets ----------
+savePresetBtn.addEventListener('click', () => {
+  const name = presetNameInput.value.trim();
+  if (!name) return;
+  const existing = latestState && latestState.presets && latestState.presets.some(p => p.name === name);
+  if (existing && !confirm(`A preset named "${name}" already exists — overwrite it?`)) return;
+  socket.emit('host:savePreset', { name });
+  presetNameInput.value = '';
+});
+
+function renderPresets(state) {
+  const enabled = state.settings && state.settings.setlistPresets;
+  setlistPresetsCard.hidden = !enabled;
+  if (!enabled) return;
+  const presets = state.presets || [];
+  const notIdle = state.roundStatus !== 'idle';
+  presetList.innerHTML = presets.length
+    ? presets.map(p => `
+        <div class="preset-row">
+          <div class="info">
+            <div class="t">${escapeHtml(p.name)}</div>
+            <div class="a muted small">${p.songCount} song${p.songCount === 1 ? '' : 's'} · saved ${new Date(p.savedAt).toLocaleDateString()}</div>
+          </div>
+          <div class="actions">
+            <button class="primary" data-load-preset="${escapeHtml(p.name)}" ${notIdle ? 'disabled title="Only between rounds"' : ''}>Load</button>
+            <button class="danger" data-delete-preset="${escapeHtml(p.name)}">✕</button>
+          </div>
+        </div>
+      `).join('')
+    : '<p class="muted small">No presets saved yet.</p>';
+
+  presetList.querySelectorAll('[data-load-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (confirm(`Load "${btn.dataset.loadPreset}"? This replaces the current playlist and game options (scores are untouched).`)) {
+        socket.emit('host:loadPreset', { name: btn.dataset.loadPreset });
+      }
+    });
+  });
+  presetList.querySelectorAll('[data-delete-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (confirm(`Delete preset "${btn.dataset.deletePreset}"?`)) {
+        socket.emit('host:deletePreset', { name: btn.dataset.deletePreset });
+      }
+    });
+  });
+}
+
+clearActionLogBtn.addEventListener('click', () => socket.emit('host:clearActionLog'));
+
+function renderActionLog(state) {
+  const enabled = state.settings && state.settings.actionLog;
+  actionLogCard.hidden = !enabled;
+  if (!enabled) return;
+  const log = state.actionLog || [];
+  actionLogList.innerHTML = log.length
+    ? log.map(entry => `
+        <div class="action-log-row">
+          <span class="time">${new Date(entry.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          <span>${escapeHtml(entry.text)}</span>
+        </div>
+      `).join('')
+    : '<p class="muted small">Nothing logged yet.</p>';
+}
+
+function renderPreflightCard(state) {
+  preflightCard.hidden = !(state.settings && state.settings.preflightCheck);
+}
+
 function renderAddSongCollapse(state) {
   // Nothing to do in "Add a song" while a round is actively live — free
   // up visual priority for the Current Round card and Scoreboard.
@@ -676,7 +1076,12 @@ socket.on('state', (state) => {
   renderPlaylist(state);
   renderScoreboard(state);
   renderLangToggle(state);
+  renderThemeToggle(state);
+  renderPlayOrderToggle(state);
   renderAddSongCollapse(state);
   renderSettings(state);
   renderCategoryVote(state);
+  renderPreflightCard(state);
+  renderActionLog(state);
+  renderPresets(state);
 });

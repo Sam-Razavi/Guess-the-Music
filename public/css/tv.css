@@ -38,6 +38,13 @@
   bottom: 3%;
   transform: translateX(-50%);
   background: rgba(22, 18, 31, 0.85);
+  /* Fixed, not var(--text-muted) — this chip's own backdrop deliberately
+     stays dark regardless of theme (a floating caption over video content
+     reads fine dark in either), so its text needs to stay light to match,
+     not follow --text-muted into a near-unreadable dark-on-dark in light
+     mode. Same reasoning for #caption-title/#caption-artist and
+     .paused-overlay h1 below. */
+  color: #9c93b0;
   padding: 0.5em 1.2em;
   border-radius: 999px;
   font-size: 1.05rem;
@@ -220,9 +227,450 @@
   .mascot, .mascot[data-expression] { animation: none; }
 }
 
+/* ---- disco ball (extraAnimations) ---- hangs from the top, off-center
+   (not dead-center or a screen corner) so it stays clear of the reveal
+   caption (top:4%, centered) and the mystery/wager banners (top:4%, the
+   4% corners) without needing to hide or move for either. Rotating the
+   whole element (string included, via transform-origin at the string's own
+   attachment point) for a real pendulum swing reads as more "hanging
+   object" than the old up/down bob ever did. */
+.disco-ball {
+  position: absolute;
+  top: 3%;
+  left: 22%;
+  z-index: 15;
+  width: 72px;
+  height: 72px;
+  pointer-events: none;
+  transform-origin: top center;
+  animation: disco-swing 3.6s ease-in-out infinite;
+}
+.disco-ball::before {
+  content: "";
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 24px;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.5));
+}
+@keyframes disco-swing {
+  0%, 100% { transform: rotate(-7deg); }
+  50% { transform: rotate(7deg); }
+}
+.disco-ball-sphere {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  /* A tiled facet grid (two crossed repeating-linear-gradients) over a
+     metallic sphere shade. Animating background-position (not transform:
+     rotate on the element) makes individual facets slide past and catch
+     the light, instead of the whole circle just spinning uniformly — same
+     reasoning as the record's diagonal shine streak elsewhere on this page. */
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.5) 0 3px, transparent 3px 9px),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.3) 0 3px, transparent 3px 9px),
+    radial-gradient(circle at 35% 30%, #f4f5ff, #c3c5da 45%, #8d8fa6 100%);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 30px rgba(245, 185, 66, 0.25);
+  animation: disco-spin 5s linear infinite;
+}
+@keyframes disco-spin {
+  from { background-position: 0 0, 0 0, 0 0; }
+  to { background-position: 70px 0, -70px 0, 0 0; }
+}
+/* A soft downward cone of colored light, like the ball is actually casting
+   it — the single biggest thing that reads as "bright" rather than "a
+   spinning gray ball with a few dots on it". */
+.disco-ball-glow {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 260px;
+  height: 260px;
+  clip-path: polygon(46% 0%, 54% 0%, 100% 100%, 0% 100%);
+  background: conic-gradient(from 200deg at 50% 0%, var(--gold), var(--coral), var(--good), var(--gold));
+  opacity: 0.14;
+  mix-blend-mode: screen;
+  animation: disco-glow-pulse 3.2s ease-in-out infinite;
+}
+@keyframes disco-glow-pulse {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.2; }
+}
+.disco-sparkle {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 10px 3px rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  animation: disco-sparkle 2.2s ease-in-out infinite;
+}
+.disco-sparkle.s1 { top: 6%; left: -14px; animation-delay: 0s; }
+.disco-sparkle.s2 { top: 55%; right: -16px; animation-delay: 0.7s; }
+.disco-sparkle.s3 { bottom: -6px; left: 45%; animation-delay: 1.4s; }
+@keyframes disco-sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.6); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
+/* A brief extra flourish for a correct answer / steal / results — faster
+   spin/swing, bigger sparkle pulse, brighter glow — triggered alongside the
+   existing confetti/chime at those same moments (see tv.js). */
+.disco-ball.celebrate { animation-duration: 1s; }
+.disco-ball.celebrate .disco-ball-sphere { animation-duration: 1.2s; }
+.disco-ball.celebrate .disco-sparkle { animation-duration: 0.6s; }
+.disco-ball.celebrate .disco-ball-glow { opacity: 0.28; animation-duration: 0.8s; }
+@media (prefers-reduced-motion: reduce) {
+  .disco-ball, .disco-ball-sphere, .disco-sparkle, .disco-ball-glow { animation: none; }
+}
+
+/* ---- equalizer bars (extraAnimations) ---- flank the video in its own
+   20%-margin side gutters (see .video-box's inset: 8% 20%), only while a
+   song is actually audibly playing (playing/buzzed/revealed — silent
+   during idle/results). Not real audio analysis (a YouTube iframe embed
+   is cross-origin, so its audio is unreachable via Web Audio API) — a
+   lively randomized bounce standing in for one. */
+.equalizer {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 12;
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  height: 90px;
+  pointer-events: none;
+}
+.equalizer-left { left: 5%; }
+.equalizer-right { right: 5%; }
+.equalizer span {
+  width: 9px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, var(--gold), var(--coral));
+  box-shadow: 0 0 10px rgba(245, 185, 66, 0.5);
+}
+/* Each bar gets its own duration/delay/peak-height keyframe so the row
+   bounces unevenly rather than all in lockstep — that unevenness is most
+   of what sells it as "reactive" rather than a metronome. */
+.equalizer span:nth-child(1) { height: 20%; animation: eq-bounce-a 0.8s ease-in-out infinite; animation-delay: 0s; }
+.equalizer span:nth-child(2) { height: 20%; animation: eq-bounce-b 1.1s ease-in-out infinite; animation-delay: 0.15s; }
+.equalizer span:nth-child(3) { height: 20%; animation: eq-bounce-c 0.6s ease-in-out infinite; animation-delay: 0.05s; }
+.equalizer span:nth-child(4) { height: 20%; animation: eq-bounce-a 0.95s ease-in-out infinite; animation-delay: 0.3s; }
+.equalizer span:nth-child(5) { height: 20%; animation: eq-bounce-b 0.7s ease-in-out infinite; animation-delay: 0.2s; }
+@keyframes eq-bounce-a {
+  0%, 100% { height: 18%; }
+  50% { height: 95%; }
+}
+@keyframes eq-bounce-b {
+  0%, 100% { height: 25%; }
+  40% { height: 60%; }
+  70% { height: 100%; }
+}
+@keyframes eq-bounce-c {
+  0%, 100% { height: 15%; }
+  30% { height: 70%; }
+  60% { height: 40%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .equalizer span { animation: none; height: 40%; }
+}
+
+/* ---- ambient glow (extraAnimations) ---- replaces an earlier, busier
+   "rotating spotlight beam" version — this is deliberately calmer: two
+   large, very soft blurred pools of color that slowly drift and breathe
+   behind the video, more like premium ambient stage wash than a searchlight
+   sweep. Pure background atmosphere: low opacity, negative z-index, never
+   over anything that needs reading. */
+.ambient-glow {
+  position: absolute;
+  inset: 0;
+  /* Negative, not a small positive number: .video-box has no z-index of its
+     own (auto), and an auto-z-index positioned sibling still paints above
+     an earlier-in-DOM positive-z-index one in that later stacking phase —
+     negative is the only way to guarantee this stays behind it. */
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.glow-pool {
+  position: absolute;
+  width: 45vw;
+  height: 45vw;
+  border-radius: 50%;
+  filter: blur(55px);
+  opacity: 0.24;
+  mix-blend-mode: screen;
+  animation: glow-drift 22s ease-in-out infinite;
+}
+.glow-pool-1 { background: var(--gold); top: -10%; left: -8%; animation-duration: 20s; }
+.glow-pool-2 { background: var(--coral); bottom: -14%; right: -10%; animation-duration: 26s; animation-delay: -8s; }
+.glow-pool-3 { background: var(--good); top: 30%; left: 38%; width: 30vw; height: 30vw; opacity: 0.16; animation-duration: 32s; animation-delay: -15s; }
+@keyframes glow-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(6%, 4%) scale(1.2); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glow-pool { animation: none; }
+}
+
+/* ---- laser beams (extraAnimations) ---- thin club-style beams pivoting
+   from just above the top edge, sweeping at different speeds/phases so they
+   cross rather than move in lockstep. Same negative-z-index layer as the
+   ambient glow (behind the video, in its own margins), so a real "laser
+   show" feel never actually crosses over the video or any readable text. */
+.laser-beams {
+  position: absolute;
+  inset: 0;
+  z-index: -1; /* same reasoning as .ambient-glow: negative, not a small positive, to guarantee it stays behind .video-box (which has no z-index of its own) */
+  overflow: hidden;
+  pointer-events: none;
+}
+.laser-beam {
+  position: absolute;
+  top: -8%;
+  width: 3px;
+  height: 130%;
+  transform-origin: top center;
+  opacity: 0.4;
+  mix-blend-mode: screen;
+  animation: laser-sweep ease-in-out infinite;
+}
+.laser-beam-1 { left: 8%; background: linear-gradient(180deg, var(--gold), transparent 75%); animation-duration: 4.5s; }
+.laser-beam-2 { left: 28%; background: linear-gradient(180deg, var(--coral), transparent 75%); animation-duration: 5.5s; animation-delay: -1.5s; animation-direction: reverse; }
+.laser-beam-3 { right: 24%; background: linear-gradient(180deg, var(--good), transparent 75%); animation-duration: 6s; animation-delay: -3s; }
+.laser-beam-4 { right: 6%; background: linear-gradient(180deg, var(--gold), transparent 75%); animation-duration: 5s; animation-delay: -2s; animation-direction: reverse; }
+@keyframes laser-sweep {
+  0%, 100% { transform: rotate(-22deg); }
+  50% { transform: rotate(22deg); }
+}
+/* A brief brighter, faster sweep for a correct answer/steal/results,
+   triggered alongside the disco ball's own celebrate burst (see tv.js) —
+   ties the two effects together as one "the lights are going off" moment. */
+.laser-beams.celebrate .laser-beam { opacity: 0.7; animation-duration: 0.9s !important; }
+@media (prefers-reduced-motion: reduce) {
+  .laser-beam { animation: none; }
+}
+
+/* ---- party light orbs (extraAnimations) ---- soft bokeh lights drifting
+   up the far side edges, spawned one at a time in tv.js (same pattern as
+   the idle screen's floating musical notes) — deliberately abstract rather
+   than literal little dancing figures, and kept well outside the video-
+   box's own margins so it can never collide with centered panel content
+   (the join QR code in particular) regardless of that content's height.
+   Only during 'idle' and 'results' — the actual party moments. */
+.party-orb {
+  position: absolute;
+  bottom: 6%;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  filter: blur(1px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 6;
+  box-shadow: 0 0 18px 4px currentColor;
+  animation: party-orb-rise 6s ease-in forwards;
+}
+@keyframes party-orb-rise {
+  0% { transform: translateY(0) scale(0.6); opacity: 0; }
+  12% { opacity: 0.85; }
+  85% { opacity: 0.5; }
+  100% { transform: translateY(-70vh) scale(1); opacity: 0; }
+}
+
+/* ---- groove dancers (extraAnimations) ---- 2 chunky rounded party-goers,
+   not literal stick figures — same gradient language as the mascot/disco
+   ball (rounded shapes, gold-to-coral fills) so they read as "designed"
+   rather than clip-art. Only during 'idle'/'results' (see tv.js), same
+   far-edge placement as the party orbs so nothing here can ever collide
+   with the centered join QR regardless of panel content height. */
+.groove-dancer {
+  position: absolute;
+  bottom: 4%;
+  width: 46px;
+  height: 84px;
+  pointer-events: none;
+  z-index: 11;
+  animation: groove-bounce 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.groove-dancer-left { left: 13%; }
+.groove-dancer-right { right: 13%; animation-delay: -0.55s; } /* offset so the two don't move in perfect unison */
+@keyframes groove-bounce {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-14px) rotate(4deg); }
+}
+/* A soft ground glow that pulses opposite the bounce (dips as the dancer
+   lifts, brightens as they land) — grounds the character and reads as a
+   little dance-floor spotlight underfoot. */
+.groove-spot {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, var(--gold), transparent 70%);
+  opacity: 0.35;
+  filter: blur(2px);
+  animation: groove-spot-pulse 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes groove-spot-pulse {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
+  50% { opacity: 0.2; transform: translateX(-50%) scale(0.75); }
+}
+.groove-body {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 40px;
+  border-radius: 15px;
+  background: linear-gradient(160deg, var(--coral), var(--gold));
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
+}
+.groove-head {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--gold), var(--coral));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+.groove-eye { width: 3px; height: 3px; border-radius: 50%; background: #21170a; }
+.groove-leg {
+  position: absolute;
+  bottom: 0;
+  width: 7px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--coral);
+  transform-origin: top center;
+  animation-duration: 1.1s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+.groove-leg-l { left: 9px; animation-name: groove-leg-l; }
+.groove-leg-r { right: 9px; animation-name: groove-leg-r; }
+@keyframes groove-leg-l { 0%, 100% { transform: rotate(14deg); } 50% { transform: rotate(-14deg); } }
+@keyframes groove-leg-r { 0%, 100% { transform: rotate(-14deg); } 50% { transform: rotate(14deg); } }
+.groove-arm {
+  position: absolute;
+  top: 32px;
+  width: 6px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--gold);
+  transform-origin: top center;
+  animation-duration: 1.1s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+.groove-arm-l { left: 3px; animation-name: groove-arm-l; }
+.groove-arm-r { right: 3px; animation-name: groove-arm-r; }
+@keyframes groove-arm-l { 0%, 100% { transform: rotate(-65deg); } 50% { transform: rotate(25deg); } }
+@keyframes groove-arm-r { 0%, 100% { transform: rotate(65deg); } 50% { transform: rotate(-25deg); } }
+/* The right-hand dancer's whole body is delayed (see .groove-dancer-right
+   above) — its limbs need the same delay or they'd fall out of sync with
+   their own body's bounce. */
+.groove-dancer-right .groove-spot,
+.groove-dancer-right .groove-leg,
+.groove-dancer-right .groove-arm { animation-delay: -0.55s; }
+@media (prefers-reduced-motion: reduce) {
+  .groove-dancer, .groove-spot, .groove-leg, .groove-arm { animation: none; }
+}
+
+/* ---- fireworks (extraAnimations) ---- a bigger flourish than confetti,
+   reserved for the results screen: a few soft-glowing bursts rather than
+   the more cartoonish sharp confetti-style dots this started as. Each
+   particle's actual end offset (--tx/--ty) is computed in JS with plain
+   Math.cos/sin and set as inline custom properties — deliberately not
+   CSS's own trig functions in calc(), which are recent enough not to bet a
+   kiosk deployment on. */
+.firework-particle {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  z-index: 55;
+  pointer-events: none;
+  box-shadow: 0 0 12px 4px currentColor;
+  animation: firework-burst 1.3s ease-out forwards;
+}
+@keyframes firework-burst {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), calc(var(--ty) + 50px)) scale(0.2); opacity: 0; }
+}
+
+/* ---- correct-answer light pulse (extraAnimations) ---- a clean expanding
+   ring from center, replacing an earlier "crossing lasers" version — reuses
+   the exact same scale+fade ring technique already established for the
+   buzzed-panel's own shockwave (#panel-buzzed h1::after), just bigger, so
+   it reads as part of the same design language instead of a new one. */
+.correct-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  border: 3px solid var(--gold);
+  z-index: 42;
+  pointer-events: none;
+  animation: correct-pulse-expand 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes correct-pulse-expand {
+  0% { width: 10px; height: 10px; margin: -5px 0 0 -5px; opacity: 0.9; border-width: 4px; }
+  100% { width: 70vmin; height: 70vmin; margin: -35vmin 0 0 -35vmin; opacity: 0; border-width: 1px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .firework-particle, .correct-pulse { display: none; }
+}
+
+.paused-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  background: rgba(22, 18, 31, 0.94);
+  color: #f4efe6; /* fixed, not inherited --text — see the .auto-advance-hint comment above */
+  text-align: center;
+}
+.paused-overlay h1 { font-size: 2.2rem; max-width: 20ch; }
+
 .mystery-banner {
   position: absolute;
   left: 4%;
+  top: 4%;
+  z-index: 10;
+  background: rgba(245, 185, 66, 0.15);
+  border: 1px solid rgba(245, 185, 66, 0.4);
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding: 0.5em 1.2em;
+  border-radius: 999px;
+}
+
+.wager-banner {
+  position: absolute;
+  right: 4%;
   top: 4%;
   z-index: 10;
   background: rgba(245, 185, 66, 0.15);
@@ -274,8 +722,8 @@
   white-space: nowrap;
   animation: caption-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-#caption-title { color: var(--gold); font-weight: 600; }
-#caption-artist { color: var(--text-muted); font-size: 0.85em; }
+#caption-title { color: #f5b942; font-weight: 600; } /* fixed, not var(--gold) — see the .auto-advance-hint comment near the top of this file */
+#caption-artist { color: #9c93b0; font-size: 0.85em; }
 #caption-artist:not(:empty)::before { content: " — "; }
 @keyframes caption-pop {
   0% { transform: translateX(-50%) scale(0.85); opacity: 0; }
@@ -303,8 +751,35 @@
 .panel h1 { font-size: 3.2rem; max-width: 18ch; }
 .panel p { font-size: 1.3rem; }
 
+#buzzed-tease { font-size: 1rem; opacity: 0.75; font-style: italic; }
+
 #reveal-title, #reveal-artist { font-family: var(--font-fun); }
 #reveal-title { color: var(--gold); }
+/* A bright diagonal shine sweeps across the title once as it appears — a
+   common "unveiling" touch in real broadcast graphics packages, and
+   deliberately a ONE-SHOT (animation, not infinite) so it doesn't compete
+   with actually reading the answer afterward. Only under the
+   extraAnimations toggle (like every other flourish here) — added via a
+   class in tv.js rather than unconditionally, so the plain solid-gold
+   #reveal-title above stays the reliable fallback whenever it's off. */
+#reveal-title.shimmer {
+  background: linear-gradient(110deg, var(--gold) 40%, #fff 50%, var(--gold) 60%);
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: title-shimmer 1.4s ease-out 0.15s;
+}
+@keyframes title-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -20% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #reveal-title.shimmer { animation: none; background-position: -20% 0; }
+}
+
+#snippet-hint { color: var(--gold); font-size: 1.05rem; }
 
 #hint-text {
   font-family: var(--font-fun);
@@ -391,7 +866,11 @@
   #playing-subtext.timer-critical { animation: none; }
 }
 
-#qr { border-radius: 12px; background: var(--text); padding: 10px; }
+/* Fixed white, not var(--text) — the generated QR PNG itself is dark
+   modules on a transparent background (see server.js's QRCode.toBuffer
+   call), so its backdrop needs to stay light regardless of theme or the
+   dark modules would vanish against a dark backdrop in light mode. */
+#qr { border-radius: 12px; background: #ffffff; padding: 10px; }
 
 #idle-hint { min-height: 1.4em; transition: opacity 0.4s ease; }
 
@@ -532,9 +1011,40 @@
   font-size: 1.3rem;
 }
 .results-row.first { box-shadow: 0 0 0 2px var(--gold) inset; }
+/* Winner glow (extraAnimations) — a slow pulsing gold halo around the #1
+   row specifically, applied as its own class from tv.js rather than
+   unconditionally, so results still look complete and correct with
+   extraAnimations off (just the plain inset ring above, no pulse). */
+.results-row.first.winner-glow { animation: winner-glow-pulse 2.2s ease-in-out infinite; }
+@keyframes winner-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--gold) inset, 0 0 18px 2px rgba(245, 185, 66, 0.35); }
+  50% { box-shadow: 0 0 0 2px var(--gold) inset, 0 0 34px 8px rgba(245, 185, 66, 0.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .results-row.first.winner-glow { animation: none; }
+}
 .results-row .rank { color: var(--text-muted); width: 2ch; }
 .results-row .rname { flex: 1; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .results-row .rscore { color: var(--gold); font-weight: 700; }
+
+.achievement-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1.2rem;
+  min-width: 320px;
+}
+.badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: rgba(245, 185, 66, 0.1);
+  border-radius: 10px;
+  padding: 0.5em 0.9em;
+  font-size: 1.05rem;
+}
+.badge-icon { font-size: 1.3rem; }
+.badge-text strong { color: var(--gold); }
 
 .session-stats {
   margin-top: 1.2rem;
@@ -554,6 +1064,24 @@
 }
 .scoreboard .pill { font-size: 1.05rem; }
 .scoreboard .pill.lead { box-shadow: 0 0 0 2px var(--gold) inset; }
+/* Idle/results "party wave" (extraAnimations) — a gentle staggered bob
+   across the scoreboard so the screen still feels alive during downtime,
+   not just when a round is actually live. Class + delays applied from
+   tv.js, only outside an actual round. */
+.scoreboard.party-wave .pill { animation: scoreboard-wave 2.4s ease-in-out infinite; }
+.scoreboard.party-wave .pill:nth-child(2) { animation-delay: 0.15s; }
+.scoreboard.party-wave .pill:nth-child(3) { animation-delay: 0.3s; }
+.scoreboard.party-wave .pill:nth-child(4) { animation-delay: 0.45s; }
+.scoreboard.party-wave .pill:nth-child(5) { animation-delay: 0.6s; }
+.scoreboard.party-wave .pill:nth-child(6) { animation-delay: 0.75s; }
+.scoreboard.party-wave .pill:nth-child(n+7) { animation-delay: 0.9s; }
+@keyframes scoreboard-wave {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scoreboard.party-wave .pill { animation: none; }
+}
 .team-tag { font-size: 0.8em; color: var(--gold); opacity: 0.85; }
 .scoreboard .score { color: var(--gold); font-weight: 700; display: inline-block; }
 .scoreboard .score.score-pulse { animation: score-pulse 0.5s ease; }

@@ -6,26 +6,40 @@ const overlay = document.getElementById('overlay');
 const panels = {
   idle: document.getElementById('panel-idle'),
   playing: document.getElementById('panel-playing'),
+  wagering: document.getElementById('panel-wagering'),
   buzzed: document.getElementById('panel-buzzed'),
   revealed: document.getElementById('panel-revealed'),
   results: document.getElementById('panel-results'),
 };
 const scoreboardEl = document.getElementById('scoreboard');
 const buzzedNameEl = document.getElementById('buzzed-name');
+const buzzedTeaseEl = document.getElementById('buzzed-tease');
 const revealTitleEl = document.getElementById('reveal-title');
 const revealArtistEl = document.getElementById('reveal-artist');
 const playingSubtext = document.getElementById('playing-subtext');
 const hintTextEl = document.getElementById('hint-text');
+const snippetHintEl = document.getElementById('snippet-hint');
 const resultsListEl = document.getElementById('results-list');
 const sessionStatsEl = document.getElementById('session-stats');
+const achievementBadgesEl = document.getElementById('achievement-badges');
 const autoAdvanceHintEl = document.getElementById('auto-advance-hint');
 const revealCaptionEl = document.getElementById('reveal-caption');
 const captionTitleEl = document.getElementById('caption-title');
 const captionArtistEl = document.getElementById('caption-artist');
 const mysteryBannerEl = document.getElementById('mystery-banner');
+const wagerBannerEl = document.getElementById('wager-banner');
+const wageringSubtextEl = document.getElementById('wagering-subtext');
 const mascotEl = document.getElementById('mascot');
+const discoBallEl = document.getElementById('disco-ball');
+const equalizerLeftEl = document.getElementById('equalizer-left');
+const equalizerRightEl = document.getElementById('equalizer-right');
+const ambientGlowEl = document.getElementById('ambient-glow');
+const laserBeamsEl = document.getElementById('laser-beams');
+const grooveDancerLeftEl = document.getElementById('groove-dancer-left');
+const grooveDancerRightEl = document.getElementById('groove-dancer-right');
 const categoryVotePanelEl = document.getElementById('category-vote-panel');
 const idleWaitingBlockEl = document.getElementById('idle-waiting-block');
+const pausedOverlayEl = document.getElementById('paused-overlay');
 const voteHeadingEl = document.getElementById('vote-heading');
 const voteOptionsTvEl = document.getElementById('vote-options-tv');
 const voteTvStatusEl = document.getElementById('vote-tv-status');
@@ -51,15 +65,33 @@ function syncVideo(state) {
   if (state.currentSong && state.currentSong.youtubeId && state.roundStatus === 'playing'
       && state.currentSong.youtubeId !== loadedYoutubeId) {
     loadedYoutubeId = state.currentSong.youtubeId;
-    player.loadVideoById(state.currentSong.youtubeId);
+    // Object form (not the plain-string form used everywhere else this app
+    // has called loadVideoById) — startSeconds is how the "start at N
+    // seconds in" option actually skips the intro, per the IFrame API.
+    player.loadVideoById({ videoId: state.currentSong.youtubeId, startSeconds: state.startOffsetSeconds || 0 });
     player.playVideo();
     ensurePlaybackStarted();
   }
 
   if (state.roundStatus === 'idle') {
     loadedYoutubeId = null;
+    clearTimeout(snippetTimeout);
     if (typeof player.stopVideo === 'function') player.stopVideo();
   }
+}
+
+// ---- snippet mode: auto-pause after a set number of seconds so guessing
+// happens from a short hook instead of the whole track. Piggybacks on the
+// exact same "new song actually started" detection the 3-2-1-GO flash
+// already uses (see the socket.on('state', ...) handler below) rather than
+// tracking its own separate one-shot-per-round-start flag. ----
+let snippetTimeout = null;
+function scheduleSnippetPause(state) {
+  clearTimeout(snippetTimeout);
+  if (!state.snippetSeconds || state.snippetSeconds <= 0) return;
+  snippetTimeout = setTimeout(() => {
+    if (player && typeof player.pauseVideo === 'function') player.pauseVideo();
+  }, state.snippetSeconds * 1000);
 }
 
 // The YouTube IFrame API is flaky about actually starting playback on the
@@ -81,9 +113,18 @@ function ensurePlaybackStarted(attempt = 0) {
 
 // Lets the host see whether a song is *actually* playing, not just that
 // the round's game-state is 'playing' — the two can disagree (silently
-// stuck loading, or a video that flat-out can't play here).
+// stuck loading, or a video that flat-out can't play here). Also includes
+// which song this is about (server.js now sends currentSong.id for exactly
+// this) so a real playback error can be attributed to that specific song
+// and remembered — YouTube's Data API embeddable flag can say a video is
+// fine when it actually isn't, so this ground-truth signal is what catches
+// the gap.
 function reportPlayerStatus(status, message) {
-  socket.emit('tv:playerStatus', { status, message: message || null });
+  socket.emit('tv:playerStatus', {
+    status,
+    message: message || null,
+    songId: latestState && latestState.currentSong ? latestState.currentSong.id : null,
+  });
 }
 
 const YT_STATE_NAMES = { '-1': 'unstarted', 0: 'ended', 1: 'playing', 2: 'paused', 3: 'buffering', 5: 'cued' };
@@ -258,6 +299,8 @@ socket.on('correct', () => {
   spawnConfetti();
   playChime();
   setMascotExpression('correct');
+  celebrateDiscoBall();
+  if (latestState && latestState.settings && latestState.settings.extraAnimations) spawnCorrectPulse();
 });
 
 // ---- steal mechanic: a wrong answer reopened buzzing, and whoever stole it
@@ -276,7 +319,11 @@ socket.on('steal', ({ name }) => {
   spawnConfetti();
   playChime();
   setMascotExpression('correct');
-  if (latestState && latestState.settings && latestState.settings.extraAnimations) spawnStealBanner(name);
+  celebrateDiscoBall();
+  if (latestState && latestState.settings && latestState.settings.extraAnimations) {
+    spawnStealBanner(name);
+    spawnCorrectPulse();
+  }
 });
 
 // ---- round timer countdown (soft cutoff — purely a display, the server
@@ -324,6 +371,16 @@ function updateMysteryBanner(state) {
   if (active) mysteryBannerEl.textContent = `🎭 Mystery Round: ${state.mysteryRound.label}`;
 }
 
+// ---- wager round (Daily Double) ----
+function updateWagerBanner(state) {
+  const active = !!state.wager && state.wager.amount !== null && state.roundStatus !== 'idle';
+  wagerBannerEl.hidden = !active;
+  if (active) wagerBannerEl.textContent = `💰 ${state.wager.playerName || 'They'} wagered ${state.wager.amount}!`;
+  if (state.roundStatus === 'wagering' && state.wager) {
+    wageringSubtextEl.textContent = `${state.wager.playerName || 'Someone'} is deciding how much to risk…`;
+  }
+}
+
 // ---- cartoon mascot companion (extraAnimations) ----
 // A face on the record (see tv.css), reacting to the game rather than just
 // decorating it. Expression is driven by roundStatus transitions, plus the
@@ -365,6 +422,147 @@ function updateMascot(state) {
   prevRoundStatusForMascot = status;
 }
 
+// ---- disco ball + laser beams ---- one "the lights are going off" moment,
+// triggered together for a correct answer/steal/results.
+function celebrateDiscoBall() {
+  if (discoBallEl && !discoBallEl.hidden) {
+    discoBallEl.classList.add('celebrate');
+    setTimeout(() => discoBallEl.classList.remove('celebrate'), 1800);
+  }
+  if (laserBeamsEl && !laserBeamsEl.hidden) {
+    laserBeamsEl.classList.add('celebrate');
+    setTimeout(() => laserBeamsEl.classList.remove('celebrate'), 1800);
+  }
+}
+
+function updateDiscoBall(state) {
+  if (!discoBallEl) return;
+  discoBallEl.hidden = !(state.settings && state.settings.extraAnimations);
+}
+
+function updateLaserBeams(state) {
+  if (!laserBeamsEl) return;
+  laserBeamsEl.hidden = !(state.settings && state.settings.extraAnimations);
+}
+
+// ---- equalizer bars ---- visible whenever a song is actually audibly
+// playing: 'playing'/'buzzed'/'revealed' (the video keeps playing under the
+// fading overlay during 'revealed' — see the Phase 5 note on why). Silent
+// during 'idle'/'results'/'wagering' (no song loaded/playing yet).
+function updateEqualizer(state) {
+  if (!equalizerLeftEl || !equalizerRightEl) return;
+  const animationsOn = state.settings && state.settings.extraAnimations;
+  const songAudible = state.roundStatus === 'playing' || state.roundStatus === 'buzzed' || state.roundStatus === 'revealed';
+  const visible = animationsOn && songAudible;
+  equalizerLeftEl.hidden = !visible;
+  equalizerRightEl.hidden = !visible;
+}
+
+// ---- ambient glow ----
+function updateAmbientGlow(state) {
+  if (!ambientGlowEl) return;
+  ambientGlowEl.hidden = !(state.settings && state.settings.extraAnimations);
+}
+
+// ---- party light orbs ---- replaces an earlier literal "dancing crowd" of
+// little cartoon figures — abstract bokeh lights read as more polished and,
+// just as importantly, drifting up the far side edges (well outside the
+// video-box's own margins) can never collide with the centered idle-panel
+// content the way a fixed-position row anchored to the bottom center did
+// (that's what was actually overlapping the join QR code before). Only the
+// actual "party" moments — idle (between rounds) and results — never while
+// a round needs attention.
+let partyOrbInterval = null;
+function spawnPartyOrb() {
+  if (reduceMotion) return;
+  const orb = document.createElement('div');
+  orb.className = 'party-orb';
+  const colors = ['var(--gold)', 'var(--coral)', 'var(--good)'];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  orb.style.background = color;
+  orb.style.color = color; // the glow (box-shadow: currentColor) reads this
+  // Far side edges only (0-12% or 88-100% from either side) — clear of the
+  // video-box's own 20% margins, nowhere near centered panel content.
+  const onLeft = Math.random() < 0.5;
+  orb.style[onLeft ? 'left' : 'right'] = (2 + Math.random() * 10) + '%';
+  orb.style.animationDuration = (5 + Math.random() * 3) + 's';
+  document.getElementById('stage').appendChild(orb);
+  orb.addEventListener('animationend', () => orb.remove());
+}
+
+function updatePartyOrbs(state) {
+  const animationsOn = state.settings && state.settings.extraAnimations;
+  const partyTime = state.roundStatus === 'idle' || state.roundStatus === 'results';
+  const active = animationsOn && partyTime;
+  if (active && !partyOrbInterval) {
+    spawnPartyOrb();
+    partyOrbInterval = setInterval(spawnPartyOrb, 1400);
+  } else if (!active && partyOrbInterval) {
+    clearInterval(partyOrbInterval);
+    partyOrbInterval = null;
+  }
+}
+
+// ---- groove dancers ---- same idle/results gate as the party orbs above.
+function updateGrooveDancers(state) {
+  if (!grooveDancerLeftEl || !grooveDancerRightEl) return;
+  const animationsOn = state.settings && state.settings.extraAnimations;
+  const partyTime = state.roundStatus === 'idle' || state.roundStatus === 'results';
+  const visible = animationsOn && partyTime;
+  grooveDancerLeftEl.hidden = !visible;
+  grooveDancerRightEl.hidden = !visible;
+}
+
+// ---- scoreboard party wave ---- same idle/results gate, so the board
+// still feels alive during downtime instead of only reacting mid-round.
+function updateScoreboardWave(state) {
+  const animationsOn = state.settings && state.settings.extraAnimations;
+  const partyTime = state.roundStatus === 'idle' || state.roundStatus === 'results';
+  scoreboardEl.classList.toggle('party-wave', !!(animationsOn && partyTime));
+}
+
+// ---- fireworks ---- a bigger one-shot flourish than confetti, for the
+// results screen specifically. A handful of soft-glowing burst origins,
+// restrained to the brand's own 3 accent colors rather than a scattershot
+// rainbow, each particle's actual end offset computed here in plain JS
+// (Math.cos/sin) rather than leaning on CSS's own trig functions.
+function spawnFireworks() {
+  if (reduceMotion) return;
+  const colors = ['#f5b942', '#ff6b5b', '#74c69d'];
+  const origins = [{ x: 30, y: 32 }, { x: 70, y: 28 }];
+  origins.forEach((origin, i) => {
+    setTimeout(() => {
+      const particleCount = 10;
+      const color = colors[i % colors.length];
+      for (let j = 0; j < particleCount; j++) {
+        const particle = document.createElement('div');
+        particle.className = 'firework-particle';
+        const angle = (Math.PI * 2 * j) / particleCount + Math.random() * 0.3;
+        const distance = 80 + Math.random() * 55;
+        particle.style.left = origin.x + 'vw';
+        particle.style.top = origin.y + 'vh';
+        particle.style.background = color;
+        particle.style.color = color; // box-shadow glow reads currentColor — see .firework-particle
+        particle.style.setProperty('--tx', `${Math.cos(angle) * distance}px`);
+        particle.style.setProperty('--ty', `${Math.sin(angle) * distance}px`);
+        document.body.appendChild(particle);
+        particle.addEventListener('animationend', () => particle.remove());
+      }
+    }, i * 260); // stagger the bursts instead of both firing at once
+  });
+}
+
+// ---- correct-answer light pulse ---- a clean expanding ring from center
+// for a correct answer/steal, replacing an earlier "crossing lasers"
+// version — gone in under a second, well clear of the moment's own text.
+function spawnCorrectPulse() {
+  if (reduceMotion) return;
+  const pulse = document.createElement('div');
+  pulse.className = 'correct-pulse';
+  document.getElementById('stage').appendChild(pulse);
+  pulse.addEventListener('animationend', () => pulse.remove());
+}
+
 // ---- category vote ----
 function renderCategoryVoteTV(state) {
   const vote = state.categoryVote;
@@ -400,6 +598,7 @@ function renderCategoryVoteTV(state) {
 let wasBuzzed = false;
 let resultsShown = false;
 let lastPlayingSongId = null;
+let wasPaused = false;
 
 function spawnGoFlash() {
   if (reduceMotion) return;
@@ -429,7 +628,7 @@ function spawnLeadBanner(name) {
   banner.addEventListener('animationend', () => banner.remove());
 }
 
-function renderResults(players) {
+function renderResults(players, animationsOn) {
   const sorted = [...players].sort((a, b) => b.score - a.score);
   if (!sorted.length) {
     resultsListEl.innerHTML = `<p class="muted">${t('noOnePlayed', currentLang)}</p>`;
@@ -437,10 +636,25 @@ function renderResults(players) {
   }
   const topScore = sorted[0].score;
   resultsListEl.innerHTML = sorted.map((p, i) => `
-    <div class="results-row ${p.score === topScore ? 'first' : ''}">
+    <div class="results-row ${p.score === topScore ? 'first' : ''} ${p.score === topScore && animationsOn ? 'winner-glow' : ''}">
       <span class="rank">${p.score === topScore ? '🏆' : i + 1}</span>
       <span class="rname">${escapeHtml(p.name)}</span>
       <span class="rscore">${p.score}</span>
+    </div>
+  `).join('');
+}
+
+function renderAchievementBadges(state) {
+  const badges = state.badges;
+  if (!badges || !badges.length) {
+    achievementBadgesEl.hidden = true;
+    return;
+  }
+  achievementBadgesEl.hidden = false;
+  achievementBadgesEl.innerHTML = badges.map(b => `
+    <div class="badge-row">
+      <span class="badge-icon">${b.icon}</span>
+      <span class="badge-text"><strong>${escapeHtml(b.label)}</strong>: ${escapeHtml(b.name)} <span class="muted">(${escapeHtml(b.detail)})</span></span>
     </div>
   `).join('');
 }
@@ -470,10 +684,19 @@ socket.on('state', (state) => {
   latestState = state;
   currentLang = state.language || 'en';
   applyTranslations(currentLang);
+  document.documentElement.dataset.theme = state.theme || 'dark';
   renderScoreboard(state.players);
   showPanel(state.roundStatus);
   updateMysteryBanner(state);
+  updateWagerBanner(state);
   updateMascot(state);
+  updateDiscoBall(state);
+  updateEqualizer(state);
+  updateAmbientGlow(state);
+  updateLaserBeams(state);
+  updatePartyOrbs(state);
+  updateGrooveDancers(state);
+  updateScoreboardWave(state);
   renderCategoryVoteTV(state);
 
   if (state.currentSong && state.currentSong.hint) {
@@ -481,6 +704,13 @@ socket.on('state', (state) => {
     hintTextEl.hidden = false;
   } else {
     hintTextEl.hidden = true;
+  }
+
+  if (state.roundStatus === 'playing' && state.snippetSeconds > 0) {
+    snippetHintEl.textContent = `🎧 First ${state.snippetSeconds}s only!`;
+    snippetHintEl.hidden = false;
+  } else {
+    snippetHintEl.hidden = true;
   }
 
   // "3...2...1...GO" flash the moment a NEW song actually starts playing —
@@ -494,6 +724,7 @@ socket.on('state', (state) => {
   if (state.roundStatus === 'playing' && state.currentSong && state.currentSong.youtubeId !== lastPlayingSongId) {
     lastPlayingSongId = state.currentSong.youtubeId;
     if (state.settings && state.settings.extraAnimations) spawnGoFlash();
+    scheduleSnippetPause(state);
   } else if (state.roundStatus !== 'playing' && state.roundStatus !== 'buzzed') {
     lastPlayingSongId = null; // replaying the same song later should flash again
   }
@@ -502,7 +733,10 @@ socket.on('state', (state) => {
     // The *current* buzzer is whoever buzzed most recently, not the first
     // person to buzz this round — those differ after a reset + a second,
     // different buzzer.
-    buzzedNameEl.textContent = state.buzzOrder[state.buzzOrder.length - 1].name;
+    const latestBuzz = state.buzzOrder[state.buzzOrder.length - 1];
+    buzzedNameEl.textContent = latestBuzz.name;
+    buzzedTeaseEl.hidden = !latestBuzz.tease;
+    buzzedTeaseEl.textContent = latestBuzz.tease || '';
     if (!wasBuzzed) spawnBuzzFlash();
     wasBuzzed = true;
   } else {
@@ -510,9 +744,19 @@ socket.on('state', (state) => {
   }
 
   if (state.roundStatus === 'revealed' && state.currentSong) {
+    // The reveal is the payoff — resume full playback even if snippet mode
+    // paused it earlier this round. Harmless to call when already playing.
+    clearTimeout(snippetTimeout);
+    if (player && typeof player.playVideo === 'function') player.playVideo();
     const title = state.currentSong.title || t('unknown', currentLang);
     const artist = state.currentSong.artist || '';
     revealTitleEl.textContent = title;
+    // Restarts automatically each time — .panel's own hidden->visible toggle
+    // on entering 'revealed' is what actually restarts a CSS animation
+    // declared on a descendant (same mechanism .panel-enter already relies
+    // on), so just keeping this class present is enough, no extra JS guard
+    // needed to replay it every round.
+    revealTitleEl.classList.toggle('shimmer', !!(state.settings && state.settings.extraAnimations));
     revealArtistEl.textContent = artist;
     // The big center reveal (above) fades out with .overlay almost right
     // away so the real video shows through — too quick to actually read.
@@ -526,11 +770,14 @@ socket.on('state', (state) => {
   }
 
   if (state.roundStatus === 'results') {
-    renderResults(state.players);
+    renderResults(state.players, !!(state.settings && state.settings.extraAnimations));
+    renderAchievementBadges(state);
     renderSessionStats(state);
     if (!resultsShown) {
       resultsShown = true;
       spawnConfetti();
+      celebrateDiscoBall();
+      if (state.settings && state.settings.extraAnimations) spawnFireworks();
     }
   } else {
     resultsShown = false;
@@ -547,6 +794,19 @@ socket.on('state', (state) => {
   if (state.roundStatus === 'revealed' && state.autoAdvance) {
     autoAdvanceInterval = setInterval(() => updateAutoAdvanceHint(state), 500);
   }
+
+  // ---- pause/resume: covers the whole screen and actually pauses playback,
+  // not just a visual overlay — a round in progress shouldn't keep playing
+  // music underneath while everyone's on a break. ----
+  pausedOverlayEl.hidden = !state.paused;
+  if (player && typeof player.pauseVideo === 'function' && typeof player.playVideo === 'function') {
+    if (state.paused) {
+      player.pauseVideo();
+    } else if (wasPaused && state.roundStatus === 'playing') {
+      player.playVideo(); // only resume actual playback if a round was live when paused
+    }
+  }
+  wasPaused = state.paused;
 
   syncVideo(state);
 });
