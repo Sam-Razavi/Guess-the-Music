@@ -56,7 +56,7 @@ Scores update live on every screen. **Reset entire game** on the host page wipes
 
 - This is plain local networking, not a hosted service — it only works while your laptop is running the server and everyone's on the same WiFi. It won't work over mobile data or across different networks.
 - If a device can't reach the site, double check the IP address printed in the terminal is still current (it can change if you reconnect to WiFi) — restart the server if so.
-- Player names/scores are kept in memory for that run of the server; the song playlist is the only thing saved to disk (`playlist.json`).
+- Player names/scores, the playlist, game options, and even the round currently in progress are all saved to disk as they change (`players.json`, `playlist.json`, `settings.json`, `roundstate.json`) — a server restart mid-round (a crash, a `pm2 restart`, the kiosk PC rebooting) picks back up on the same song instead of dropping to idle. The one thing that doesn't survive a restart is an open category vote — it's quick enough to just start over.
 
 ## Windows always-on setup
 

@@ -2,6 +2,9 @@ node_modules/
 npm-debug.log
 .env
 
-# Runtime game data (song playlist, scores) — not source, changes every game night
+# Runtime game data (song playlist, scores, settings, stats, in-progress round) — not source, changes every game night
 playlist.json
 players.json
+settings.json
+stats.json
+roundstate.json

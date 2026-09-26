@@ -21,6 +21,7 @@ const PLAYLIST_FILE = path.join(__dirname, 'playlist.json');
 const PLAYERS_FILE = path.join(__dirname, 'players.json');
 const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 const STATS_FILE = path.join(__dirname, 'stats.json');
+const ROUNDSTATE_FILE = path.join(__dirname, 'roundstate.json');
 
 const DEFAULT_STATS = {
   fastestBuzz: null,          // {name, ms, at} | null — quickest reaction to a round starting, all-time
@@ -110,6 +111,49 @@ function saveStats() {
   fs.writeFileSync(STATS_FILE, JSON.stringify(state.stats, null, 2));
 }
 
+// Round-state resume: so a crash + pm2 auto-restart (or any server restart)
+// mid-round comes back exactly where it left off — same song, same buzz
+// order — instead of silently dropping to 'idle' and leaving the host to
+// notice and re-pick the interrupted song by hand. Written on every
+// broadcast() (cheap: a handful of fields, one small file) and read back at
+// startup. Deliberately narrower than a full snapshot of `state`:
+//   - roundTimer / autoAdvance (the live countdowns) are NOT resumed — only
+//     `buzzingLocked` (a static flag) survives. Reconstructing an exact
+//     "seconds remaining" across an unknown-length outage isn't worth the
+//     complexity; buzzing just stays open a bit longer than intended in the
+//     rare case a timer was still ticking when the crash happened, which is
+//     a far smaller loss than the round vanishing outright.
+//   - categoryVote is NOT resumed — it's an idle-only, players-tap-a-button
+//     interaction with no game state riding on it; re-starting a vote after
+//     a crash costs a few seconds, not worth persisting for.
+//   - mysterySongId/mysteryModifier ARE resumed even outside an active round
+//     (any roundStatus), since ensureMysterySong() would otherwise silently
+//     re-roll a different song on every restart, breaking the "one song,
+//     sticky for the whole game" guarantee documented on that function.
+function loadRoundState() {
+  try {
+    return JSON.parse(fs.readFileSync(ROUNDSTATE_FILE, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function saveRoundState() {
+  const song = currentSong();
+  fs.writeFileSync(ROUNDSTATE_FILE, JSON.stringify({
+    currentSongId: song ? song.id : null,
+    roundStatus: state.roundStatus,
+    buzzOrder: state.buzzOrder,
+    buzzingLocked: state.buzzingLocked,
+    roundHadMiss: state.roundHadMiss,
+    roundStartedAt: state.roundStartedAt,
+    speedBonusPaid: state.speedBonusPaid,
+    hintRevealedIndices: state.hintRevealedIndices,
+    mysterySongId: state.mysterySongId,
+    mysteryModifier: state.mysteryModifier,
+  }, null, 2));
+}
+
 function getLanIp() {
   const nets = os.networkInterfaces();
   const candidates = [];
@@ -134,25 +178,35 @@ function getLanIp() {
 
 // ---------- game state ----------
 
+const initialPlaylist = loadPlaylist();
+const savedRound = loadRoundState();
+// 'idle'/'results' need no current song (currentIndex is legitimately -1 for
+// both); 'playing'/'buzzed'/'revealed' do — if that song can't be found
+// (removed from the playlist during the outage, a rare edge case), fall
+// back to a clean idle state rather than resuming into something broken.
+const roundNeedsSong = savedRound && ['playing', 'buzzed', 'revealed'].includes(savedRound.roundStatus);
+const resumedIndex = roundNeedsSong ? initialPlaylist.findIndex(s => s.id === savedRound.currentSongId) : -1;
+const canResumeRound = !!savedRound && savedRound.roundStatus !== 'idle' && (!roundNeedsSong || resumedIndex !== -1);
+
 const state = {
-  playlist: loadPlaylist(),       // [{id, youtubeId, title, artist, played}]
-  currentIndex: -1,
-  roundStatus: 'idle',            // idle | playing | buzzed | revealed
-  buzzOrder: [],                  // [{id, name, time}]
+  playlist: initialPlaylist,       // [{id, youtubeId, title, artist, played}]
+  currentIndex: canResumeRound ? resumedIndex : -1,
+  roundStatus: canResumeRound ? savedRound.roundStatus : 'idle',   // idle | playing | buzzed | revealed | results
+  buzzOrder: canResumeRound ? (savedRound.buzzOrder || []) : [],  // [{id, name, time}]
   players: loadPlayers(),         // playerId -> {name, score, connected, socketId}
-  roundTimer: null,               // {seconds, endsAt} | null — a soft cutoff, doesn't change roundStatus
-  buzzingLocked: false,           // true once the timer expires with no buzz — host still controls reveal/close
+  roundTimer: null,               // {seconds, endsAt} | null — a soft cutoff; doesn't survive a restart, see saveRoundState()
+  buzzingLocked: canResumeRound ? !!savedRound.buzzingLocked : false, // true once the timer expires with no buzz — host still controls reveal/close
   language: 'en',                 // 'en' | 'fa' — TV/player display language, set by the host
-  autoAdvance: null,               // {endsAt} | null — pending auto-start of the next unplayed song after a reveal
+  autoAdvance: null,               // {endsAt} | null — pending auto-start of the next unplayed song; doesn't survive a restart either
   settings: loadSettings(),       // host-toggleable game options — see DEFAULT_SETTINGS
-  roundHadMiss: false,             // true once resetBuzzers has fired this round — powers the steal-mechanic bonus
-  roundStartedAt: null,            // Date.now() when the current round began — powers the speed-bonus window
-  speedBonusPaid: false,           // true once this round's speed bonus has been awarded once
+  roundHadMiss: canResumeRound ? !!savedRound.roundHadMiss : false, // true once resetBuzzers has fired this round — powers the steal-mechanic bonus
+  roundStartedAt: canResumeRound ? savedRound.roundStartedAt : null, // Date.now() when the current round began — powers the speed-bonus window
+  speedBonusPaid: canResumeRound ? !!savedRound.speedBonusPaid : false, // true once this round's speed bonus has been awarded once
   stats: loadStats(),              // all-time records — see DEFAULT_STATS; only recorded while sessionStats is on
-  hintRevealedIndices: [],         // character indices of the current song's title already revealed — see buildHintMask
-  mysterySongId: null,             // id of this game's one Mystery Modifier Round song, or null — see ensureMysterySong()
-  mysteryModifier: null,           // 'double' | 'noHint' | 'blind' | null — only revealed (via payloadFor) once that song's round starts
-  categoryVote: null,              // {options, votes: {playerId: category}, closed, result, endsAt} | null — see host:startCategoryVote
+  hintRevealedIndices: canResumeRound ? (savedRound.hintRevealedIndices || []) : [], // character indices of the current song's title already revealed — see buildHintMask
+  mysterySongId: savedRound ? savedRound.mysterySongId : null,     // id of this game's one Mystery Modifier Round song, or null — see ensureMysterySong()
+  mysteryModifier: savedRound ? savedRound.mysteryModifier : null, // 'double' | 'noHint' | 'blind' | null — only revealed (via payloadFor) once that song's round starts
+  categoryVote: null,              // {options, votes: {playerId: category}, closed, result, endsAt} | null — deliberately not resumed, see saveRoundState()
 };
 
 const SPEED_BONUS_WINDOW_MS = 3000;
@@ -377,6 +431,7 @@ function payloadFor(role) {
 
 function broadcast() {
   ensureMysterySong();
+  saveRoundState();
   io.to('host').emit('state', payloadFor('host'));
   io.to('tv').emit('state', payloadFor('tv'));
   io.to('player').emit('state', payloadFor('player'));
