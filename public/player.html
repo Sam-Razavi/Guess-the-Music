@@ -26,6 +26,10 @@
     <p data-i18n="whatShouldTvCallYou">What should the TV call you?</p>
     <input type="text" id="name-input" maxlength="24" placeholder="Your name" data-i18n-placeholder="yourNamePlaceholder" autocomplete="off">
     <input type="text" id="team-input" maxlength="24" placeholder="Team name (optional)" autocomplete="off">
+    <div id="pin-row" hidden>
+      <input type="text" id="pin-input" inputmode="numeric" autocomplete="off" data-i18n-placeholder="joinPinPlaceholder" placeholder="Join PIN">
+      <p class="muted small" id="pin-error"></p>
+    </div>
     <button class="primary" id="name-submit" data-i18n="joinGame">Join the game</button>
   </div>
 

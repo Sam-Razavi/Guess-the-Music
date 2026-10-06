@@ -19,7 +19,19 @@
 <meta name="apple-mobile-web-app-title" content="GTM Host">
 </head>
 <body>
-  <div class="host-wrap">
+  <!-- Join-PIN gate (optional — see .env.example's JOIN_PIN). Hidden by
+       default via the plain HTML attribute below (not JS) so there's no
+       flash of the real control panel before script.js can hide it, and
+       host-wrap starts hidden the same way for the same reason. -->
+  <div class="pin-gate" id="pin-gate">
+    <h1><img src="/logo.svg" alt="" class="logo-mark" width="44" height="44"> Guess the Music</h1>
+    <p>Enter the join PIN to access host controls.</p>
+    <input type="text" id="pin-input" inputmode="numeric" placeholder="PIN" autocomplete="off">
+    <button class="primary" id="pin-submit-btn">Unlock</button>
+    <p class="muted small" id="pin-error"></p>
+  </div>
+
+  <div class="host-wrap" id="host-wrap" hidden>
     <header class="host-header">
       <h1><img src="/logo.svg" alt="" class="logo-mark" width="32" height="32"> Host Control</h1>
       <div class="header-right">

@@ -10,10 +10,20 @@ function getPlayerId() {
 const myId = getPlayerId();
 const socket = io();
 
+// Join-PIN gate (optional — see .env.example's JOIN_PIN). A URL param wins
+// over a remembered one so a freshly-shared/QR'd link always takes
+// precedence over a stale value from a previous game that used a different
+// PIN. Blank everywhere just means the server isn't requiring one, and
+// nothing below ever shows.
+let currentPin = new URLSearchParams(location.search).get('pin') || localStorage.getItem('gtm_pin') || '';
+// Only set once a 'state' broadcast actually arrives — there's no language
+// context at all before that, including on a failed-PIN registration.
+let lastLang = 'en';
+
 let currentName = null;
 let currentTeam = '';
 function sendRegister() {
-  if (currentName) socket.emit('register', { role: 'player', id: myId, name: currentName, team: currentTeam });
+  if (currentName) socket.emit('register', { role: 'player', id: myId, name: currentName, team: currentTeam, pin: currentPin });
 }
 // See host.js for why this re-registers on every 'connect' rather than once
 // — otherwise a phone that locks/drops WiFi mid-game stops getting updates
@@ -40,6 +50,18 @@ const voteBlockEl = document.getElementById('vote-block');
 const voteHeadingEl = document.getElementById('vote-heading');
 const voteOptionsPlayerEl = document.getElementById('vote-options-player');
 const votePlayerStatusEl = document.getElementById('vote-player-status');
+const pinRow = document.getElementById('pin-row');
+const pinInput = document.getElementById('pin-input');
+const pinError = document.getElementById('pin-error');
+
+// Only shows the PIN field at all when the server is actually configured
+// with one — otherwise this stays hidden and nothing about joining changes.
+fetch('/join-info').then(r => r.json()).then(({ pinRequired }) => {
+  if (pinRequired) {
+    pinRow.hidden = false;
+    if (currentPin) pinInput.value = currentPin;
+  }
+}).catch(() => { /* worst case the PIN field just doesn't show pre-filled; register() still enforces it */ });
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -48,13 +70,31 @@ function escapeHtml(s) {
 function join(name, team) {
   currentName = name;
   currentTeam = (team || '').trim();
+  const pinVal = pinInput.value.trim();
+  if (pinVal) currentPin = pinVal;
   localStorage.setItem('gtm_player_name', name);
   localStorage.setItem('gtm_player_team', currentTeam);
   nameChip.textContent = name;
+  pinError.textContent = '';
   nameScreen.hidden = true;
   buzzerScreen.hidden = false;
   sendRegister();
 }
+
+// A wrong/missing PIN means the server never actually joined this socket to
+// the 'player' room (see server.js's register handler) — bounce back to the
+// name screen with the PIN field visible and an error, same screen the user
+// was just on, rather than leaving them stranded on a buzzer screen that
+// will never receive a single update.
+socket.on('registerError', () => {
+  localStorage.removeItem('gtm_pin');
+  currentPin = '';
+  buzzerScreen.hidden = true;
+  nameScreen.hidden = false;
+  pinRow.hidden = false;
+  pinError.textContent = t('incorrectPin', lastLang);
+  pinInput.focus();
+});
 
 document.getElementById('name-submit').addEventListener('click', () => {
   const name = nameInput.value.trim();
@@ -66,10 +106,14 @@ nameInput.addEventListener('keydown', (e) => {
 teamInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('name-submit').click();
 });
+pinInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('name-submit').click();
+});
 
 nameChip.addEventListener('click', () => {
   nameInput.value = localStorage.getItem('gtm_player_name') || '';
   teamInput.value = localStorage.getItem('gtm_player_team') || '';
+  if (currentPin) pinInput.value = currentPin;
   nameScreen.hidden = false;
   buzzerScreen.hidden = true;
 });
@@ -212,6 +256,8 @@ let wasArmed = false;
 
 socket.on('state', (state) => {
   const lang = state.language || 'en';
+  lastLang = lang;
+  if (currentPin) localStorage.setItem('gtm_pin', currentPin);
   applyTranslations(lang);
   document.documentElement.dataset.theme = state.theme || 'dark';
   renderMysteryNote(state);

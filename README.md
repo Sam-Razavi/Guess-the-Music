@@ -152,6 +152,53 @@ artists), so this is a suggestion the host can always override, not a
 guarantee — and it never overwrites a category you typed yourself. Works
 fine with nothing configured — the setting just won't find any suggestions.
 
+### Playing from outside your WiFi
+
+Everything above assumes the TV, host, and every player are on the same home
+WiFi — that's still the default and needs nothing extra. To let a remote
+friend join or to host from somewhere else, put the always-on PC's server
+behind a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/):
+an outbound-only connection from this PC to Cloudflare's edge, so there's no
+port-forwarding and no exposed IP on your router. The TV itself stays local
+— it's physically HDMI'd into the room, so only `host.html`/`player.html`
+need to be reachable remotely.
+
+1. Needs a domain you own in a Cloudflare account (any domain registrar
+   works — point its nameservers at Cloudflare, which is free).
+2. Run the setup script, which installs `cloudflared` and walks you through
+   the one-time account steps it can't do for you (your own Cloudflare
+   login and domain choice):
+   ```powershell
+   cd C:\Guess-the-Music\scripts
+   powershell -ExecutionPolicy Bypass -File .\install-cloudflare-tunnel.ps1
+   ```
+   It'll print the exact `cloudflared tunnel login` / `create` / `route dns`
+   commands to run, then ask you to re-run the script with `-Hostname` once
+   you have one — it registers `cloudflared` as a Windows service after
+   that, the same role pm2 and the kiosk shortcut play for the rest of this
+   app (auto-starts on reboot, no manual relaunching).
+3. **Set a join PIN before sharing the link** — once the game is reachable
+   from the whole internet rather than just your WiFi, anyone with the link
+   could otherwise join as a player or take over hosting. Add to `.env`:
+   ```
+   JOIN_PIN=some-pin-only-you-and-your-friends-know
+   ```
+   then `pm2 restart guess-the-music`. This gates `host.html` and
+   `player.html` registration only — **the TV screen never asks for a PIN**,
+   since it's a read-only kiosk display with no join/control surface worth
+   gating, and the kiosk autostart script has no way to type one in anyway.
+   Share the link as `https://your-hostname/player.html?pin=<the-pin>` (or
+   `/host.html?pin=...`) so the PIN auto-fills instead of needing to be
+   typed — the QR code on the TV already does exactly this for in-person
+   joins, baking the PIN into the encoded URL for a zero-typing scan.
+   Leave `JOIN_PIN` unset (the default) and nothing about joining changes
+   at all — no PIN field appears anywhere.
+
+   This is a lightweight deterrent, not hardened security: there's no rate
+   limiting beyond a small deliberate delay on a wrong attempt, and the
+   PIN travels in plain query-string params. It's sized for "keep random
+   internet traffic out," not for protecting anything sensitive.
+
 ### Friendly hostname (mDNS)
 
 The server also advertises itself as `guess-the-music.local` on the network, shown as a secondary hint under the QR code on the host page. It's a convenience only, not the primary path — the QR code and printed IP-based links stay the reliable way to join, since Android Chrome's support for `.local` addresses is inconsistent. The first time the server starts, Windows may prompt a one-time Firewall dialog for Node.js (multicast UDP) — allow it on **Private networks**.

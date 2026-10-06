@@ -24,6 +24,12 @@ const STATS_FILE = path.join(__dirname, 'stats.json');
 const PRESETS_FILE = path.join(__dirname, 'presets.json');
 const ROUNDSTATE_FILE = path.join(__dirname, 'roundstate.json');
 
+// Optional shared-secret gate for host/player join — see .env.example.
+// Blank (the default) short-circuits the `JOIN_PIN && ...` check below, so
+// nothing ever prompts for a PIN unless one is actually configured. Never
+// required for 'tv' — the kiosk display can't interactively supply one.
+const JOIN_PIN = (process.env.JOIN_PIN || '').trim();
+
 const DEFAULT_STATS = {
   fastestBuzz: null,          // {name, ms, at} | null — quickest reaction to a round starting, all-time
   mostPointsInRound: null,    // {name, points, at} | null — biggest single correct-answer award, all-time
@@ -768,12 +774,22 @@ app.get('/join-info', (req, res) => {
     // inconsistent, so the IP-based URL above (and the QR code) stays
     // the reliable one.
     mdnsUrl: `http://${MDNS_HOST}:${PORT}/player.html`,
+    // Just a flag for the host/player pages to know whether to show a PIN
+    // field — deliberately never the PIN value itself, since this route is
+    // unauthenticated (anyone who can reach it at all already has the
+    // join link, but that's not the same as having the PIN).
+    pinRequired: !!JOIN_PIN,
   });
 });
 
 app.get('/qr.png', async (req, res) => {
   const ip = getLanIp();
-  const url = `http://${ip}:${PORT}/player.html`;
+  // Unlike /join-info above, the QR code DOES bake the real PIN in (when
+  // set) — it exists specifically for in-person, zero-typing join, and
+  // only people physically in the room scanning the TV screen ever see it.
+  const url = JOIN_PIN
+    ? `http://${ip}:${PORT}/player.html?pin=${encodeURIComponent(JOIN_PIN)}`
+    : `http://${ip}:${PORT}/player.html`;
   try {
     const png = await QRCode.toBuffer(url, { width: 320, margin: 1, color: { dark: '#16121f', light: '#00000000' } });
     res.type('png').send(png);
@@ -1074,7 +1090,16 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('register', ({ role: r, id, name, team }) => {
+  socket.on('register', ({ role: r, id, name, team, pin }) => {
+    // Checked before socket.join(role), so a wrong/missing PIN never puts
+    // this socket in the 'host'/'player' room — it gets no state broadcasts
+    // at all until a correct register call comes in. A small deliberate
+    // delay on the failure path is a minimal (not exhaustive) brute-force
+    // deterrent, not real rate-limiting.
+    if (JOIN_PIN && (r === 'host' || r === 'player') && pin !== JOIN_PIN) {
+      setTimeout(() => socket.emit('registerError', { reason: 'badPin' }), 400);
+      return;
+    }
     role = r;
     socket.join(role);
 

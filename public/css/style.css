@@ -63,6 +63,30 @@ html[data-theme="light"] {
    found via .panel/.pill/.name-screen/.buzzer-screen all being affected). */
 [hidden] { display: none !important; }
 
+/* Join-PIN gate screen (host.html and player.html's name-screen use this
+   for their PIN field) — mirrors player.css's .name-screen sizing so both
+   pages' gates look consistent without host.html needing to load
+   player.css just for this. */
+.pin-gate {
+  min-height: 100vh;
+  padding: env(safe-area-inset-top, 1.5rem) 1.5rem env(safe-area-inset-bottom, 1.5rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 1rem;
+}
+.pin-gate h1 { font-size: 2rem; }
+.pin-gate input {
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  font-size: 1.1rem;
+  padding: 0.9em;
+}
+.pin-gate button { width: 100%; max-width: 320px; padding: 0.9em; }
+
 html, body {
   margin: 0;
   padding: 0;

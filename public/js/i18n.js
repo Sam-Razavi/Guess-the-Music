@@ -41,6 +41,8 @@ const translations = {
     yourFinalScore: 'Your final score: {n}',
     nextSongIn: '⏭ Next song in {s}s…',
     gamePaused: '⏸ Game paused — back in a moment!',
+    joinPinPlaceholder: 'Join PIN',
+    incorrectPin: 'Incorrect PIN — try again.',
   },
   fa: {
     brand: 'حدس آهنگ',
@@ -84,6 +86,8 @@ const translations = {
     yourFinalScore: 'امتیاز نهایی‌ات: {n}',
     nextSongIn: '⏭ آهنگ بعدی تا {s} ثانیه دیگر…',
     gamePaused: '⏸ بازی متوقف شد — به‌زودی برمی‌گردیم!',
+    joinPinPlaceholder: 'پین ورود',
+    incorrectPin: 'پین اشتباه است — دوباره تلاش کن.',
   },
 };
 

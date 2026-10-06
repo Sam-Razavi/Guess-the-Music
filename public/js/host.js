@@ -1,9 +1,52 @@
 const socket = io();
+
+// Join-PIN gate (optional — see .env.example's JOIN_PIN). A URL param wins
+// over a remembered one, same reasoning as player.js: a freshly-shared link
+// should always take precedence over a stale value from a previous game.
+let currentPin = new URLSearchParams(location.search).get('pin') || localStorage.getItem('gtm_pin') || '';
+
 // Re-registering on every 'connect' (not just once at load) matters because
 // Socket.IO fires 'connect' again after any auto-reconnect (network blip,
 // screen lock) — without this, a reconnected socket silently stops
 // receiving 'state' broadcasts until the page is manually reloaded.
-socket.on('connect', () => socket.emit('register', { role: 'host' }));
+socket.on('connect', () => socket.emit('register', { role: 'host', pin: currentPin }));
+
+const pinGate = document.getElementById('pin-gate');
+const hostWrap = document.getElementById('host-wrap');
+const pinInput = document.getElementById('pin-input');
+const pinError = document.getElementById('pin-error');
+const pinSubmitBtn = document.getElementById('pin-submit-btn');
+
+function unlockGate() {
+  if (currentPin) localStorage.setItem('gtm_pin', currentPin);
+  pinGate.hidden = true;
+  hostWrap.hidden = false;
+}
+// A 'state' broadcast only ever reaches this socket once the server has
+// actually joined it to the 'host' room (see server.js's register handler)
+// — so receiving one at all is proof the PIN (or lack of one) was accepted.
+socket.on('state', unlockGate);
+
+// A wrong/missing PIN means that join never happened — bounce to (or stay
+// on) the gate screen instead of leaving a blank control panel that will
+// never receive a single update.
+socket.on('registerError', () => {
+  localStorage.removeItem('gtm_pin');
+  currentPin = '';
+  hostWrap.hidden = true;
+  pinGate.hidden = false;
+  pinError.textContent = 'Incorrect PIN — try again.';
+  pinInput.focus();
+});
+
+pinSubmitBtn.addEventListener('click', () => {
+  const val = pinInput.value.trim();
+  if (!val) return;
+  currentPin = val;
+  pinError.textContent = '';
+  socket.emit('register', { role: 'host', pin: currentPin });
+});
+pinInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') pinSubmitBtn.click(); });
 
 const connPill = document.getElementById('conn-pill');
 const roundStatusPill = document.getElementById('round-status-pill');
