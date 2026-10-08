@@ -34,7 +34,7 @@
     <p data-i18n="whatShouldTvCallYou">What should the TV call you?</p>
     <div class="join-form">
       <input type="text" id="name-input" maxlength="24" placeholder="Your name" data-i18n-placeholder="yourNamePlaceholder" autocomplete="off">
-      <input type="text" id="team-input" maxlength="24" placeholder="Team name (optional)" autocomplete="off">
+      <input type="text" id="team-input" maxlength="24" placeholder="Team name (optional)" data-i18n-placeholder="teamNamePlaceholder" autocomplete="off">
       <div id="pin-row" hidden>
         <input type="text" id="pin-input" inputmode="numeric" autocomplete="off" data-i18n-placeholder="joinPinPlaceholder" placeholder="Join PIN">
         <p class="muted small" id="pin-error"></p>
@@ -52,14 +52,14 @@
 
     <main>
       <div id="wager-block" class="sheet" hidden>
-        <h2>💰 Daily Double!</h2>
-        <p>You get an exclusive crack at this one — no one else can buzz. How much do you wager?</p>
+        <h2 data-i18n="dailyDouble">💰 Daily Double!</h2>
+        <p data-i18n="wagerIntro">You get an exclusive crack at this one — no one else can buzz. How much do you wager?</p>
         <input type="number" id="wager-input" min="0" step="1" value="0">
         <p class="muted small" id="wager-max-hint"></p>
-        <button class="primary" id="wager-submit-btn">Lock in wager</button>
+        <button class="primary" id="wager-submit-btn" data-i18n="lockWager">Lock in wager</button>
       </div>
       <div id="wager-waiting-block" class="sheet" hidden>
-        <p class="muted">🎲 <strong id="wager-player-name"></strong> is setting a wager…</p>
+        <p class="muted" id="wager-waiting-text"></p>
       </div>
 
       <div id="vote-block" class="sheet" hidden>

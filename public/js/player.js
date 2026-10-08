@@ -45,7 +45,7 @@ const wagerWaitingBlockEl = document.getElementById('wager-waiting-block');
 const wagerInputEl = document.getElementById('wager-input');
 const wagerMaxHintEl = document.getElementById('wager-max-hint');
 const wagerSubmitBtn = document.getElementById('wager-submit-btn');
-const wagerPlayerNameEl = document.getElementById('wager-player-name');
+const wagerWaitingEl = document.getElementById('wager-waiting-text');
 const voteBlockEl = document.getElementById('vote-block');
 const voteHeadingEl = document.getElementById('vote-heading');
 const voteOptionsPlayerEl = document.getElementById('vote-options-player');
@@ -56,7 +56,11 @@ const pinError = document.getElementById('pin-error');
 
 // Only shows the PIN field at all when the server is actually configured
 // with one — otherwise this stays hidden and nothing about joining changes.
-fetch('/join-info').then(r => r.json()).then(({ pinRequired }) => {
+fetch('/join-info').then(r => r.json()).then(({ pinRequired, language, theme }) => {
+  // The join screen is shown before the first game 'state' arrives, so take
+  // the language/theme from here — otherwise it is always English.
+  if (language) { lastLang = language; applyTranslations(language); }
+  if (theme) document.documentElement.dataset.theme = theme;
   if (pinRequired) {
     pinRow.hidden = false;
     if (currentPin) pinInput.value = currentPin;
@@ -194,7 +198,7 @@ if (savedName) {
 function renderMysteryNote(state) {
   const active = !!state.mysteryRound && state.roundStatus !== 'idle' && state.roundStatus !== 'results';
   mysteryNoteEl.hidden = !active;
-  if (active) mysteryNoteEl.textContent = `🎭 Mystery Round: ${state.mysteryRound.label}`;
+  if (active) mysteryNoteEl.textContent = t('mysteryRound', lastLang).replace('{label}', t('mystery_' + state.mysteryRound.modifier, lastLang));
 }
 
 function renderCategoryVote(state) {
@@ -207,7 +211,7 @@ function renderCategoryVote(state) {
 
   const myVote = vote.votes[myId];
   if (!vote.closed) {
-    voteHeadingEl.textContent = '🗳️ Vote for the next category!';
+    voteHeadingEl.textContent = t('voteHeading', lastLang);
     voteOptionsPlayerEl.innerHTML = vote.options.map(c => `
       <button class="vote-option-btn ${c === myVote ? 'selected' : ''}" data-vote="${escapeHtml(c)}">
         <span class="vote-avatar">${categoryAvatar(c)}</span>${escapeHtml(c)}
@@ -216,9 +220,9 @@ function renderCategoryVote(state) {
     voteOptionsPlayerEl.querySelectorAll('[data-vote]').forEach(btn => {
       btn.addEventListener('click', () => socket.emit('player:voteCategory', { category: btn.dataset.vote }));
     });
-    votePlayerStatusEl.textContent = myVote ? `You voted: ${myVote}` : 'Tap a category to vote!';
+    votePlayerStatusEl.textContent = myVote ? t('youVoted', lastLang).replace('{name}', myVote) : t('tapToVote', lastLang);
   } else {
-    voteHeadingEl.textContent = `🏆 Winner: ${vote.result}!`;
+    voteHeadingEl.textContent = t('voteWinner', lastLang).replace('{name}', vote.result);
     voteOptionsPlayerEl.innerHTML = '';
     votePlayerStatusEl.textContent = '';
   }
@@ -245,10 +249,10 @@ function renderWager(state) {
     if (isMe) {
       const me = state.players.find(p => p.id === myId);
       const max = me ? me.score : 0;
-      wagerMaxHintEl.textContent = `You have ${max} point${max === 1 ? '' : 's'} to risk.`;
+      wagerMaxHintEl.textContent = t(max === 1 ? 'wagerHint1' : 'wagerHintN', lastLang).replace('{n}', max);
       wagerInputEl.max = max;
     } else {
-      wagerPlayerNameEl.textContent = wager.playerName || 'Someone';
+      wagerWaitingEl.textContent = t('wagerWaiting', lastLang).replace('{name}', wager.playerName || t('someone', lastLang));
     }
   } else {
     // Must respect an open category vote — renderCategoryVote() runs first
@@ -271,6 +275,12 @@ function setScreenState(name) {
 }
 
 socket.on('state', (state) => {
+  // The site files changed since this page loaded (a deploy while it was open):
+  // reload to pick up the new scripts instead of running stale ones.
+  if (state.buildId) {
+    if (window.__buildId && window.__buildId !== state.buildId) { location.reload(); return; }
+    window.__buildId = state.buildId;
+  }
   const lang = state.language || 'en';
   lastLang = lang;
   if (currentPin) localStorage.setItem('gtm_pin', currentPin);
@@ -324,13 +334,15 @@ socket.on('state', (state) => {
     const wagerLockout = state.wager && state.wager.playerId !== myId;
     if (wagerLockout) {
       buzzBtn.disabled = true;
-      buzzLabel.textContent = '💰 Daily Double';
-      statusText.textContent = `Only ${state.wager.playerName || 'they'} can buzz on this one.`;
+      buzzLabel.textContent = t('dailyDoubleShort', lang);
+      statusText.textContent = t('onlyThey', lang).replace('{name}', state.wager.playerName || t('they', lang));
     } else if (buzzed) {
       buzzBtn.disabled = true;
       buzzBtn.classList.add('beaten');
       setScreenState('beaten');
-      buzzLabel.textContent = t('alreadyBuzzed', lang);
+      // My own buzz was judged wrong (steal reopened buzzing for the others): say so.
+      const mine = state.buzzOrder.find(b => b.id === myId);
+      buzzLabel.textContent = mine && mine.verdict === 'wrong' ? t('verdictWrong', lang) : t('alreadyBuzzed', lang);
       statusText.textContent = t('someoneElsesTurn', lang);
     } else if (state.buzzingLocked) {
       buzzBtn.disabled = true;
@@ -338,8 +350,8 @@ socket.on('state', (state) => {
       statusText.textContent = t('waitingHost', lang);
     } else {
       buzzBtn.disabled = false;
-      buzzLabel.textContent = t('buzzBtnLabel', lang);
-      statusText.textContent = t('buzzInAsap', lang);
+      buzzLabel.textContent = state.stealOpen ? t('stealBtn', lang) : t('buzzBtnLabel', lang);
+      statusText.textContent = state.stealOpen ? t('stealStatus', lang) : t('buzzInAsap', lang);
       setScreenState('armed');
     }
   } else if (state.roundStatus === 'buzzed') {
@@ -349,6 +361,16 @@ socket.on('state', (state) => {
       buzzLabel.textContent = t('lockedIn', lang);
       statusText.textContent = t('sayAnswerHostChecking', lang);
       setScreenState('locked');
+      if (current.verdict === 'correct') {
+        buzzLabel.textContent = t('verdictCorrect', lang);
+        statusText.textContent = '';
+      } else if (current.verdict === 'wrong') {
+        buzzBtn.classList.remove('locked');
+        buzzBtn.classList.add('beaten');
+        buzzLabel.textContent = t('verdictWrong', lang);
+        statusText.textContent = '';
+        setScreenState('beaten');
+      }
     } else {
       buzzBtn.classList.add('beaten');
       setScreenState('beaten');

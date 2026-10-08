@@ -891,3 +891,35 @@ body.fx .place-1 .podium-player .avatar { animation: winner-glow 2.4s var(--ease
   .aurora-blob, .viz-bar i, .sunburst { animation: none !important; }
   .confetti-piece, .firework-particle, .screen-glow, .go-flash { display: none; }
 }
+
+/* ---- the host's verdict on a buzz-in ---- */
+.verdict {
+  margin: 0.2rem 0 0;
+  padding: 0.3em 1.1em;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.5rem !important;
+  animation: chip-in 0.5s var(--ease-spring) both;
+}
+.verdict.correct { color: #03241a; background: linear-gradient(135deg, #6ee7b7, #10b981); box-shadow: 0 0.8rem 2rem -0.6rem rgba(16, 185, 129, 0.8); }
+.verdict.wrong { color: #fff; background: linear-gradient(135deg, #fb7185, #e11d48); box-shadow: 0 0.8rem 2rem -0.6rem rgba(225, 29, 72, 0.8); }
+
+.correct-stamp.wrong .stamp-main {
+  color: #fff;
+  background: linear-gradient(135deg, #fb7185, #f43f5e 50%, #be123c);
+  box-shadow: 0 1.5rem 4rem -1rem rgba(225, 29, 72, 0.8), inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  transform: rotate(3deg);
+}
+.correct-stamp.wrong .stamp-tag { color: #fff; background: rgba(11, 8, 20, 0.7); }
+
+.overlay.shake { animation: verdict-shake 0.6s ease; }
+@keyframes verdict-shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-1.4rem) rotate(-1deg); }
+  30% { transform: translateX(1.4rem) rotate(1deg); }
+  45% { transform: translateX(-1rem); }
+  60% { transform: translateX(1rem); }
+  80% { transform: translateX(-0.4rem); }
+}
+@media (prefers-reduced-motion: reduce) { .overlay.shake { animation: none; } }

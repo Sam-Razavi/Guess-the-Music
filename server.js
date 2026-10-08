@@ -77,7 +77,32 @@ const MYSTERY_LABELS = {
 const MYSTERY_MODIFIER_KEYS = Object.keys(MYSTERY_LABELS);
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Newest modification time of anything in public/. Sent with every state so an
+// already-open TV/phone/host page can tell the site was updated while it was
+// running (it keeps executing the OLD page scripts after a deploy) and reload
+// itself. Restarting the server without changing any site file leaves this
+// unchanged, so those restarts don't reload anyone.
+const BUILD_ID = (() => {
+  let latest = 0;
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(p); else latest = Math.max(latest, fs.statSync(p).mtimeMs);
+    }
+  };
+  try { walk(path.join(__dirname, 'public')); } catch (e) { /* no public dir — leave 0 */ }
+  return Math.round(latest).toString(36);
+})();
 app.use(express.json());
+
+// The /api routes spend YouTube quota and read the playlist, so with a join PIN
+// set they need it too — the host page sends it as x-join-pin. (They used to
+// be open to anyone who could reach the server.) No PIN configured = no check.
+app.use('/api', (req, res, next) => {
+  if (JOIN_PIN && req.get('x-join-pin') !== JOIN_PIN) return res.status(401).json({ error: 'Join PIN required.' });
+  next();
+});
 
 // ---------- persistence ----------
 
@@ -521,17 +546,17 @@ function computeBadges() {
   const bs = state.badgeStats;
 
   if (bs.fastestBuzz && state.players[bs.fastestBuzz.id]) {
-    badges.push({ key: 'fastest', icon: '🏃', label: 'Fastest Buzzer', name: displayName(bs.fastestBuzz.name), detail: `${(bs.fastestBuzz.ms / 1000).toFixed(2)}s` });
+    badges.push({ key: 'fastest', icon: '🏃', label: 'Fastest Buzzer', name: displayName(bs.fastestBuzz.name), detail: `${(bs.fastestBuzz.ms / 1000).toFixed(2)}s`, value: (bs.fastestBuzz.ms / 1000).toFixed(2) });
   }
 
   const stealTop = Object.entries(bs.steals).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1])[0];
   if (stealTop && state.players[stealTop[0]]) {
-    badges.push({ key: 'steals', icon: '🔥', label: 'Most Steals', name: displayName(state.players[stealTop[0]].name), detail: `${stealTop[1]} steal${stealTop[1] === 1 ? '' : 's'}` });
+    badges.push({ key: 'steals', icon: '🔥', label: 'Most Steals', name: displayName(state.players[stealTop[0]].name), detail: `${stealTop[1]} steal${stealTop[1] === 1 ? '' : 's'}`, value: stealTop[1] });
   }
 
   const correctTop = Object.entries(bs.correct).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1])[0];
   if (correctTop && state.players[correctTop[0]]) {
-    badges.push({ key: 'sharpshooter', icon: '🎯', label: 'Sharpshooter', name: displayName(state.players[correctTop[0]].name), detail: `${correctTop[1]} correct` });
+    badges.push({ key: 'sharpshooter', icon: '🎯', label: 'Sharpshooter', name: displayName(state.players[correctTop[0]].name), detail: `${correctTop[1]} correct`, value: correctTop[1] });
   }
 
   // Comeback Kid: ever registered in (sole or shared) last place at some
@@ -549,6 +574,48 @@ function computeBadges() {
 
 function currentSong() {
   return state.currentIndex >= 0 ? state.playlist[state.currentIndex] : null;
+}
+
+// Judges a buzz-in wrong: remembers it on the buzz entry (so the host and TV
+// keep showing the verdict), notes that this round had a miss (what arms the
+// steal bonus), buzzes that player's own phone, shows "Wrong!" on the TV and
+// logs it. Safe to call twice for the same buzz — it only fires once.
+function applyWrongVerdict(entry) {
+  if (!entry || entry.verdict) return false;
+  entry.verdict = 'wrong';
+  state.roundHadMiss = true;
+  const p = state.players[entry.id];
+  // Targeted at that player's actual socket, not broadcast to everyone.
+  if (p && p.socketId) io.to(p.socketId).emit('wrong');
+  io.to('tv').emit('wrong', { name: displayName(entry.name) });
+  const song = currentSong();
+  logAction(`❌ ${entry.name} answered wrong${song ? ` on "${song.title}"` : ''}`);
+  return true;
+}
+
+// Reopens buzzing for the players who haven't had a turn (earlier buzzers stay
+// locked out because buzzOrder is cumulative within a round).
+function reopenBuzzing() {
+  const priorTimerSeconds = state.roundTimer ? state.roundTimer.seconds : 0;
+  state.roundStatus = 'playing';
+  clearRoundTimer();
+  // Also cancel any pending auto-advance — a reset can fire while 'revealed'
+  // (e.g. the R shortcut hit out of habit), and without this the countdown
+  // pill just silently vanishes with nothing happening.
+  clearAutoAdvance();
+  if (priorTimerSeconds > 0) startRoundTimer(priorTimerSeconds);
+}
+
+// Is there anyone connected who hasn't had a turn this round (and, in team
+// mode, whose team hasn't)? Used so a steal isn't "opened" for nobody.
+function someoneCanStillBuzz() {
+  const taken = new Set(state.buzzOrder.map(b => b.id));
+  const teamsTaken = state.settings.teamMode ? new Set(state.buzzOrder.map(b => teamOf(b.id)).filter(Boolean)) : new Set();
+  return Object.entries(state.players).some(([pid, p]) => {
+    if (taken.has(pid) || p.connected === false) return false;
+    if (state.settings.teamMode && teamsTaken.has(teamOf(pid))) return false;
+    return true;
+  });
 }
 
 // Optional organizing tags beyond `category` (which doubles as the genre):
@@ -644,8 +711,12 @@ function payloadFor(role) {
   const mysteryModifier = isMysterySong ? state.mysteryModifier : null;
 
   const base = {
+    buildId: BUILD_ID,
     roundStatus: state.roundStatus,
-    buzzOrder: state.buzzOrder.map(b => ({ id: b.id, name: displayName(b.name), tease: b.tease || null })),
+    buzzOrder: state.buzzOrder.map(b => ({ id: b.id, name: displayName(b.name), tease: b.tease || null, verdict: b.verdict || null })),
+    // True while a wrong answer has reopened buzzing for a steal — TV and
+    // phones use it to say "steal it!" instead of the plain buzz prompt.
+    stealOpen: !!(state.settings.stealMechanic && state.roundHadMiss && state.roundStatus === 'playing' && !state.wager),
     roundsPlayed: state.roundsPlayed,
     players: publicPlayers(),
     roundTimer: state.roundTimer,
@@ -818,6 +889,11 @@ app.get('/join-info', (req, res) => {
     // unauthenticated (anyone who can reach it at all already has the
     // join link, but that's not the same as having the PIN).
     pinRequired: !!JOIN_PIN,
+    // Language/theme so a phone that hasn't joined yet (it only receives game
+    // state after registering) can already show its join screen in the right
+    // language instead of always starting in English.
+    language: state.language,
+    theme: state.theme,
   });
 });
 
@@ -921,6 +997,25 @@ async function checkEmbeddable(apiKey, videoIds) {
   return { embeddable, hadApiError, reasons };
 }
 
+// Turns a YouTube API failure into something the host can act on, instead of
+// one generic "couldn't reach the API" for everything. Search (which "Find
+// replacement" needs) has its own small daily quota — separate from the
+// cheap calls adding/importing songs use — and it resets at midnight Pacific
+// time, which is about 09:00 in Sweden.
+function explainYoutubeError(e) {
+  const reason = e && e.reason;
+  if (reason === 'quotaExceeded' || reason === 'rateLimitExceeded' || reason === 'dailyLimitExceeded' || (e && e.status === 429)) {
+    return { status: 429, code: 'quota', message: "YouTube's daily search limit has been used up, so replacements can't be looked up right now. It resets every day at midnight Pacific time (about 09:00 in Sweden). Adding and playing songs still works — only searching is paused." };
+  }
+  if (reason === 'keyInvalid' || reason === 'keyExpired' || reason === 'API_KEY_INVALID') {
+    return { status: 400, code: 'key', message: "The YouTube API key isn't valid — check YOUTUBE_API_KEY in your .env file." };
+  }
+  if (reason === 'accessNotConfigured' || reason === 'forbidden') {
+    return { status: 403, code: 'access', message: 'YouTube refused the request — make sure the YouTube Data API v3 is enabled for your API key.' };
+  }
+  return null;
+}
+
 // Looks for a differently-uploaded copy of the same song when the current
 // video has embedding disabled — many official-label uploads block it, but
 // an "Artist - Topic" auto-generated upload, a lyric video, or a fan upload
@@ -942,7 +1037,12 @@ async function findReplacement(apiKey, title, artist) {
 
   const r = await fetch(apiUrl);
   const data = await r.json();
-  if (!r.ok) throw new Error((data.error && data.error.message) || `YouTube API error (${r.status})`);
+  if (!r.ok) {
+    const err = new Error((data.error && data.error.message) || `YouTube API error (${r.status})`);
+    err.status = r.status;
+    err.reason = data.error && data.error.errors && data.error.errors[0] && data.error.errors[0].reason;
+    throw err;
+  }
 
   const candidates = (data.items || [])
     .map(item => ({
@@ -970,7 +1070,8 @@ app.post('/api/find-replacement', async (req, res) => {
     const replacement = await findReplacement(apiKey, song.title, song.artist);
     res.json({ replacement });
   } catch (e) {
-    res.status(502).json({ error: 'Could not reach the YouTube API — check your connection and try again.' });
+    const known = explainYoutubeError(e);
+    res.status(known ? known.status : 502).json(known ? { error: known.message, code: known.code } : { error: 'Could not reach the YouTube API — check your connection and try again.' });
   }
 });
 
@@ -1143,6 +1244,14 @@ io.on('connection', (socket) => {
   // so a bad event is logged and dropped instead of taking the server down.
   const rawOn = socket.on.bind(socket);
   socket.on = (event, handler) => rawOn(event, (...args) => {
+    // Role gate. Every control event is checked against the role this socket
+    // registered as — registering as 'host' is what the join PIN protects, so
+    // without this any connected socket (a player's phone, a stray browser
+    // tab, anything that can reach the server) could emit host:resetGame and
+    // friends without ever registering, sidestepping the PIN entirely.
+    if (event.startsWith('host:') && role !== 'host') return;
+    if (event.startsWith('player:') && role !== 'player') return;
+    if (event === 'tv:playerStatus' && role !== 'tv') return;
     try {
       const result = handler(...args);
       if (result && typeof result.catch === 'function') result.catch(e => console.error(`[socket ${event}]`, e));
@@ -1151,7 +1260,16 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('register', ({ role: r, id, name, team, pin }) => {
+  socket.on('register', ({ role: r, id, name, team, pin } = {}) => {
+    if (r !== 'host' && r !== 'tv' && r !== 'player') return;
+    if (r === 'player') {
+      // The id becomes a key of state.players and ends up in HTML attributes
+      // on the host page, so it must be a plain token — the real client sends
+      // a UUID or "p-xxxx". Names/teams are clamped to what the UI allows.
+      if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(id) || ['__proto__', 'constructor', 'prototype'].includes(id)) return;
+      name = typeof name === 'string' ? name.trim().slice(0, 24) : '';
+      team = typeof team === 'string' ? team : undefined;
+    }
     // Checked before socket.join(role), so a wrong/missing PIN never puts
     // this socket in the 'host'/'player' room — it gets no state broadcasts
     // at all until a correct register call comes in. A small deliberate
@@ -1295,8 +1413,10 @@ io.on('connection', (socket) => {
   socket.on('host:addSongs', (songs) => {
     if (!Array.isArray(songs) || !songs.length) return;
     const existingIds = new Set(state.playlist.map(s => s.youtubeId));
-    for (const { youtubeId, title, artist, category, year, decade, difficulty } of songs) {
-      if (!youtubeId || existingIds.has(youtubeId.trim())) continue;
+    for (const entry of songs) {
+      if (!entry || typeof entry.youtubeId !== 'string') continue;
+      const { youtubeId, title, artist, category, year, decade, difficulty } = entry;
+      if (!youtubeId.trim() || existingIds.has(youtubeId.trim())) continue;
       const song = makeSong(youtubeId, title, artist, category, { year, decade, difficulty });
       state.playlist.push(song);
       existingIds.add(song.youtubeId);
@@ -1463,32 +1583,40 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
+  // "Reset buzzers" = "that answer was wrong, let someone else try". If the
+  // current buzz hasn't been judged yet it is judged wrong now, so the TV and
+  // that player's phone show it exactly as the Wrong button would.
   socket.on('host:resetBuzzers', () => {
     if (state.currentIndex === -1) return;
-    // Resetting buzzers after someone's had a turn means their answer was
-    // wrong — give that specific player (not everyone) a distinct sound/
-    // vibration on their own phone. Targeted at their actual socket, not
-    // broadcast to the whole 'player' room.
     const current = state.buzzOrder[state.buzzOrder.length - 1];
-    if (current && state.players[current.id] && state.players[current.id].socketId) {
-      io.to(state.players[current.id].socketId).emit('wrong');
+    if (current && state.roundStatus === 'buzzed') applyWrongVerdict(current);
+    reopenBuzzing();
+    broadcast();
+  });
+
+  // The host's ❌ Wrong button. Shows the verdict on the TV and on that
+  // player's phone, and — only when the steal mechanic is on — reopens buzzing
+  // for everyone who hasn't had a turn yet. With steal off the verdict just
+  // stays up: the host can reveal the answer, or press Reset buzzers to let
+  // others try anyway. A Daily Double miss costs the wager.
+  socket.on('host:markWrong', ({ id } = {}) => {
+    const current = state.buzzOrder[state.buzzOrder.length - 1];
+    if (state.paused || state.roundStatus !== 'buzzed' || !current || current.id !== id || current.verdict) return;
+    applyWrongVerdict(current);
+
+    const wagerAmount = state.wager && state.wager.amount != null ? state.wager.amount : 0;
+    if (wagerAmount > 0) {
+      const team = state.settings.teamMode ? teamOf(id) : '';
+      const recipients = team ? Object.keys(state.players).filter(pid => teamOf(pid) === team) : [id];
+      recipients.forEach(pid => { state.players[pid].score -= wagerAmount; });
+      savePlayers();
+      logAction(`-${wagerAmount} ${state.players[id].name} (lost the Daily Double wager)`);
     }
-    // Marks this round as "had a miss" — powers the steal-mechanic bonus if
-    // whoever buzzes in next actually gets it right (see host:awardPoint).
-    if (current) state.roundHadMiss = true;
-    if (current) {
-      const song = currentSong();
-      logAction(`❌ ${current.name} answered wrong${song ? ` on "${song.title}"` : ''}`);
-    }
-    const priorTimerSeconds = state.roundTimer ? state.roundTimer.seconds : 0;
-    state.roundStatus = 'playing';
-    clearRoundTimer();
-    // Also cancel any pending auto-advance — resetBuzzers can fire while
-    // 'revealed' (e.g. the R shortcut hit out of habit), and without this
-    // the countdown pill just silently vanishes with nothing happening,
-    // instead of visibly cancelling.
-    clearAutoAdvance();
-    if (priorTimerSeconds > 0) startRoundTimer(priorTimerSeconds);
+
+    // Steal: wrong answers reopen buzzing for the players who haven't had a
+    // go. Never on a Daily Double (exclusive to one player), and not when
+    // nobody is left who could buzz — the host reveals instead.
+    if (state.settings.stealMechanic && !state.wager && someoneCanStillBuzz()) reopenBuzzing();
     broadcast();
   });
 
@@ -1555,7 +1683,7 @@ io.on('connection', (socket) => {
       // between) getting a point — not just any manual scoreboard tweak
       // elsewhere on the host page.
       const currentBuzzer = state.buzzOrder[state.buzzOrder.length - 1];
-      const isNaturalCorrectAward = delta > 0 && state.roundStatus === 'buzzed' && currentBuzzer && currentBuzzer.id === id;
+      const isNaturalCorrectAward = delta > 0 && state.roundStatus === 'buzzed' && currentBuzzer && currentBuzzer.id === id && !currentBuzzer.verdict;
       // A "steal": this round already had a miss (resetBuzzers fired), and
       // whoever buzzed in after that miss just got it right — bonus point
       // on top of the normal award. Only one bonus per steal opportunity,
@@ -1588,6 +1716,7 @@ io.on('connection', (socket) => {
         saveStats();
       }
 
+      if (isNaturalCorrectAward) currentBuzzer.verdict = 'correct';
       if (isSteal) {
         state.roundHadMiss = false;
         io.to('tv').emit('steal', { name: displayName(state.players[id].name), speedBonus: isSpeedBonus });
@@ -1772,14 +1901,15 @@ io.on('connection', (socket) => {
     if (!state.players[id]) return;
     logAction(`🗑️ ${state.players[id].name} removed from the game`);
     delete state.players[id];
-    const hadBuzzed = state.buzzOrder.some(b => b.id === id);
+    const holdingFloor = state.buzzOrder.length > 0 && state.buzzOrder[state.buzzOrder.length - 1].id === id;
     state.buzzOrder = state.buzzOrder.filter(b => b.id !== id);
     // If the player we removed was the one currently holding the floor,
     // reopen buzzing for whoever's left rather than leaving the round
-    // stuck on a buzz-in that no longer has anyone behind it.
-    if (hadBuzzed && state.roundStatus === 'buzzed' && state.buzzOrder.length === 0) {
-      state.roundStatus = 'playing';
-    }
+    // stuck on a buzz-in that no longer has anyone behind it. (This used to
+    // check "nobody has buzzed at all any more", which missed the case where
+    // earlier — already-wrong — buzzers remain after a steal: the round then
+    // sat on one of THEM as the "current" buzzer, with buzzing closed.)
+    if (holdingFloor && state.roundStatus === 'buzzed') reopenBuzzing();
     savePlayers();
     broadcast();
   });

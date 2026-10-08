@@ -41,6 +41,7 @@ const voteHeadingEl = document.getElementById('vote-heading');
 const voteOptionsTvEl = document.getElementById('vote-options-tv');
 const voteTvStatusEl = document.getElementById('vote-tv-status');
 const joinCountEl = document.getElementById('join-count');
+const buzzedVerdictEl = document.getElementById('buzzed-verdict');
 const headerJoinChipEl = document.getElementById('header-join-chip');
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -336,6 +337,16 @@ setInterval(() => {
   }, 400);
 }, 6000);
 idleHintEl.textContent = t('idleHints', currentLang)[0];
+// The first hint is set before the game's language is known, and a language
+// switch would otherwise leave the old-language hint up until the next
+// rotation 6 seconds later.
+let hintLang = currentLang;
+function refreshIdleHintLanguage() {
+  if (hintLang === currentLang) return;
+  hintLang = currentLang;
+  const hints = t('idleHints', currentLang);
+  idleHintEl.textContent = hints[idleHintIndex % hints.length];
+}
 
 function updateLobby(state) {
   const n = state.players.length;
@@ -364,11 +375,11 @@ function spawnScreenGlow(color) {
   addToStage(glow);
 }
 
-function spawnStamp(text, tags) {
+function spawnStamp(text, tags, kind) {
   const stamp = document.createElement('div');
-  stamp.className = 'correct-stamp';
-  stamp.innerHTML = `<span class="stamp-main">${escapeHtml(text)}</span>` +
-    tags.map(tag => `<span class="stamp-tag">${escapeHtml(tag)}</span>`).join('');
+  stamp.className = 'correct-stamp' + (kind === 'wrong' ? ' wrong' : '');
+  stamp.innerHTML = '<span class="stamp-main">' + escapeHtml(text) + '</span>' +
+    tags.map(tag => '<span class="stamp-tag">' + escapeHtml(tag) + '</span>').join('');
   addToStage(stamp);
 }
 
@@ -440,6 +451,23 @@ function celebrate({ speedBonus } = {}, extraTags = []) {
 
 socket.on('correct', (data) => celebrate(data));
 
+// The host pressed Wrong (or Reset buzzers on an unjudged buzz): a red stamp
+// naming who missed, a low buzzer, and a shake of the buzz-in screen.
+function playWrongSound() {
+  playTones([[196, 0, 0.2], [147, 0.18, 0.4]], 'sawtooth', 0.16);
+}
+socket.on('wrong', ({ name } = {}) => {
+  spawnScreenGlow('rgba(244, 63, 94, 0.42)');
+  spawnStamp(t('wrongStamp', currentLang), name ? [name] : [], 'wrong');
+  playWrongSound();
+  if (!reduceMotion) {
+    overlay.classList.remove('shake');
+    void overlay.offsetWidth;
+    overlay.classList.add('shake');
+  }
+});
+overlay.addEventListener('animationend', (e) => { if (e.animationName === 'verdict-shake') overlay.classList.remove('shake'); });
+
 // Steal mechanic: a wrong answer reopened buzzing, and whoever stole it got
 // it right. The stamp/confetti/chime always play (same baseline as a normal
 // correct answer); the "stole it!" tag on the stamp is the extraAnimations
@@ -496,6 +524,7 @@ function updateBuzzed(state) {
   const buzzed = state.roundStatus === 'buzzed' && state.buzzOrder.length;
   if (!buzzed) {
     buzzTakeoverEl.classList.remove('show');
+    buzzedVerdictEl.hidden = true;
     lastBuzzKey = null;
     return;
   }
@@ -506,6 +535,13 @@ function updateBuzzed(state) {
   const key = latestBuzz.id + ':' + state.buzzOrder.length;
   buzzedTeaseEl.hidden = !latestBuzz.tease;
   buzzedTeaseEl.textContent = latestBuzz.tease || '';
+  // The host's verdict on this buzz (set by the Correct / Wrong buttons) stays
+  // on screen under the name — it updates in place, without replaying the
+  // takeover animation below.
+  const verdict = latestBuzz.verdict;
+  buzzedVerdictEl.hidden = !verdict;
+  buzzedVerdictEl.className = 'verdict ' + (verdict || '');
+  buzzedVerdictEl.textContent = verdict === 'correct' ? t('verdictCorrect', currentLang) : verdict === 'wrong' ? t('verdictWrong', currentLang) : '';
   if (key === lastBuzzKey) return; // re-rendering would restart the entrance animations
   lastBuzzKey = key;
 
@@ -533,12 +569,12 @@ function updatePlayingSubtext(state) {
     return;
   }
   if (!state.roundTimer) {
-    playingSubtext.textContent = t('buzzInPhone', currentLang);
+    playingSubtext.textContent = state.stealOpen ? t('stealOpen', currentLang) : t('buzzInPhone', currentLang);
     playingSubtext.classList.remove('timer-critical');
     return;
   }
   const remaining = Math.max(0, Math.ceil((state.roundTimer.endsAt - Date.now()) / 1000));
-  playingSubtext.textContent = t('buzzInPhoneTimer', currentLang).replace('{s}', remaining);
+  playingSubtext.textContent = state.stealOpen ? t('stealOpen', currentLang) + ' (' + remaining + ')' : t('buzzInPhoneTimer', currentLang).replace('{s}', remaining);
   const critical = fxOn(state) && remaining > 0 && remaining <= TIMER_CRITICAL_SECONDS;
   playingSubtext.classList.toggle('timer-critical', critical);
 }
@@ -582,16 +618,16 @@ function updateAutoAdvanceHint(state) {
 function updateMysteryBanner(state) {
   const active = !!state.mysteryRound && state.roundStatus !== 'idle' && state.roundStatus !== 'results';
   mysteryBannerEl.hidden = !active;
-  if (active) mysteryBannerEl.textContent = `🎭 Mystery Round: ${state.mysteryRound.label}`;
+  if (active) mysteryBannerEl.textContent = t('mysteryRound', currentLang).replace('{label}', t('mystery_' + state.mysteryRound.modifier, currentLang));
 }
 
 // ---- wager round (Daily Double) ----
 function updateWagerBanner(state) {
   const active = !!state.wager && state.wager.amount !== null && state.roundStatus !== 'idle';
   wagerBannerEl.hidden = !active;
-  if (active) wagerBannerEl.textContent = `💰 ${state.wager.playerName || 'They'} wagered ${state.wager.amount}!`;
+  if (active) wagerBannerEl.textContent = t('wagerBanner', currentLang).replace('{name}', state.wager.playerName || t('they', currentLang)).replace('{n}', state.wager.amount);
   if (state.roundStatus === 'wagering' && state.wager) {
-    wageringSubtextEl.textContent = `${state.wager.playerName || 'Someone'} is deciding how much to risk…`;
+    wageringSubtextEl.textContent = t('wagerDeciding', currentLang).replace('{name}', state.wager.playerName || t('someone', currentLang));
   }
 }
 
@@ -635,10 +671,10 @@ function renderCategoryVoteTV(state) {
   if (rebuilt) requestAnimationFrame(apply); else apply();
 
   if (!vote.closed) {
-    voteHeadingEl.textContent = '🗳️ Vote for the next category!';
-    voteTvStatusEl.textContent = `${totalVotes} vote${totalVotes === 1 ? '' : 's'} so far — grab your phone!`;
+    voteHeadingEl.textContent = t('voteHeading', currentLang);
+    voteTvStatusEl.textContent = t(totalVotes === 1 ? 'votesSoFar1' : 'votesSoFarN', currentLang).replace('{n}', totalVotes);
   } else {
-    voteHeadingEl.textContent = `🏆 Winner: ${vote.result}!`;
+    voteHeadingEl.textContent = t('voteWinner', currentLang).replace('{name}', vote.result);
     voteTvStatusEl.textContent = '';
   }
 }
@@ -704,6 +740,16 @@ function fitResultsPanel() {
 }
 window.addEventListener('resize', fitResultsPanel);
 
+// Badge text is built here from the badge's key + raw value (the server sends
+// English labels too, but those can't follow the language toggle).
+function badgeLabel(b) { return t('badge_' + b.key, currentLang); }
+function badgeDetail(b) {
+  if (b.key === 'fastest') return t('badgeFastest', currentLang).replace('{v}', b.value);
+  if (b.key === 'steals') return t(Number(b.value) === 1 ? 'badgeSteals1' : 'badgeStealsN', currentLang).replace('{v}', b.value);
+  if (b.key === 'sharpshooter') return t('badgeCorrect', currentLang).replace('{v}', b.value);
+  return t('badgeComeback', currentLang);
+}
+
 function renderAchievementBadges(state) {
   const badges = state.badges;
   if (!badges || !badges.length) {
@@ -714,7 +760,7 @@ function renderAchievementBadges(state) {
   achievementBadgesEl.innerHTML = badges.map(b => `
     <div class="badge-row">
       <span class="badge-icon">${b.icon}</span>
-      <span class="badge-text"><strong>${escapeHtml(b.label)}</strong> · ${escapeHtml(b.name)} <span class="muted">(${escapeHtml(b.detail)})</span></span>
+      <span class="badge-text"><strong>${escapeHtml(badgeLabel(b))}</strong> · ${escapeHtml(b.name)} <span class="muted">(${escapeHtml(badgeDetail(b))})</span></span>
     </div>
   `).join('');
 }
@@ -727,10 +773,10 @@ function renderSessionStats(state) {
     return;
   }
   if (stats.fastestBuzz) {
-    lines.push(`🏃 Fastest buzz ever: <strong>${escapeHtml(stats.fastestBuzz.name)}</strong> (${(stats.fastestBuzz.ms / 1000).toFixed(2)}s)`);
+    lines.push(t('fastestBuzzEver', currentLang).replace('{name}', '<strong>' + escapeHtml(stats.fastestBuzz.name) + '</strong>').replace('{s}', (stats.fastestBuzz.ms / 1000).toFixed(2)));
   }
   if (stats.mostPointsInRound) {
-    lines.push(`💯 Biggest round ever: <strong>${escapeHtml(stats.mostPointsInRound.name)}</strong> (+${stats.mostPointsInRound.points})`);
+    lines.push(t('biggestRoundEver', currentLang).replace('{name}', '<strong>' + escapeHtml(stats.mostPointsInRound.name) + '</strong>').replace('{n}', stats.mostPointsInRound.points));
   }
   if (!lines.length) {
     sessionStatsEl.hidden = true;
@@ -745,9 +791,16 @@ let lastPlayingSongId = null;
 let wasPaused = false;
 
 socket.on('state', (state) => {
+  // The site files changed since this page loaded (a deploy while it was open):
+  // reload to pick up the new scripts instead of running stale ones.
+  if (state.buildId) {
+    if (window.__buildId && window.__buildId !== state.buildId) { location.reload(); return; }
+    window.__buildId = state.buildId;
+  }
   latestState = state;
   currentLang = state.language || 'en';
   applyTranslations(currentLang);
+  refreshIdleHintLanguage();
   document.documentElement.dataset.theme = state.theme || 'dark';
   document.body.classList.toggle('fx', fxOn(state));
 
@@ -768,7 +821,7 @@ socket.on('state', (state) => {
   }
 
   if (state.roundStatus === 'playing' && state.snippetSeconds > 0) {
-    snippetHintEl.textContent = `🎧 First ${state.snippetSeconds}s only!`;
+    snippetHintEl.textContent = t('snippetHint', currentLang).replace('{s}', state.snippetSeconds);
     snippetHintEl.hidden = false;
   } else {
     snippetHintEl.hidden = true;

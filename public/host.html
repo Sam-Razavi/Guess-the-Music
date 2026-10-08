@@ -72,7 +72,7 @@
           <button id="prev-song-btn" title="Start the previous song in the playlist">⏮ Previous</button>
           <button id="next-song-btn" title="Start the next song in the playlist">⏭ Next</button>
           <button id="reveal-btn" class="primary">Reveal answer</button>
-          <button id="reset-buzzers-btn">Reset buzzers</button>
+          <button id="reset-buzzers-btn" title="Let the other players try — counts the current answer as wrong">Reset buzzers</button>
           <button id="close-round-btn">Close round</button>
           <button id="reveal-hint-btn" hidden>💡 Reveal a letter</button>
         </div>
@@ -161,7 +161,7 @@
         <div class="options-list">
           <label class="option-row">
             <input type="checkbox" data-setting="stealMechanic">
-            <span><strong>Steal mechanic</strong><br><span class="muted small">A wrong answer reopens buzzing to everyone — whoever steals it gets a bonus point.</span></span>
+            <span><strong>Steal mechanic</strong><br><span class="muted small">The ❌ Wrong button reopens buzzing for everyone who has not had a turn — whoever steals it gets a bonus point. With this off, Wrong just shows on the TV and buzzing stays closed (Reset buzzers still lets others try).</span></span>
           </label>
           <label class="option-row">
             <input type="checkbox" data-setting="extraAnimations">

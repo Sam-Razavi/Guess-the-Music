@@ -132,8 +132,8 @@ Tip: pick videos that don't show the song title on screen (plain "official audio
 2. The TV shows a spinning record and starts playing the audio; players' buzzers light up.
 3. First phone to tap **BUZZ** locks the buzzer — their name pops up on the TV.
 4. Judge their answer out loud, then:
-   - **Correct:** hit **+1** next to their name.
-   - **Wrong:** hit **Reset buzzers** so everyone else can jump in again (the player who already went can't buzz twice on the same song).
+   - **✅ Correct:** hit **Correct** next to their name. The TV shows a "Correct!" stamp and the points are added.
+   - **❌ Wrong:** hit **Wrong**. The TV and that player's phone show it. With the **Steal mechanic** option on, buzzing then reopens for everyone who hasn't had a turn (their buzzers say STEAL!, and a correct steal earns a bonus point). With it off, buzzing stays closed — reveal the answer, or hit **Reset buzzers** to let the others try. (A player who already went can't buzz twice on the same song.)
 5. Hit **Reveal answer** to show the real title/artist and video on the TV.
 6. Hit **Close round** and pick the next song.
 
@@ -274,7 +274,7 @@ need to be reachable remotely.
    JOIN_PIN=some-pin-only-you-and-your-friends-know
    ```
    then `pm2 restart guess-the-music`. This gates `host.html` and
-   `player.html` registration only — **the TV screen never asks for a PIN**,
+   `player.html` registration, every host control event, and the server's `/api` routes — **the TV screen never asks for a PIN**,
    since it's a read-only kiosk display with no join/control surface worth
    gating, and the kiosk autostart script has no way to type one in anyway.
    Share the link as `https://your-hostname/player.html?pin=<the-pin>` (or

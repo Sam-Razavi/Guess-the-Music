@@ -5,6 +5,12 @@ const socket = io();
 // should always take precedence over a stale value from a previous game.
 let currentPin = new URLSearchParams(location.search).get('pin') || localStorage.getItem('gtm_pin') || '';
 
+// fetch() for the /api routes — carries the join PIN (if any) so the server's
+// PIN check on /api applies to the host page too.
+function apiFetch(url, opts = {}) {
+  return fetch(url, { ...opts, headers: { ...(opts.headers || {}), 'x-join-pin': currentPin } });
+}
+
 // Re-registering on every 'connect' (not just once at load) matters because
 // Socket.IO fires 'connect' again after any auto-reconnect (network blip,
 // screen lock) — without this, a reconnected socket silently stops
@@ -165,6 +171,10 @@ function syncFiltersFromState(state) {
   difficultyFilter = f.difficulty || 'All';
 }
 
+function matchesSearch(s) {
+  return !searchQuery || s.title.toLowerCase().includes(searchQuery) || (s.artist || '').toLowerCase().includes(searchQuery);
+}
+
 playlistSearchInput.addEventListener('input', () => {
   searchQuery = playlistSearchInput.value.trim().toLowerCase();
   renderLimit = PAGE_SIZE;
@@ -201,6 +211,7 @@ socket.on('state', () => {
 // without silently re-spending quota on every repeated error event for the
 // same song (onError/onStateChange can both fire for one real failure).
 let lastAutoSearchedErrorSongId = null;
+let autoSearchPaused = false; // set once YouTube reports the daily search quota is used up — stop spending requests that can only fail
 
 socket.on('playerStatus', ({ status, message }) => {
   openYoutubeFallbackBtn.hidden = status !== 'error';
@@ -212,7 +223,7 @@ socket.on('playerStatus', ({ status, message }) => {
   if (status === 'error') {
     setPlaybackPill('❌ ' + (message || 'Playback error'), 'error');
     const songId = latestState && latestState.currentSong && latestState.currentSong.id;
-    if (songId && lastAutoSearchedErrorSongId !== songId) {
+    if (songId && lastAutoSearchedErrorSongId !== songId && !autoSearchPaused) {
       lastAutoSearchedErrorSongId = songId;
       runFindReplacement(songId, findReplacementLiveResult);
     }
@@ -233,13 +244,14 @@ openYoutubeFallbackBtn.addEventListener('click', () => socket.emit('host:openOnY
 async function runFindReplacement(songId, containerEl) {
   containerEl.innerHTML = '<p class="muted small">🔍 Searching for a replacement…</p>';
   try {
-    const r = await fetch('/api/find-replacement', {
+    const r = await apiFetch('/api/find-replacement', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: songId }),
     });
     const data = await r.json();
     if (!r.ok) {
+      if (data.code === 'quota') autoSearchPaused = true;
       containerEl.innerHTML = `<p class="muted small">${escapeHtml(data.error || 'Search failed.')}</p>`;
       return;
     }
@@ -417,7 +429,7 @@ importBtn.addEventListener('click', async () => {
   importStatus.textContent = 'Importing…';
   importBtn.disabled = true;
   try {
-    const r = await fetch('/api/import-playlist', {
+    const r = await apiFetch('/api/import-playlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
@@ -451,7 +463,7 @@ checkPlaylistBtn.addEventListener('click', async () => {
   checkPlaylistStatus.textContent = 'Checking…';
   brokenVideosList.innerHTML = '';
   try {
-    const r = await fetch('/api/check-playlist', { method: 'POST' });
+    const r = await apiFetch('/api/check-playlist', { method: 'POST' });
     const data = await r.json();
     if (!r.ok) {
       checkPlaylistStatus.textContent = data.error || 'Check failed.';
@@ -544,7 +556,7 @@ preflightBtn.addEventListener('click', async () => {
   preflightBtn.disabled = true;
   preflightResults.innerHTML = '<p class="muted small">Checking…</p>';
   try {
-    const r = await fetch('/api/preflight', { method: 'POST' });
+    const r = await apiFetch('/api/preflight', { method: 'POST' });
     const data = await r.json();
     preflightResults.innerHTML = `
       <p class="preflight-verdict ${data.ready ? 'ok' : 'bad'}">${data.ready ? '✅ Ready to go!' : '⚠️ Not quite ready'}</p>
@@ -579,19 +591,26 @@ function startRoundWithCurrentOptions(id, wagerPlayerId) {
   socket.emit('host:startRound', payload);
 }
 
-// Next/Previous: jump to the adjacent song in the playlist's current order
-// (not "next unplayed" — this is a quick DJ-style skip control tied to the
-// visible list order the host already controls via drag-to-reorder), same
-// round-start options as the Play button. Wraps around at either end.
+// Next/Previous: jump to the adjacent song in the list as the host currently
+// sees it — the playlist's own order, narrowed by the decade/difficulty/genre
+// chips and the search box (not "next unplayed" — this is a quick DJ-style
+// skip control tied to the visible list order the host controls via drag-to-
+// reorder), same round-start options as the Play button. Wraps around at
+// either end. (It used to step through the WHOLE playlist, so with a filter on
+// "Next" could jump to a song the filter had hidden.)
 // Deliberately never triggers wager mode even for a wager-eligible song —
 // that needs the host to explicitly pick who's wagering via its own picker,
 // which a quick skip button can't do; it just plays normally instead.
 function stepToAdjacentSong(delta) {
   if (!latestState || !latestState.playlist.length) return;
-  const playlist = latestState.playlist;
-  const from = latestState.currentIndex >= 0 ? latestState.currentIndex : (delta > 0 ? -1 : 0);
-  const to = (from + delta + playlist.length) % playlist.length;
-  startRoundWithCurrentOptions(playlist[to].id);
+  const visible = latestState.playlist.filter(s => songMatchesFilters(s) && matchesSearch(s));
+  if (!visible.length) return;
+  const currentId = latestState.currentSong ? latestState.currentSong.id : null;
+  const at = visible.findIndex(s => s.id === currentId);
+  // Nothing playing (or the playing song isn't in the filtered list): Next
+  // starts at the top of the filtered list, Previous at the bottom.
+  const to = at === -1 ? (delta > 0 ? 0 : visible.length - 1) : (at + delta + visible.length) % visible.length;
+  startRoundWithCurrentOptions(visible[to].id);
 }
 prevSongBtn.addEventListener('click', () => stepToAdjacentSong(-1));
 nextSongBtn.addEventListener('click', () => stepToAdjacentSong(1));
@@ -757,20 +776,46 @@ function renderRound(state) {
   const songPoints = state.wager && state.wager.amount != null
     ? state.wager.amount
     : (state.currentSong && state.currentSong.points) || 1;
-  buzzOrderList.innerHTML = state.buzzOrder.map((b, i) => `
+  const lastIdx = state.buzzOrder.length - 1;
+  const wagerOn = !!(state.wager && state.wager.amount != null);
+  buzzOrderList.innerHTML = state.buzzOrder.map((b, i) => {
+    // Only the CURRENT buzz-in (the latest one, still waiting for a verdict)
+    // gets the buttons. Earlier buzzers were judged wrong — that is what
+    // reopened buzzing — and a judged buzz just shows its verdict.
+    const awaitingVerdict = state.roundStatus === 'buzzed' && i === lastIdx && !b.verdict;
+    let right;
+    if (awaitingVerdict) {
+      right = `<div class="actions">
+          <button class="good" data-award="${b.id}:${songPoints}" ${state.paused ? 'disabled' : ''}>✅ Correct +${songPoints}</button>
+          <button class="danger" data-wrong="${b.id}" ${state.paused ? 'disabled' : ''}>❌ Wrong${wagerOn ? ` −${songPoints}` : ''}</button>
+        </div>`;
+    } else if (b.verdict === 'correct') {
+      right = '<span class="verdict-chip ok">✅ Correct</span>';
+    } else {
+      right = '<span class="verdict-chip bad">❌ Wrong</span>';
+    }
+    // Steal is off, so a wrong answer doesn't reopen buzzing by itself — say what to do next.
+    const hint = state.roundStatus === 'buzzed' && i === lastIdx && b.verdict === 'wrong'
+      ? '<div class="verdict-hint muted small">Buzzing stays closed. Reveal the answer, or press Reset buzzers to let the others try.</div>' : '';
+    return `
     <div class="buzz-row">
       <div class="buzz-who"><span class="order">#${i + 1}</span>${avatarHtml(b.name)}<span>${escapeHtml(b.name)}</span>${b.tease ? ` <span class="muted small">${escapeHtml(b.tease)}</span>` : ''}</div>
-      <div class="actions">
-        <button class="good" data-award="${b.id}:${songPoints}" ${state.paused ? 'disabled' : ''}>+${songPoints}</button>
-        <button data-award="${b.id}:${-songPoints}" ${state.paused ? 'disabled' : ''}>-${songPoints}</button>
-      </div>
-    </div>
-  `).join('');
+      ${right}
+      ${hint}
+    </div>`;
+  }).join('');
 
   buzzOrderList.querySelectorAll('[data-award]').forEach(btn => {
     btn.addEventListener('click', () => {
       const [id, delta] = btn.dataset.award.split(':');
+      buzzOrderList.querySelectorAll('button').forEach(b => { b.disabled = true; }); // one verdict per buzz — no double-clicks
       socket.emit('host:awardPoint', { id, delta: Number(delta) });
+    });
+  });
+  buzzOrderList.querySelectorAll('[data-wrong]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      buzzOrderList.querySelectorAll('button').forEach(b => { b.disabled = true; });
+      socket.emit('host:markWrong', { id: btn.dataset.wrong });
     });
   });
 }
@@ -1280,6 +1325,12 @@ function renderAddSongCollapse(state) {
 }
 
 socket.on('state', (state) => {
+  // The site files changed since this page loaded (a deploy while it was open):
+  // reload to pick up the new scripts instead of running stale ones.
+  if (state.buildId) {
+    if (window.__buildId && window.__buildId !== state.buildId) { location.reload(); return; }
+    window.__buildId = state.buildId;
+  }
   latestState = state;
   renderRound(state);
   syncFiltersFromState(state);

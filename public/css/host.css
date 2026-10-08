@@ -616,3 +616,10 @@ body.mc-mode .buzz-row button { font-size: 1.2rem; min-height: 3rem; }
    background, so its backdrop needs to stay light regardless of theme. */
 .join-card img { border-radius: 14px; background: #ffffff; padding: 9px; margin: 0.7rem 0 0.6rem; box-shadow: var(--shadow-md); }
 .join-actions { display: flex; justify-content: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.8rem; }
+
+/* the host's verdict on a buzz-in */
+.verdict-chip { font-weight: 800; font-size: 0.9rem; padding: 0.3em 0.85em; border-radius: 999px; white-space: nowrap; }
+.verdict-chip.ok { color: var(--good); background: rgba(52, 211, 153, 0.14); }
+.verdict-chip.bad { color: var(--bad); background: rgba(244, 63, 94, 0.14); }
+.verdict-hint { flex-basis: 100%; line-height: 1.4; }
+.buzz-row button.good, .buzz-row button.danger { min-width: 0; padding: 0.45em 0.95em; font-size: 1rem; }
