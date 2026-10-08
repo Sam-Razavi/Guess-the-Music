@@ -15,7 +15,10 @@ const MDNS_HOST = 'guess-the-music.local';
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+// perMessageDeflate only above 4KB: a big playlist makes every host-bound
+// state broadcast hundreds of KB of highly repetitive JSON, which compresses
+// ~5-10x; small messages (everything the TV/players get) stay uncompressed.
+const io = new Server(server, { perMessageDeflate: { threshold: 4096 } });
 
 const PORT = process.env.PORT || 3000;
 const PLAYLIST_FILE = path.join(__dirname, 'playlist.json');
@@ -254,6 +257,7 @@ const state = {
   buzzingLocked: canResumeRound ? !!savedRound.buzzingLocked : false, // true once the timer expires with no buzz — host still controls reveal/close
   language: 'en',                 // 'en' | 'fa' — TV/player display language, set by the host
   theme: 'dark',                  // 'dark' | 'light' — TV/player/host display theme, set by the host; same in-memory-only, resets-on-restart treatment as language
+  playFilter: { category: '', decade: '', difficulty: '' }, // narrows which unplayed songs pickNextSong() draws from — mirrors the host's playlist filter chips; '' = no filter on that axis. In-memory only, same as playOrder.
   playOrder: 'sequential',        // 'sequential' | 'random' — order pickNextSong() picks from for auto-advance/host:playNext; same in-memory-only treatment as language/theme. Manually clicking Play on a specific song always ignores this and just plays that song.
   autoAdvance: null,               // {endsAt} | null — pending auto-start of the next unplayed song; doesn't survive a restart, see saveRoundState()
   settings: loadSettings(),       // host-toggleable game options — see DEFAULT_SETTINGS
@@ -315,8 +319,15 @@ function clearAutoAdvance() {
 // 'sequential' — it only ever draws from the unplayed pool. Manually clicking
 // Play/Replay on a specific playlist row bypasses this entirely by design
 // (that's the one place a deliberate repeat is allowed).
+function matchesPlayFilter(song) {
+  const f = state.playFilter;
+  return (!f.category || song.category === f.category)
+    && (!f.decade || song.decade === f.decade)
+    && (!f.difficulty || song.difficulty === f.difficulty);
+}
+
 function pickNextSong() {
-  const unplayed = state.playlist.filter(s => !s.played);
+  const unplayed = state.playlist.filter(s => !s.played && matchesPlayFilter(s));
   if (!unplayed.length) return null;
   if (state.playOrder === 'random') return unplayed[Math.floor(Math.random() * unplayed.length)];
   return unplayed[0];
@@ -540,13 +551,34 @@ function currentSong() {
   return state.currentIndex >= 0 ? state.playlist[state.currentIndex] : null;
 }
 
-function makeSong(youtubeId, title, artist, category) {
+// Optional organizing tags beyond `category` (which doubles as the genre):
+// release year / decade and a host-facing difficulty. Validated here rather
+// than trusted — these arrive from the host UI and from bulk loads alike.
+const DIFFICULTIES = ['easy', 'medium', 'hard'];
+function decadeLabel(year) {
+  return `${Math.floor(year / 10) * 10}s`;
+}
+function sanitizeSongTags({ year, decade, difficulty } = {}) {
+  const out = { year: null, decade: '', difficulty: '' };
+  const y = Math.round(Number(year));
+  if (Number.isFinite(y) && y >= 1900 && y <= 2100) {
+    out.year = y;
+    out.decade = decadeLabel(y);
+  }
+  // An explicit decade only counts when no year was given (a year wins).
+  if (!out.decade && /^(19|20)\d0s$/.test(String(decade || ''))) out.decade = String(decade);
+  if (DIFFICULTIES.includes(difficulty)) out.difficulty = difficulty;
+  return out;
+}
+
+function makeSong(youtubeId, title, artist, category, tags) {
   return {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + Math.random().toString(36).slice(2, 5),
     youtubeId: youtubeId.trim(),
     title: (title || '').trim() || 'Untitled',
     artist: (artist || '').trim(),
     category: (category || '').trim(),
+    ...sanitizeSongTags(tags),
     played: false,
     points: 1,                    // how many points a correct buzz on this song is worth — see host:setSongPoints
     wagerEligible: false,         // host-flagged "Daily Double" song — see host:setWagerEligible
@@ -649,6 +681,7 @@ function payloadFor(role) {
       playlist: state.playlist,
       currentIndex: state.currentIndex,
       playOrder: state.playOrder,
+      playFilter: state.playFilter,
       // "Double points" reuses the points-per-song pipeline exactly — just
       // overriding the runtime value shown/awarded for this one round. The
       // song's own stored points field never changes.
@@ -1165,9 +1198,9 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  socket.on('host:addSong', async ({ youtubeId, title, artist, category }) => {
+  socket.on('host:addSong', async ({ youtubeId, title, artist, category, year, decade, difficulty }) => {
     if (!youtubeId) return;
-    const song = makeSong(youtubeId, title, artist, category);
+    const song = makeSong(youtubeId, title, artist, category, { year, decade, difficulty });
     state.playlist.push(song);
     savePlaylist();
     broadcast();
@@ -1205,9 +1238,9 @@ io.on('connection', (socket) => {
   socket.on('host:addSongs', (songs) => {
     if (!Array.isArray(songs) || !songs.length) return;
     const existingIds = new Set(state.playlist.map(s => s.youtubeId));
-    for (const { youtubeId, title, artist, category } of songs) {
+    for (const { youtubeId, title, artist, category, year, decade, difficulty } of songs) {
       if (!youtubeId || existingIds.has(youtubeId.trim())) continue;
-      const song = makeSong(youtubeId, title, artist, category);
+      const song = makeSong(youtubeId, title, artist, category, { year, decade, difficulty });
       state.playlist.push(song);
       existingIds.add(song.youtubeId);
     }
@@ -1224,6 +1257,28 @@ io.on('connection', (socket) => {
     }
     delete state.knownBroken[id];
     savePlaylist();
+    broadcast();
+  });
+
+  // Click-to-cycle difficulty badge on a playlist row.
+  socket.on('host:setSongDifficulty', ({ id, difficulty }) => {
+    const song = state.playlist.find(s => s.id === id);
+    if (!song || (difficulty !== '' && !DIFFICULTIES.includes(difficulty))) return;
+    song.difficulty = difficulty;
+    savePlaylist();
+    broadcast();
+  });
+
+  // The host's playlist filter chips double as the pool Play next / auto-
+  // advance / random draw from — see matchesPlayFilter().
+  socket.on('host:setPlayFilter', (f) => {
+    if (!f || typeof f !== 'object') return;
+    const text = v => (typeof v === 'string' ? v.slice(0, 60) : '');
+    state.playFilter = {
+      category: text(f.category),
+      decade: /^(19|20)\d0s$/.test(f.decade) ? f.decade : '',
+      difficulty: DIFFICULTIES.includes(f.difficulty) ? f.difficulty : '',
+    };
     broadcast();
   });
 

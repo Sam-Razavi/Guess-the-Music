@@ -110,6 +110,14 @@ Keep this terminal running for the whole game night — closing it stops the gam
 
 On the host page, paste a YouTube link (or just the video ID) plus the title, and add it to the playlist. The title/artist are only ever shown to you — the TV and players never see them until you reveal.
 
+### Decade, genre and difficulty filters
+
+Every song can carry a **genre** (the category tag), a **decade**, and a **difficulty** (easy / medium / hard). The playlist card has a filter row for each, with live counts, and they combine — e.g. *1980s + Easy + Rock* — on top of the search box. The filters also decide what **Play next**, **Random** and auto-advance pick from, so you can run a whole "90s hip-hop, medium" round without hunting through the list. Tap a song's difficulty badge to change it if you disagree with the rating.
+
+A big playlist only renders the first 100 matching songs at a time (**Show more** loads the next page), so it stays fast with thousands of songs.
+
+New songs added through the host page can carry a year (which sets the decade) and a difficulty; imported songs can be tagged the same way. The decade and difficulty values are best-effort estimates, so expect to nudge a few.
+
 Tip: pick videos that don't show the song title on screen (plain "official audio" uploads work great), since the video only stays hidden behind a spinning-record animation *while the round is live* — once you hit **Reveal**, the real video appears.
 
 ## 4. Run a round

@@ -86,6 +86,12 @@ const roundLimitInput = document.getElementById('round-limit-input');
 const prevSongBtn = document.getElementById('prev-song-btn');
 const nextSongBtn = document.getElementById('next-song-btn');
 const categoryFilterEl = document.getElementById('category-filter');
+const decadeFilterEl = document.getElementById('decade-filter');
+const difficultyFilterEl = document.getElementById('difficulty-filter');
+const playPoolHintEl = document.getElementById('play-pool-hint');
+const playlistMoreEl = document.getElementById('playlist-more');
+const playlistMoreBtn = document.getElementById('playlist-more-btn');
+const playlistMoreCountEl = document.getElementById('playlist-more-count');
 const playlistSearchInput = document.getElementById('playlist-search');
 const checkPlaylistBtn = document.getElementById('check-playlist-btn');
 const checkPlaylistStatus = document.getElementById('check-playlist-status');
@@ -121,10 +127,51 @@ const preflightResults = document.getElementById('preflight-results');
 
 let latestState = null;
 let categoryFilter = 'All';
+let decadeFilter = 'All';
+let difficultyFilter = 'All';
 let searchQuery = '';
+let showAllGenres = false;
+// A big playlist (1000+ songs) is far too many rows to rebuild on every
+// state broadcast, so only the first PAGE_SIZE matches render at a time —
+// "Show more" adds another page. Reset whenever the filters/search change.
+const PAGE_SIZE = 100;
+let renderLimit = PAGE_SIZE;
+
+// The filter chips also decide what Play next / auto-advance draw from (see
+// server.js matchesPlayFilter) — so every change is sent to the server, not
+// just applied to this page's own list.
+function currentPlayFilter() {
+  return {
+    category: categoryFilter === 'All' ? '' : categoryFilter,
+    decade: decadeFilter === 'All' ? '' : decadeFilter,
+    difficulty: difficultyFilter === 'All' ? '' : difficultyFilter,
+  };
+}
+function setFilters(patch) {
+  if ('category' in patch) categoryFilter = patch.category;
+  if ('decade' in patch) decadeFilter = patch.decade;
+  if ('difficulty' in patch) difficultyFilter = patch.difficulty;
+  renderLimit = PAGE_SIZE;
+  socket.emit('host:setPlayFilter', currentPlayFilter());
+  renderFilters(latestState);
+  renderPlaylist(latestState);
+}
+// Adopt the server's filter (first load, or another host device changing it).
+function syncFiltersFromState(state) {
+  const f = state.playFilter;
+  if (!f) return;
+  categoryFilter = f.category || 'All';
+  decadeFilter = f.decade || 'All';
+  difficultyFilter = f.difficulty || 'All';
+}
 
 playlistSearchInput.addEventListener('input', () => {
   searchQuery = playlistSearchInput.value.trim().toLowerCase();
+  renderLimit = PAGE_SIZE;
+  renderPlaylist(latestState);
+});
+playlistMoreBtn.addEventListener('click', () => {
+  renderLimit += PAGE_SIZE;
   renderPlaylist(latestState);
 });
 
@@ -708,34 +755,104 @@ function renderRound(state) {
   });
 }
 
-function renderCategoryFilter(state) {
-  const categories = [...new Set(state.playlist.map(s => s.category).filter(Boolean))].sort();
-  if (categoryFilter !== 'All' && !categories.includes(categoryFilter)) categoryFilter = 'All';
-  if (!categories.length) {
-    categoryFilterEl.innerHTML = '';
-    return;
+const DIFFICULTY_LABELS = { easy: '🟢 Easy', medium: '🟡 Medium', hard: '🔴 Hard' };
+const DIFFICULTY_ORDER = ['easy', 'medium', 'hard'];
+const GENRE_CHIP_LIMIT = 14;
+
+function songMatchesFilters(s, skip) {
+  return (skip === 'category' || categoryFilter === 'All' || s.category === categoryFilter)
+    && (skip === 'decade' || decadeFilter === 'All' || s.decade === decadeFilter)
+    && (skip === 'difficulty' || difficultyFilter === 'All' || s.difficulty === difficultyFilter);
+}
+
+// Chip counts are "faceted": each row's counts apply every OTHER active
+// filter, so the numbers always say how many songs you'd get by clicking.
+function facetCounts(playlist, axis, key) {
+  const counts = new Map();
+  for (const s of playlist) {
+    if (!songMatchesFilters(s, axis)) continue;
+    const v = s[key];
+    if (v) counts.set(v, (counts.get(v) || 0) + 1);
   }
-  const chips = ['All', ...categories];
-  categoryFilterEl.innerHTML = chips.map(c => `
-    <button class="${c === categoryFilter ? 'active' : ''}" data-category="${escapeHtml(c)}">${escapeHtml(c)}</button>
+  return counts;
+}
+
+function chipRow(el, attr, items, active, total) {
+  const all = [{ value: 'All', label: 'All', count: total }, ...items];
+  el.innerHTML = all.map(i => `
+    <button class="${i.value === active ? 'active' : ''}" data-${attr}="${escapeHtml(i.value)}">${escapeHtml(i.label)}${i.count != null ? ` <span class="chip-count">${i.count}</span>` : ''}</button>
   `).join('');
-  categoryFilterEl.querySelectorAll('[data-category]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      categoryFilter = btn.dataset.category;
-      renderPlaylist(latestState);
-      renderCategoryFilter(latestState);
-    });
-  });
+  return el;
+}
+
+function renderFilters(state) {
+  const playlist = state.playlist;
+  let reset = false;
+
+  const decades = facetCounts(playlist, 'decade', 'decade');
+  const allDecades = [...new Set(playlist.map(s => s.decade).filter(Boolean))].sort();
+  if (decadeFilter !== 'All' && !allDecades.includes(decadeFilter)) { decadeFilter = 'All'; reset = true; }
+  const decadeTotal = playlist.filter(s => songMatchesFilters(s, 'decade')).length;
+  decadeFilterEl.parentElement.hidden = !allDecades.length;
+  chipRow(decadeFilterEl, 'decade', allDecades.map(d => ({ value: d, label: d, count: decades.get(d) || 0 })), decadeFilter, decadeTotal)
+    .querySelectorAll('[data-decade]').forEach(btn => btn.addEventListener('click', () => setFilters({ decade: btn.dataset.decade })));
+
+  const diffs = facetCounts(playlist, 'difficulty', 'difficulty');
+  const diffTotal = playlist.filter(s => songMatchesFilters(s, 'difficulty')).length;
+  difficultyFilterEl.parentElement.hidden = !playlist.some(s => s.difficulty);
+  chipRow(difficultyFilterEl, 'difficulty', DIFFICULTY_ORDER.map(d => ({ value: d, label: DIFFICULTY_LABELS[d], count: diffs.get(d) || 0 })), difficultyFilter, diffTotal)
+    .querySelectorAll('[data-difficulty]').forEach(btn => btn.addEventListener('click', () => setFilters({ difficulty: btn.dataset.difficulty })));
+
+  const cats = facetCounts(playlist, 'category', 'category');
+  const allCats = [...new Set(playlist.map(s => s.category).filter(Boolean))];
+  if (categoryFilter !== 'All' && !allCats.includes(categoryFilter)) { categoryFilter = 'All'; reset = true; }
+  const catTotal = playlist.filter(s => songMatchesFilters(s, 'category')).length;
+  categoryFilterEl.parentElement.hidden = !allCats.length;
+  // Most-populated genres first; the long tail hides behind "More" so a
+  // playlist with dozens of tags doesn't turn into a wall of chips.
+  let ranked = allCats.map(c => ({ value: c, label: c, count: cats.get(c) || 0 })).sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+  let hiddenCount = 0;
+  if (!showAllGenres && ranked.length > GENRE_CHIP_LIMIT) {
+    const kept = ranked.slice(0, GENRE_CHIP_LIMIT);
+    const active = ranked.find(i => i.value === categoryFilter);
+    if (active && !kept.includes(active)) kept.push(active);
+    hiddenCount = ranked.length - kept.length;
+    ranked = kept;
+  }
+  chipRow(categoryFilterEl, 'category', ranked, categoryFilter, catTotal)
+    .querySelectorAll('[data-category]').forEach(btn => btn.addEventListener('click', () => setFilters({ category: btn.dataset.category })));
+  if (hiddenCount || (showAllGenres && allCats.length > GENRE_CHIP_LIMIT)) {
+    const more = document.createElement('button');
+    more.className = 'chip-more';
+    more.textContent = showAllGenres ? 'Fewer ▴' : `+${hiddenCount} more ▾`;
+    more.addEventListener('click', () => { showAllGenres = !showAllGenres; renderFilters(latestState); });
+    categoryFilterEl.appendChild(more);
+  }
+
+  if (reset) socket.emit('host:setPlayFilter', currentPlayFilter());
+
+  const filtered = categoryFilter !== 'All' || decadeFilter !== 'All' || difficultyFilter !== 'All';
+  const pool = playlist.filter(s => !s.played && songMatchesFilters(s)).length;
+  const unplayed = playlist.filter(s => !s.played).length;
+  playPoolHintEl.hidden = !playlist.length;
+  playPoolHintEl.textContent = filtered
+    ? `🎯 Play next and auto-advance pick from the ${pool} unplayed song${pool === 1 ? '' : 's'} matching these filters.`
+    : `Play next picks from all ${unplayed} unplayed song${unplayed === 1 ? '' : 's'}. Pick a decade, difficulty or genre to narrow it.`;
 }
 
 function renderPlaylist(state) {
   snippetRow.hidden = !(state.settings && state.settings.snippetMode);
   startOffsetRow.hidden = !(state.settings && state.settings.startOffset);
-  let songs = categoryFilter === 'All' ? state.playlist : state.playlist.filter(s => s.category === categoryFilter);
+  let songs = state.playlist.filter(s => songMatchesFilters(s));
   if (searchQuery) {
     songs = songs.filter(s =>
       s.title.toLowerCase().includes(searchQuery) || (s.artist || '').toLowerCase().includes(searchQuery));
   }
+  const totalMatches = songs.length;
+  songs = songs.slice(0, renderLimit);
+  playlistMoreEl.hidden = totalMatches <= songs.length;
+  playlistMoreCountEl.textContent = `Showing ${songs.length} of ${totalMatches}`;
+  playlistMoreBtn.textContent = `Show ${Math.min(PAGE_SIZE, totalMatches - songs.length)} more`;
   const pointValuesOn = state.settings && state.settings.pointValues;
   const wagerRoundOn = state.settings && state.settings.wagerRound;
   playlistList.innerHTML = songs.map(song => {
@@ -760,7 +877,11 @@ function renderPlaylist(state) {
       <div class="info">
         <div class="t">${song.id === state.mysterySongId ? '<span class="mystery-badge" title="This game\'s Mystery Round song — modifier stays secret until it plays">🎭</span> ' : ''}${wagerRoundOn && song.wagerEligible ? '<span title="Daily Double eligible">💰</span> ' : ''}${escapeHtml(song.title)}</div>
         <div class="a">${escapeHtml(song.artist || '')}</div>
-        ${song.category ? `<span class="cat">${escapeHtml(song.category)}</span>` : ''}
+        <div class="tags">
+          ${song.category ? `<span class="cat">${escapeHtml(song.category)}</span>` : ''}
+          ${song.decade ? `<span class="cat decade-tag">${escapeHtml(song.decade)}</span>` : ''}
+          <span class="cat diff-tag diff-${song.difficulty || 'none'}" role="button" tabindex="0" data-difficulty-cycle="${song.id}" title="Click to change difficulty">${song.difficulty ? DIFFICULTY_LABELS[song.difficulty] : '＋ difficulty'}</span>
+        </div>
       </div>
       <div class="actions">
         ${pointValuesOn ? `<input type="number" class="points-input" min="1" step="1" value="${song.points || 1}" data-points="${song.id}" title="Points this song is worth">` : ''}
@@ -774,6 +895,17 @@ function renderPlaylist(state) {
 
   playlistList.querySelectorAll('[data-play]').forEach(btn => {
     btn.addEventListener('click', () => startRoundWithCurrentOptions(btn.dataset.play));
+  });
+  playlistList.querySelectorAll('[data-difficulty-cycle]').forEach(el => {
+    const cycle = () => {
+      const song = latestState.playlist.find(s => s.id === el.dataset.difficultyCycle);
+      if (!song) return;
+      const order = ['', ...DIFFICULTY_ORDER];
+      const next = order[(order.indexOf(song.difficulty || '') + 1) % order.length];
+      socket.emit('host:setSongDifficulty', { id: song.id, difficulty: next });
+    };
+    el.addEventListener('click', cycle);
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycle(); } });
   });
   playlistList.querySelectorAll('[data-wager-start]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -985,9 +1117,7 @@ startVoteBtn.addEventListener('click', () => {
 document.getElementById('close-vote-btn').addEventListener('click', () => socket.emit('host:closeCategoryVote'));
 document.getElementById('apply-vote-filter-btn').addEventListener('click', () => {
   if (!latestState || !latestState.categoryVote || !latestState.categoryVote.result) return;
-  categoryFilter = latestState.categoryVote.result;
-  renderPlaylist(latestState);
-  renderCategoryFilter(latestState);
+  setFilters({ category: latestState.categoryVote.result });
 });
 
 let voteInterval = null;
@@ -1014,10 +1144,19 @@ function renderCategoryVote(state) {
     voteSetupEl.hidden = false;
     voteLiveEl.hidden = true;
     voteResultEl.hidden = true;
-    const available = [...new Set(state.playlist.filter(s => !s.played && s.category).map(s => s.category))].sort();
+    const unplayedCounts = new Map();
+    state.playlist.forEach(s => { if (!s.played && s.category) unplayedCounts.set(s.category, (unplayedCounts.get(s.category) || 0) + 1); });
+    const available = [...unplayedCounts.keys()].sort((a, b) => unplayedCounts.get(b) - unplayedCounts.get(a) || a.localeCompare(b));
+    // A big playlist has dozens of genres — the TV can't show them all as
+    // vote rows. Only the most-populated few start ticked; tick more by hand.
+    const DEFAULT_VOTE_OPTIONS = 6;
+    // Keep whatever the host has already ticked across re-renders (this runs
+    // on every state broadcast) — only the very first render uses the default.
+    const ticked = new Set([...voteCategoryChecksEl.querySelectorAll('input:checked')].map(el => el.value));
+    const hadRows = voteCategoryChecksEl.querySelector('input') !== null;
     voteCategoryChecksEl.innerHTML = available.length
-      ? available.map(c => `
-          <label class="option-row"><input type="checkbox" value="${escapeHtml(c)}" checked><span>${categoryAvatar(c)} ${escapeHtml(c)}</span></label>
+      ? available.map((c, i) => `
+          <label class="option-row"><input type="checkbox" value="${escapeHtml(c)}" ${(hadRows ? ticked.has(c) : i < DEFAULT_VOTE_OPTIONS) ? 'checked' : ''}><span>${categoryAvatar(c)} ${escapeHtml(c)} <span class="muted small">(${unplayedCounts.get(c)})</span></span></label>
         `).join('')
       : `<p class="muted small">Tag at least 2 categories on unplayed songs first.</p>`;
     const notIdle = state.roundStatus !== 'idle';
@@ -1123,7 +1262,8 @@ function renderAddSongCollapse(state) {
 socket.on('state', (state) => {
   latestState = state;
   renderRound(state);
-  renderCategoryFilter(state);
+  syncFiltersFromState(state);
+  renderFilters(state);
   renderPlaylist(state);
   renderScoreboard(state);
   renderLangToggle(state);

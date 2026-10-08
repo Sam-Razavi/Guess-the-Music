@@ -126,13 +126,29 @@
           <input id="start-offset-input" type="number" min="0" step="1" value="0">
         </div>
         <input id="playlist-search" type="text" class="playlist-search" placeholder="🔍 Search songs or artists…">
-        <div id="category-filter" class="category-filter"></div>
+        <div class="filter-group">
+          <span class="filter-label">Decade</span>
+          <div id="decade-filter" class="category-filter"></div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Difficulty</span>
+          <div id="difficulty-filter" class="category-filter"></div>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Genre</span>
+          <div id="category-filter" class="category-filter"></div>
+        </div>
+        <p class="muted small play-pool-hint" id="play-pool-hint"></p>
         <div class="check-playlist-row">
           <button id="check-playlist-btn">🔍 Check for broken videos</button>
           <span class="muted small" id="check-playlist-status"></span>
         </div>
         <div id="broken-videos-list"></div>
         <div id="playlist-list" class="playlist"></div>
+        <div class="playlist-more" id="playlist-more" hidden>
+          <button id="playlist-more-btn">Show more</button>
+          <span class="muted small" id="playlist-more-count"></span>
+        </div>
       </section>
 
       <section class="card">
