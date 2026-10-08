@@ -132,24 +132,25 @@ Everything else works fine without this — the host page just shows a clear err
 
 The same key also powers **"🔁 Find replacement"**, next to any song flagged as non-embeddable (the "Check for broken videos" scan, or the live "❌ Embedding disabled" error during a round). It searches YouTube for a different upload of the same song — often an "Artist - Topic" auto-upload or a lyric video allows embedding even when the official music video doesn't — and lets you swap it in with one click, keeping the song's title/artist/category/points as-is. Each lookup costs about 100 of your daily 10,000 API quota units, so it's a per-song action, not something to run on a whole playlist at once.
 
-### Spotify auto-categories (optional)
+### Auto-categories (optional)
 
-With the "Auto-categories" game option turned on, the host page can suggest
-a category per song (manual add or playlist import) from its artist's genre
-on Spotify. This needs its own free API credentials, separate from YouTube:
+With the "Auto-categories" game option turned on, the host page asks Claude
+(Anthropic's API) to suggest a category per song (manual add or playlist
+import) — whichever of genre, mood, era, or origin/language best
+distinguishes it (e.g. "Rock", "Happy", "80s", "Persian"), not just genre.
+This needs its own API key, separate from YouTube:
 
-1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), log in, and create an app (any name/redirect URI — this only uses the app's client credentials, not a user login).
-2. From the app's Settings page, copy the **Client ID** and **Client Secret**.
-3. Add both to `.env`:
+1. Go to the [Anthropic Console](https://console.anthropic.com/), log in (or create a free account), and open **API Keys**.
+2. Create a new key and copy it.
+3. Add it to `.env`:
    ```
-   SPOTIFY_CLIENT_ID=your-client-id-here
-   SPOTIFY_CLIENT_SECRET=your-client-secret-here
+   ANTHROPIC_API_KEY=your-key-here
    ```
 4. `pm2 restart guess-the-music` so the server picks it up.
 
-Spotify's genre tagging is inconsistent (sparse for many non-Western
-artists), so this is a suggestion the host can always override, not a
-guarantee — and it never overwrites a category you typed yourself. Works
+Each suggestion is one small, cheap request (Claude Haiku, a few cents per
+hundred songs at most) — a convenience the host can always override, never
+a guarantee, and it never overwrites a category you typed yourself. Works
 fine with nothing configured — the setting just won't find any suggestions.
 
 ### Playing from outside your WiFi

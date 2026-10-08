@@ -9,6 +9,7 @@ const { Server } = require('socket.io');
 const QRCode = require('qrcode');
 const { Bonjour } = require('bonjour-service');
 const { exec } = require('child_process');
+const Anthropic = require('@anthropic-ai/sdk');
 
 const MDNS_HOST = 'guess-the-music.local';
 
@@ -707,58 +708,45 @@ function broadcast() {
   io.to('player').emit('state', payloadFor('player'));
 }
 
-// ---------- Spotify auto-categories (optional, like YOUTUBE_API_KEY) ----------
+// ---------- Claude-based auto-categories (optional, like YOUTUBE_API_KEY) ----------
+// Replaced the earlier Spotify-genre version in Phase 19 — Spotify's genre
+// tagging was sparse for non-Western artists anyway, and this needed no
+// OAuth app-registration step, just an API key.
 
-let spotifyTokenCache = { token: null, expiresAt: 0 };
-
-async function getSpotifyToken() {
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-  if (spotifyTokenCache.token && Date.now() < spotifyTokenCache.expiresAt) return spotifyTokenCache.token;
-  try {
-    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const r = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'grant_type=client_credentials',
-    });
-    if (!r.ok) return null;
-    const data = await r.json();
-    spotifyTokenCache = { token: data.access_token, expiresAt: Date.now() + (data.expires_in - 60) * 1000 };
-    return spotifyTokenCache.token;
-  } catch (e) {
-    return null;
-  }
+let anthropicClient = null;
+function getAnthropicClient() {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+  if (!anthropicClient) anthropicClient = new Anthropic({ apiKey });
+  return anthropicClient;
 }
 
-// Best-effort category suggestion from the matched track's artist genre.
-// Fails silently (returns null) on missing config, no match, or any error —
-// this is a convenience only and must never block adding a song or an
-// import. Spotify's genre tagging is inconsistent (sparse for many
-// non-Western artists), so this is "suggested category, host can override",
-// never a guarantee.
+// Best-effort category suggestion from an LLM — deliberately not limited to
+// genre: whichever of genre/mood/era/origin most usefully distinguishes the
+// song is what gets suggested, since a party playlist filter benefits from
+// all of those. Haiku, low effort, thinking off — this is a trivial
+// single-tag classification, not a task that needs reasoning. Fails
+// silently (returns null) on missing config or any error — this is a
+// convenience only and must never block adding a song or an import; always
+// "suggested category, host can override", never a guarantee.
 async function suggestCategory(title, artist) {
-  const token = await getSpotifyToken();
-  if (!token) return null;
+  const client = getAnthropicClient();
+  if (!client) return null;
   try {
-    const q = encodeURIComponent(`track:${title}${artist ? ' artist:' + artist : ''}`);
-    const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${q}&type=track&limit=1`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const song = artist ? `"${title}" by ${artist}` : `"${title}"`;
+    const response = await client.messages.create({
+      model: 'claude-haiku-5-5',
+      max_tokens: 20,
+      thinking: { type: 'disabled' },
+      output_config: { effort: 'low' },
+      messages: [{
+        role: 'user',
+        content: `Suggest ONE short category tag (1-3 words) for the song ${song}, for a party music-guessing game's playlist filter. Pick whichever kind of tag best distinguishes this song — a genre (e.g. "Rock", "Pop"), a mood (e.g. "Happy", "Sad"), an era (e.g. "80s", "90s"), or an origin/language (e.g. "Persian", "Spanish") — whichever is most useful, not necessarily genre. Reply with ONLY the tag itself, no punctuation, no explanation.`,
+      }],
     });
-    if (!searchRes.ok) return null;
-    const searchData = await searchRes.json();
-    const track = searchData.tracks && searchData.tracks.items && searchData.tracks.items[0];
-    const artistId = track && track.artists && track.artists[0] && track.artists[0].id;
-    if (!artistId) return null;
-    const artistRes = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!artistRes.ok) return null;
-    const artistData = await artistRes.json();
-    const genre = artistData.genres && artistData.genres[0];
-    if (!genre) return null;
-    return genre.replace(/\b\w/g, (c) => c.toUpperCase()); // "art pop" -> "Art Pop"
+    const block = response.content.find(b => b.type === 'text');
+    const tag = block && block.text.trim();
+    return tag ? tag.slice(0, 30) : null;
   } catch (e) {
     return null;
   }
@@ -959,8 +947,8 @@ app.post('/api/import-playlist', async (req, res) => {
     const playable = songs.filter(s => embeddable.has(s.youtubeId));
 
     // Auto-category suggestion per song — a small concurrency limit keeps a
-    // big playlist from taking forever while not hammering Spotify's rate
-    // limit. The host's own blanket "Tag these as..." (applied client-side,
+    // big playlist from taking forever while not firing off too many
+    // concurrent API calls at once. The host's own blanket "Tag these as..." (applied client-side,
     // if they used it) still wins over these per-song suggestions.
     if (state.settings.autoCategories) {
       const CONCURRENCY = 5;
