@@ -4,6 +4,58 @@ A local party game: the TV shows the stage, everyone's phone is a buzzer, songs 
 
 It runs from a laptop on your WiFi — nothing to install on the Android TV itself besides its normal browser.
 
+> 🎉 **A fun hobby project.** This is a for-fun side project built for game nights with friends and family — not a polished commercial product. It works well for us, and you're welcome to use it, fork it, or poke around, but expect a few rough edges.
+
+## A tour of the game
+
+Everything below is the real app, captured from a demo game.
+
+### 1. The TV waits for players
+The TV (or any big screen) shows a QR code. Players scan it with their phones to grab a buzzer.
+
+![TV idle screen with QR code to join](docs/screenshots/01-tv-idle.png)
+
+### 2. Players join from their phones
+Type a name and you're in. Everyone shows up on the TV scoreboard right away.
+
+<p>
+  <img src="docs/screenshots/03-player-join.png" width="260" alt="Player join screen" />
+  <img src="docs/screenshots/04-player-ready.png" width="260" alt="Player waiting for the round" />
+</p>
+
+### 3. The host runs the show
+The host page is the control panel: the playlist (search, category filters, drag-to-reorder), the scoreboard, and a list of toggleable game options. Songs can be added one at a time or imported from a YouTube playlist, and with an Anthropic API key the game can [suggest a category for each song automatically](#auto-categories-optional).
+
+![Host control panel](docs/screenshots/02-host-lobby.png)
+
+### 4. A song plays — first to buzz wins the floor
+The song plays through the TV while a spinning record hides the video. The first phone to tap **BUZZ** locks everyone else out and their name takes over the screen.
+
+![TV while a song is playing](docs/screenshots/05-tv-playing.png)
+![TV showing who buzzed in first](docs/screenshots/07-tv-buzzed.png)
+
+The host sees who buzzed and awards (or withholds) the point with one tap.
+
+<p>
+  <img src="docs/screenshots/08-player-buzzed.png" width="260" alt="Player phone after buzzing in" />
+</p>
+
+![Host view with a buzz-in](docs/screenshots/09-host-buzzed.png)
+
+### 5. Correct answer, then the reveal
+A right answer gets confetti and a chime. **Reveal answer** fades the record away to show the real video along with the title and artist.
+
+![TV celebrating a correct answer](docs/screenshots/10-tv-correct.png)
+![TV revealing the song](docs/screenshots/11-tv-reveal.png)
+
+### 6. Final scores
+When the host is done (or a score/round limit is hit), the TV shows the final ranking, with optional achievement badges and all-time records.
+
+![TV final scores](docs/screenshots/12-tv-results.png)
+![Host view at the results screen](docs/screenshots/13-host-results.png)
+
+There's a lot more behind the **Game options** card on the host page — steal mechanic, speed bonus, per-song point values, team mode, blind mode, karaoke-style title hints, a mystery modifier round, category voting, wager rounds, snippet mode, pause, setlist presets, Farsi/English, and more.
+
 > **Running on the always-on TV PC?** The server and kiosk screen already start themselves — see [Windows always-on setup](#windows-always-on-setup) below. You don't need `npm start`; just check `pm2 status`.
 
 ## 1. Install & start

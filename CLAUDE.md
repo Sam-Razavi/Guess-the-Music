@@ -154,3 +154,9 @@ Phase 19 (shipped) — swapped Spotify for Claude in the auto-categories feature
 Next ideas, not yet started:
 
 - More languages — i18n.js's translations object is keyed by language code, so adding a third is mostly copying the 'en'/'fa' block and adding a toggle button in host.html.
+
+Phase 20 (shipped) — README tour + live Auto-categories:
+
+- README now opens with a "fun hobby project" note and a screenshot tour of a full game (TV idle → player join → host panel → buzz → correct/reveal → results), images in `docs/screenshots/`.
+- Screenshots were captured with Playwright against an **isolated demo instance** (scratch dir, port 3999, fake songs/players) so the live game's data was never touched. That copy needed mDNS publishing stubbed out: two instances advertising `guess-the-music.local` at once made the second one crash on a name conflict (real server only runs one instance, so not an issue in production).
+- `ANTHROPIC_API_KEY` configured in `.env`; Auto-categories toggle enabled; the existing 284-song playlist was categorized in one batch (backup kept locally, gitignored). Tags came back dominated by "Persian" (230 of 284) — a finer-grained prompt (era/style) would make the category filter and voting more useful.
