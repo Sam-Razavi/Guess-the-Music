@@ -5,14 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Guess the Music — Host</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/host.css">
 <link rel="manifest" href="/manifest-host.json">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="/logo.svg">
 <link rel="icon" href="/icons/icon-192.png">
-<meta name="theme-color" content="#16121f">
+<meta name="theme-color" content="#0b0814">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -49,7 +50,7 @@
     </header>
 
     <div class="grid">
-      <section class="card">
+      <section class="card round-card">
         <h2>Current round</h2>
         <div class="pill" id="round-status-pill">idle</div>
         <span class="pill" id="playback-pill" hidden></span>
@@ -148,7 +149,7 @@
           </label>
           <label class="option-row">
             <input type="checkbox" data-setting="extraAnimations">
-            <span><strong>Extra animations</strong><br><span class="muted small">Bonus TV flourishes — steal/lead banners, the 3-2-1-GO flash, a cartoon mascot, dancing characters and a bouncing scoreboard between rounds, a disco ball hanging overhead, sweeping laser beams, glowing equalizer bars, bright ambient light, a shimmering reveal title, a glowing winner spotlight, and fireworks on the big moments.</span></span>
+            <span><strong>Extra animations</strong><br><span class="muted small">Bonus TV flourishes on top of the standard animations — a drifting color backdrop, a music visualizer ring around the record, the 3-2-1-GO countdown, a "takes the lead" banner and "stole it!" callout, a rotating sunburst on buzz-ins, a shine across the revealed title, a pulsing timer in the last 5 seconds, a glowing winner, and fireworks on the results screen.</span></span>
           </label>
           <label class="option-row">
             <input type="checkbox" data-setting="speedBonus">

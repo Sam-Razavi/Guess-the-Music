@@ -20,7 +20,14 @@ const pinSubmitBtn = document.getElementById('pin-submit-btn');
 function unlockGate() {
   if (currentPin) localStorage.setItem('gtm_pin', currentPin);
   pinGate.hidden = true;
+  const wasHidden = hostWrap.hidden;
   hostWrap.hidden = false;
+  // The game-options list's expand height is measured at load, while this
+  // whole panel is still display:none behind the gate — which reads as 0px
+  // and leaves the list looking empty. Re-measure once it's actually shown.
+  if (wasHidden && !optionsCollapsed && !document.body.classList.contains('mc-mode')) {
+    optionsListEl.style.maxHeight = measureOptionsHeight() + 'px';
+  }
 }
 // A 'state' broadcast only ever reaches this socket once the server has
 // actually joined it to the 'host' room (see server.js's register handler)
@@ -589,6 +596,7 @@ let prevRoundStatus = null;
 
 function renderRound(state) {
   roundStatusPill.textContent = state.roundStatus;
+  roundStatusPill.dataset.status = state.roundStatus; // color-codes the pill, see host.css
   if (prevRoundStatus !== null && prevRoundStatus !== state.roundStatus) {
     roundStatusPill.classList.add('status-flash');
   }
@@ -684,7 +692,7 @@ function renderRound(state) {
     : (state.currentSong && state.currentSong.points) || 1;
   buzzOrderList.innerHTML = state.buzzOrder.map((b, i) => `
     <div class="buzz-row">
-      <div><span class="order">#${i + 1}</span>${escapeHtml(b.name)}${b.tease ? ` <span class="muted small">${escapeHtml(b.tease)}</span>` : ''}</div>
+      <div class="buzz-who"><span class="order">#${i + 1}</span>${avatarHtml(b.name)}<span>${escapeHtml(b.name)}</span>${b.tease ? ` <span class="muted small">${escapeHtml(b.tease)}</span>` : ''}</div>
       <div class="actions">
         <button class="good" data-award="${b.id}:${songPoints}" ${state.paused ? 'disabled' : ''}>+${songPoints}</button>
         <button data-award="${b.id}:${-songPoints}" ${state.paused ? 'disabled' : ''}>-${songPoints}</button>
@@ -847,7 +855,7 @@ function renderScoreboard(state) {
   hostScoreboard.innerHTML = players.map(p => `
     <div class="score-row">
       <div class="name">
-        <span class="dot ${p.connected ? 'connected' : ''}"></span>${escapeHtml(p.name)}
+        <span class="avatar-wrap">${avatarHtml(p.name)}<span class="dot ${p.connected ? 'connected' : ''}"></span></span><span class="pname">${escapeHtml(p.name)}</span>
         ${teamModeOn && p.team ? `<span class="team-tag">${escapeHtml(p.team)}</span>` : ''}
       </div>
       <div class="actions">

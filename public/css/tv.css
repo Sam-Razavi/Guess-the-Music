@@ -1,4 +1,52 @@
+/* The TV is designed against rem, and rem scales with the screen — the
+   standard broadcast-graphics trick that makes one layout look identical at
+   960x540 (Android TV browser), 1280x720 and 1920x1080: 16px at 720p,
+   24px at 1080p. min() of width and height keeps it from overflowing on
+   unusual aspect ratios. */
+html { font-size: clamp(10px, min(1.25vw, 2.22vh), 40px); }
+body { overflow: hidden; }
+
+/* ---------- Ambient aurora ---------- */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+}
+/* Plain radial gradients rather than filter: blur() — they're already soft
+   at the edges, and a large blur filter is expensive on a TV-class GPU. */
+.aurora-blob.b1 {
+  width: 75vmax; height: 75vmax; top: -35vmax; left: -20vmax;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.42), transparent 62%);
+}
+.aurora-blob.b2 {
+  width: 70vmax; height: 70vmax; bottom: -38vmax; right: -18vmax;
+  background: radial-gradient(circle, rgba(240, 69, 143, 0.3), transparent 62%);
+}
+.aurora-blob.b3 {
+  width: 50vmax; height: 50vmax; top: 18%; left: 30%;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.14), transparent 62%);
+}
+html[data-theme="light"] .aurora-blob.b1 { background: radial-gradient(circle, rgba(139, 92, 246, 0.22), transparent 62%); }
+html[data-theme="light"] .aurora-blob.b2 { background: radial-gradient(circle, rgba(255, 122, 80, 0.2), transparent 62%); }
+html[data-theme="light"] .aurora-blob.b3 { background: radial-gradient(circle, rgba(34, 211, 238, 0.12), transparent 62%); }
+body.fx .aurora-blob.b1 { animation: aurora-a 28s var(--ease-in-out) infinite alternate; }
+body.fx .aurora-blob.b2 { animation: aurora-b 34s var(--ease-in-out) infinite alternate; }
+body.fx .aurora-blob.b3 { animation: aurora-c 40s var(--ease-in-out) infinite alternate; }
+@keyframes aurora-a { to { transform: translate(18vw, 14vh) scale(1.15); } }
+@keyframes aurora-b { to { transform: translate(-16vw, -12vh) scale(1.2); } }
+@keyframes aurora-c { to { transform: translate(-14vw, 10vh) scale(0.85); } }
+
+/* ---------- Frame ---------- */
 .tv-wrap {
+  position: relative;
+  z-index: 1;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -6,12 +54,36 @@
 }
 
 .tv-header {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2rem 3rem 0;
+  padding: 1.4rem 2.4rem 0;
+  min-height: 4.4rem;
 }
-.brand { font-family: var(--font-display); font-size: 1.4rem; letter-spacing: 0.02em; }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+.brand .logo-mark { width: 2.2rem; height: 2.2rem; }
+.header-chip {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.45em 1em;
+  backdrop-filter: blur(10px);
+  animation: fade-up var(--dur-slow) var(--ease-out) both;
+}
+.header-chip strong { color: var(--gold); }
 
 .stage {
   flex: 1;
@@ -22,623 +94,546 @@
   overflow: hidden;
 }
 
+/* ---------- Video ---------- */
 .video-box {
   position: absolute;
-  inset: 8% 20%;
-  border-radius: var(--radius);
+  inset: 9% 16% 5%;
+  border-radius: 1.4rem;
   overflow: hidden;
   background: #000;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
-}
-.video-box iframe, #yt-player { width: 100%; height: 100%; }
-
-.auto-advance-hint {
-  position: absolute;
-  left: 50%;
-  bottom: 3%;
-  transform: translateX(-50%);
-  background: rgba(22, 18, 31, 0.85);
-  /* Fixed, not var(--text-muted) — this chip's own backdrop deliberately
-     stays dark regardless of theme (a floating caption over video content
-     reads fine dark in either), so its text needs to stay light to match,
-     not follow --text-muted into a near-unreadable dark-on-dark in light
-     mode. Same reasoning for #caption-title/#caption-artist and
-     .paused-overlay h1 below. */
-  color: #9c93b0;
-  padding: 0.5em 1.2em;
-  border-radius: 999px;
-  font-size: 1.05rem;
-  z-index: 10;
-}
-.auto-advance-hint:empty { display: none; }
-
-/* ---- cartoon mascot companion (extraAnimations) ---- */
-.mascot {
-  position: absolute;
-  right: 4%;
-  bottom: 4%;
-  z-index: 15;
-  width: 110px;
-  height: 132px;
-  pointer-events: none;
-}
-.mascot-head {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  /* Same recipe as .record (a face on the record, not a separate asset) — see the note there on why the shine streak matters. */
-  background:
-    linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.18) 49%, transparent 58%),
-    repeating-radial-gradient(circle at center, #100c18 0px, #100c18 2px, #1c1628 2px, #1c1628 5px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
-}
-.mascot-face {
-  position: absolute;
-  top: 34%;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 18px;
-}
-.mascot-eye {
-  display: block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--gold);
-  transition: width 0.15s ease, height 0.15s ease;
-}
-.mascot-mouth {
-  position: absolute;
-  top: 58%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 26px;
-  height: 14px;
-  border: 3px solid var(--gold);
-  border-top: none;
-  border-radius: 0 0 20px 20px;
-  transition: all 0.15s ease;
-  box-sizing: border-box;
-}
-.mascot-cheek {
-  position: absolute;
-  top: 50%;
-  width: 10px;
-  height: 7px;
-  border-radius: 50%;
-  background: rgba(255, 107, 91, 0.55);
+  box-shadow: 0 2.5rem 6rem -1.5rem rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  /* Hidden (but still playing audio) until the reveal, so a title burned
+     into the music video can't give the answer away. */
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transform: scale(0.94) translateY(1rem);
+  transition: opacity 0.6s ease, transform 0.9s var(--ease-out);
 }
-.mascot-cheek-l { left: 16%; }
-.mascot-cheek-r { right: 16%; }
+.stage[data-status="revealed"] .video-box { opacity: 1; transform: none; }
+.video-box iframe, #yt-player { width: 100%; height: 100%; display: block; }
 
-.mascot-arm {
-  position: absolute;
-  bottom: 26px;
-  width: 8px;
-  height: 34px;
-  border-radius: 999px;
-  background: var(--gold);
-  transform-origin: top center;
-  transition: transform 0.25s ease;
-}
-.mascot-arm-l { left: 2px; transform: rotate(18deg); }
-.mascot-arm-r { right: 2px; transform: rotate(-18deg); }
-
-/* Triangle apex points up (that's what an uncolored border-top + colored
-   border-bottom on a 0x0 box gives you); base sits at top+26px. Positioned
-   so that base overlaps a little into the head's top curve, like it's
-   actually resting on the head rather than floating above it. */
-.mascot-hat {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%) scale(0);
-  transform-origin: 50% 100%;
-  width: 0;
-  height: 0;
-  border-left: 16px solid transparent;
-  border-right: 16px solid transparent;
-  border-bottom: 26px solid var(--coral);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.mascot-hat::after {
-  content: "";
-  position: absolute;
-  top: -8px;
-  left: -4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--gold);
-}
-
-/* idle (also 'playing', before anyone's buzzed): gentle bob */
-.mascot[data-expression="idle"] { animation: mascot-bob 2.6s ease-in-out infinite; }
-@keyframes mascot-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-/* buzz: eyes go wide, mouth pops into an "o", quick jump */
-.mascot[data-expression="buzz"] .mascot-eye { width: 15px; height: 15px; }
-.mascot[data-expression="buzz"] .mascot-mouth {
-  width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--gold);
-}
-.mascot[data-expression="buzz"] { animation: mascot-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
-@keyframes mascot-pop {
-  0% { transform: translateY(0) scale(1); }
-  40% { transform: translateY(-18px) scale(1.08); }
-  100% { transform: translateY(0) scale(1); }
-}
-
-/* correct / steal: happy squint eyes, big grin, blush, arms raised, hop */
-.mascot[data-expression="correct"] .mascot-eye,
-.mascot[data-expression="results"] .mascot-eye {
-  height: 3px; width: 13px; border-radius: 999px;
-}
-.mascot[data-expression="correct"] .mascot-mouth,
-.mascot[data-expression="results"] .mascot-mouth {
-  width: 34px; height: 18px; border-radius: 0 0 26px 26px; border-width: 4px;
-}
-.mascot[data-expression="correct"] .mascot-cheek,
-.mascot[data-expression="results"] .mascot-cheek { opacity: 1; }
-.mascot[data-expression="correct"] .mascot-arm-l,
-.mascot[data-expression="results"] .mascot-arm-l { transform: rotate(-130deg); }
-.mascot[data-expression="correct"] .mascot-arm-r,
-.mascot[data-expression="results"] .mascot-arm-r { transform: rotate(130deg); }
-.mascot[data-expression="correct"] { animation: mascot-cheer 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
-@keyframes mascot-cheer {
-  0% { transform: translateY(0) rotate(0deg); }
-  30% { transform: translateY(-22px) rotate(-6deg); }
-  60% { transform: translateY(-4px) rotate(6deg); }
-  100% { transform: translateY(0) rotate(0deg); }
-}
-
-/* wrong (a resetBuzzers just reopened buzzing after a miss): frown, droopy arms, sad wobble */
-.mascot[data-expression="wrong"] .mascot-mouth {
-  border: 3px solid var(--gold); border-bottom: none; border-top: 3px solid var(--gold);
-  border-radius: 20px 20px 0 0; top: 62%; height: 10px;
-}
-.mascot[data-expression="wrong"] .mascot-arm-l { transform: rotate(35deg); }
-.mascot[data-expression="wrong"] .mascot-arm-r { transform: rotate(-35deg); }
-.mascot[data-expression="wrong"] { animation: mascot-wobble 0.5s ease; }
-@keyframes mascot-wobble {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-8deg); }
-  75% { transform: rotate(8deg); }
-}
-
-/* results: party hat on, gentle celebratory sway */
-.mascot[data-expression="results"] .mascot-hat { transform: translateX(-50%) scale(1) rotate(-8deg); }
-.mascot[data-expression="results"] { animation: mascot-sway 1.4s ease-in-out infinite; }
-@keyframes mascot-sway {
-  0%, 100% { transform: rotate(-4deg); }
-  50% { transform: rotate(4deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mascot, .mascot[data-expression] { animation: none; }
-}
-
-/* ---- disco ball (extraAnimations) ---- hangs from the top, off-center
-   (not dead-center or a screen corner) so it stays clear of the reveal
-   caption (top:4%, centered) and the mystery/wager banners (top:4%, the
-   4% corners) without needing to hide or move for either. Rotating the
-   whole element (string included, via transform-origin at the string's own
-   attachment point) for a real pendulum swing reads as more "hanging
-   object" than the old up/down bob ever did. */
-.disco-ball {
-  position: absolute;
-  top: 3%;
-  left: 22%;
-  z-index: 15;
-  width: 72px;
-  height: 72px;
-  pointer-events: none;
-  transform-origin: top center;
-  animation: disco-swing 3.6s ease-in-out infinite;
-}
-.disco-ball::before {
-  content: "";
-  position: absolute;
-  top: -24px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2px;
-  height: 24px;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.5));
-}
-@keyframes disco-swing {
-  0%, 100% { transform: rotate(-7deg); }
-  50% { transform: rotate(7deg); }
-}
-.disco-ball-sphere {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  /* A tiled facet grid (two crossed repeating-linear-gradients) over a
-     metallic sphere shade. Animating background-position (not transform:
-     rotate on the element) makes individual facets slide past and catch
-     the light, instead of the whole circle just spinning uniformly — same
-     reasoning as the record's diagonal shine streak elsewhere on this page. */
-  background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.5) 0 3px, transparent 3px 9px),
-    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.3) 0 3px, transparent 3px 9px),
-    radial-gradient(circle at 35% 30%, #f4f5ff, #c3c5da 45%, #8d8fa6 100%);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5), 0 0 30px rgba(245, 185, 66, 0.25);
-  animation: disco-spin 5s linear infinite;
-}
-@keyframes disco-spin {
-  from { background-position: 0 0, 0 0, 0 0; }
-  to { background-position: 70px 0, -70px 0, 0 0; }
-}
-/* A soft downward cone of colored light, like the ball is actually casting
-   it — the single biggest thing that reads as "bright" rather than "a
-   spinning gray ball with a few dots on it". */
-.disco-ball-glow {
-  position: absolute;
-  top: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 260px;
-  height: 260px;
-  clip-path: polygon(46% 0%, 54% 0%, 100% 100%, 0% 100%);
-  background: conic-gradient(from 200deg at 50% 0%, var(--gold), var(--coral), var(--good), var(--gold));
-  opacity: 0.14;
-  mix-blend-mode: screen;
-  animation: disco-glow-pulse 3.2s ease-in-out infinite;
-}
-@keyframes disco-glow-pulse {
-  0%, 100% { opacity: 0.1; }
-  50% { opacity: 0.2; }
-}
-.disco-sparkle {
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 10px 3px rgba(255, 255, 255, 0.9);
-  opacity: 0;
-  animation: disco-sparkle 2.2s ease-in-out infinite;
-}
-.disco-sparkle.s1 { top: 6%; left: -14px; animation-delay: 0s; }
-.disco-sparkle.s2 { top: 55%; right: -16px; animation-delay: 0.7s; }
-.disco-sparkle.s3 { bottom: -6px; left: 45%; animation-delay: 1.4s; }
-@keyframes disco-sparkle {
-  0%, 100% { opacity: 0; transform: scale(0.6); }
-  50% { opacity: 1; transform: scale(1.3); }
-}
-/* A brief extra flourish for a correct answer / steal / results — faster
-   spin/swing, bigger sparkle pulse, brighter glow — triggered alongside the
-   existing confetti/chime at those same moments (see tv.js). */
-.disco-ball.celebrate { animation-duration: 1s; }
-.disco-ball.celebrate .disco-ball-sphere { animation-duration: 1.2s; }
-.disco-ball.celebrate .disco-sparkle { animation-duration: 0.6s; }
-.disco-ball.celebrate .disco-ball-glow { opacity: 0.28; animation-duration: 0.8s; }
-@media (prefers-reduced-motion: reduce) {
-  .disco-ball, .disco-ball-sphere, .disco-sparkle, .disco-ball-glow { animation: none; }
-}
-
-/* ---- equalizer bars (extraAnimations) ---- flank the video in its own
-   20%-margin side gutters (see .video-box's inset: 8% 20%), only while a
-   song is actually audibly playing (playing/buzzed/revealed — silent
-   during idle/results). Not real audio analysis (a YouTube iframe embed
-   is cross-origin, so its audio is unreachable via Web Audio API) — a
-   lively randomized bounce standing in for one. */
-.equalizer {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 12;
-  display: flex;
-  align-items: flex-end;
-  gap: 7px;
-  height: 90px;
-  pointer-events: none;
-}
-.equalizer-left { left: 5%; }
-.equalizer-right { right: 5%; }
-.equalizer span {
-  width: 9px;
-  border-radius: 4px 4px 0 0;
-  background: linear-gradient(180deg, var(--gold), var(--coral));
-  box-shadow: 0 0 10px rgba(245, 185, 66, 0.5);
-}
-/* Each bar gets its own duration/delay/peak-height keyframe so the row
-   bounces unevenly rather than all in lockstep — that unevenness is most
-   of what sells it as "reactive" rather than a metronome. */
-.equalizer span:nth-child(1) { height: 20%; animation: eq-bounce-a 0.8s ease-in-out infinite; animation-delay: 0s; }
-.equalizer span:nth-child(2) { height: 20%; animation: eq-bounce-b 1.1s ease-in-out infinite; animation-delay: 0.15s; }
-.equalizer span:nth-child(3) { height: 20%; animation: eq-bounce-c 0.6s ease-in-out infinite; animation-delay: 0.05s; }
-.equalizer span:nth-child(4) { height: 20%; animation: eq-bounce-a 0.95s ease-in-out infinite; animation-delay: 0.3s; }
-.equalizer span:nth-child(5) { height: 20%; animation: eq-bounce-b 0.7s ease-in-out infinite; animation-delay: 0.2s; }
-@keyframes eq-bounce-a {
-  0%, 100% { height: 18%; }
-  50% { height: 95%; }
-}
-@keyframes eq-bounce-b {
-  0%, 100% { height: 25%; }
-  40% { height: 60%; }
-  70% { height: 100%; }
-}
-@keyframes eq-bounce-c {
-  0%, 100% { height: 15%; }
-  30% { height: 70%; }
-  60% { height: 40%; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .equalizer span { animation: none; height: 40%; }
-}
-
-/* ---- ambient glow (extraAnimations) ---- replaces an earlier, busier
-   "rotating spotlight beam" version — this is deliberately calmer: two
-   large, very soft blurred pools of color that slowly drift and breathe
-   behind the video, more like premium ambient stage wash than a searchlight
-   sweep. Pure background atmosphere: low opacity, negative z-index, never
-   over anything that needs reading. */
-.ambient-glow {
+/* ---------- Overlay + panels ---------- */
+.overlay {
   position: absolute;
   inset: 0;
-  /* Negative, not a small positive number: .video-box has no z-index of its
-     own (auto), and an auto-z-index positioned sibling still paints above
-     an earlier-in-DOM positive-z-index one in that later stacking phase —
-     negative is the only way to guarantee this stays behind it. */
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-.glow-pool {
-  position: absolute;
-  width: 45vw;
-  height: 45vw;
-  border-radius: 50%;
-  filter: blur(55px);
-  opacity: 0.24;
-  mix-blend-mode: screen;
-  animation: glow-drift 22s ease-in-out infinite;
-}
-.glow-pool-1 { background: var(--gold); top: -10%; left: -8%; animation-duration: 20s; }
-.glow-pool-2 { background: var(--coral); bottom: -14%; right: -10%; animation-duration: 26s; animation-delay: -8s; }
-.glow-pool-3 { background: var(--good); top: 30%; left: 38%; width: 30vw; height: 30vw; opacity: 0.16; animation-duration: 32s; animation-delay: -15s; }
-@keyframes glow-drift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(6%, 4%) scale(1.2); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .glow-pool { animation: none; }
-}
-
-/* ---- laser beams (extraAnimations) ---- thin club-style beams pivoting
-   from just above the top edge, sweeping at different speeds/phases so they
-   cross rather than move in lockstep. Same negative-z-index layer as the
-   ambient glow (behind the video, in its own margins), so a real "laser
-   show" feel never actually crosses over the video or any readable text. */
-.laser-beams {
-  position: absolute;
-  inset: 0;
-  z-index: -1; /* same reasoning as .ambient-glow: negative, not a small positive, to guarantee it stays behind .video-box (which has no z-index of its own) */
-  overflow: hidden;
-  pointer-events: none;
-}
-.laser-beam {
-  position: absolute;
-  top: -8%;
-  width: 3px;
-  height: 130%;
-  transform-origin: top center;
-  opacity: 0.4;
-  mix-blend-mode: screen;
-  animation: laser-sweep ease-in-out infinite;
-}
-.laser-beam-1 { left: 8%; background: linear-gradient(180deg, var(--gold), transparent 75%); animation-duration: 4.5s; }
-.laser-beam-2 { left: 28%; background: linear-gradient(180deg, var(--coral), transparent 75%); animation-duration: 5.5s; animation-delay: -1.5s; animation-direction: reverse; }
-.laser-beam-3 { right: 24%; background: linear-gradient(180deg, var(--good), transparent 75%); animation-duration: 6s; animation-delay: -3s; }
-.laser-beam-4 { right: 6%; background: linear-gradient(180deg, var(--gold), transparent 75%); animation-duration: 5s; animation-delay: -2s; animation-direction: reverse; }
-@keyframes laser-sweep {
-  0%, 100% { transform: rotate(-22deg); }
-  50% { transform: rotate(22deg); }
-}
-/* A brief brighter, faster sweep for a correct answer/steal/results,
-   triggered alongside the disco ball's own celebrate burst (see tv.js) —
-   ties the two effects together as one "the lights are going off" moment. */
-.laser-beams.celebrate .laser-beam { opacity: 0.7; animation-duration: 0.9s !important; }
-@media (prefers-reduced-motion: reduce) {
-  .laser-beam { animation: none; }
-}
-
-/* ---- party light orbs (extraAnimations) ---- soft bokeh lights drifting
-   up the far side edges, spawned one at a time in tv.js (same pattern as
-   the idle screen's floating musical notes) — deliberately abstract rather
-   than literal little dancing figures, and kept well outside the video-
-   box's own margins so it can never collide with centered panel content
-   (the join QR code in particular) regardless of that content's height.
-   Only during 'idle' and 'results' — the actual party moments. */
-.party-orb {
-  position: absolute;
-  bottom: 6%;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  filter: blur(1px);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 6;
-  box-shadow: 0 0 18px 4px currentColor;
-  animation: party-orb-rise 6s ease-in forwards;
-}
-@keyframes party-orb-rise {
-  0% { transform: translateY(0) scale(0.6); opacity: 0; }
-  12% { opacity: 0.85; }
-  85% { opacity: 0.5; }
-  100% { transform: translateY(-70vh) scale(1); opacity: 0; }
-}
-
-/* ---- groove dancers (extraAnimations) ---- 2 chunky rounded party-goers,
-   not literal stick figures — same gradient language as the mascot/disco
-   ball (rounded shapes, gold-to-coral fills) so they read as "designed"
-   rather than clip-art. Only during 'idle'/'results' (see tv.js), same
-   far-edge placement as the party orbs so nothing here can ever collide
-   with the centered join QR regardless of panel content height. */
-.groove-dancer {
-  position: absolute;
-  bottom: 4%;
-  width: 46px;
-  height: 84px;
-  pointer-events: none;
-  z-index: 11;
-  animation: groove-bounce 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-.groove-dancer-left { left: 13%; }
-.groove-dancer-right { right: 13%; animation-delay: -0.55s; } /* offset so the two don't move in perfect unison */
-@keyframes groove-bounce {
-  0%, 100% { transform: translateY(0) rotate(-4deg); }
-  50% { transform: translateY(-14px) rotate(4deg); }
-}
-/* A soft ground glow that pulses opposite the bounce (dips as the dancer
-   lifts, brightens as they land) — grounds the character and reads as a
-   little dance-floor spotlight underfoot. */
-.groove-spot {
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 44px;
-  height: 12px;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at center, var(--gold), transparent 70%);
-  opacity: 0.35;
-  filter: blur(2px);
-  animation: groove-spot-pulse 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-@keyframes groove-spot-pulse {
-  0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
-  50% { opacity: 0.2; transform: translateX(-50%) scale(0.75); }
-}
-.groove-body {
-  position: absolute;
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 30px;
-  height: 40px;
-  border-radius: 15px;
-  background: linear-gradient(160deg, var(--coral), var(--gold));
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
-}
-.groove-head {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: linear-gradient(160deg, var(--gold), var(--coral));
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.5s ease;
 }
-.groove-eye { width: 3px; height: 3px; border-radius: 50%; background: #21170a; }
-.groove-leg {
-  position: absolute;
-  bottom: 0;
-  width: 7px;
-  height: 18px;
-  border-radius: 4px;
-  background: var(--coral);
-  transform-origin: top center;
-  animation-duration: 1.1s;
-  animation-iteration-count: infinite;
-  animation-timing-function: ease-in-out;
-}
-.groove-leg-l { left: 9px; animation-name: groove-leg-l; }
-.groove-leg-r { right: 9px; animation-name: groove-leg-r; }
-@keyframes groove-leg-l { 0%, 100% { transform: rotate(14deg); } 50% { transform: rotate(-14deg); } }
-@keyframes groove-leg-r { 0%, 100% { transform: rotate(-14deg); } 50% { transform: rotate(14deg); } }
-.groove-arm {
-  position: absolute;
-  top: 32px;
-  width: 6px;
-  height: 26px;
-  border-radius: 999px;
-  background: var(--gold);
-  transform-origin: top center;
-  animation-duration: 1.1s;
-  animation-iteration-count: infinite;
-  animation-timing-function: ease-in-out;
-}
-.groove-arm-l { left: 3px; animation-name: groove-arm-l; }
-.groove-arm-r { right: 3px; animation-name: groove-arm-r; }
-@keyframes groove-arm-l { 0%, 100% { transform: rotate(-65deg); } 50% { transform: rotate(25deg); } }
-@keyframes groove-arm-r { 0%, 100% { transform: rotate(65deg); } 50% { transform: rotate(-25deg); } }
-/* The right-hand dancer's whole body is delayed (see .groove-dancer-right
-   above) — its limbs need the same delay or they'd fall out of sync with
-   their own body's bounce. */
-.groove-dancer-right .groove-spot,
-.groove-dancer-right .groove-leg,
-.groove-dancer-right .groove-arm { animation-delay: -0.55s; }
-@media (prefers-reduced-motion: reduce) {
-  .groove-dancer, .groove-spot, .groove-leg, .groove-arm { animation: none; }
-}
+.overlay.hide { opacity: 0; pointer-events: none; }
 
-/* ---- fireworks (extraAnimations) ---- a bigger flourish than confetti,
-   reserved for the results screen: a few soft-glowing bursts rather than
-   the more cartoonish sharp confetti-style dots this started as. Each
-   particle's actual end offset (--tx/--ty) is computed in JS with plain
-   Math.cos/sin and set as inline custom properties — deliberately not
-   CSS's own trig functions in calc(), which are recent enough not to bet a
-   kiosk deployment on. */
-.firework-particle {
-  position: fixed;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  z-index: 55;
-  pointer-events: none;
-  box-shadow: 0 0 12px 4px currentColor;
-  animation: firework-burst 1.3s ease-out forwards;
+.panel {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  max-width: 92%;
+  /* CSS animations restart automatically whenever an element goes from
+     display:none (the `hidden` attribute) to visible — so every panel
+     switch gets this entrance with no JS re-triggering. */
+  animation: panel-enter var(--dur-slow) var(--ease-out) both;
 }
-@keyframes firework-burst {
-  0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(var(--tx), calc(var(--ty) + 50px)) scale(0.2); opacity: 0; }
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateY(1.6rem) scale(0.98); }
+  to { opacity: 1; transform: none; }
 }
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(0.8rem); }
+  to { opacity: 1; transform: none; }
+}
+.panel h1 { font-size: 3rem; max-width: 20ch; }
+.panel p { font-size: 1.3rem; }
+/* Children, not .panel itself — .panel's entrance animation holds its own
+   opacity (fill-mode both), which would override a plain declaration. */
+.stage.counting #panel-playing > * { opacity: 0.12; transition: opacity 0.3s ease; }
+#panel-playing > * { transition: opacity 0.5s ease; }
 
-/* ---- correct-answer light pulse (extraAnimations) ---- a clean expanding
-   ring from center, replacing an earlier "crossing lasers" version — reuses
-   the exact same scale+fade ring technique already established for the
-   buzzed-panel's own shockwave (#panel-buzzed h1::after), just bigger, so
-   it reads as part of the same design language instead of a new one. */
-.correct-pulse {
+/* ---------- Record + visualizer ring ---------- */
+.record-stage {
+  position: relative;
+  width: 17rem;
+  height: 17rem;
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.4rem;
+}
+.record-stage .record { width: 12.5rem; height: 12.5rem; }
+.record-stage-sm { width: 11rem; height: 11rem; }
+.record-stage-sm .record { width: 8rem; height: 8rem; }
+
+.viz-ring { position: absolute; inset: 0; }
+/* Each bar is a center-anchored arm rotated into place (tv.js builds them);
+   only its outer tip is painted, and that tip grows outward. Not real
+   audio analysis — a cross-origin YouTube embed's audio can't be tapped —
+   but staggered random timings read as reactive rather than mechanical. */
+.viz-bar {
   position: absolute;
-  top: 50%;
   left: 50%;
-  width: 10px;
-  height: 10px;
-  margin: -5px 0 0 -5px;
-  border-radius: 50%;
-  border: 3px solid var(--gold);
-  z-index: 42;
-  pointer-events: none;
-  animation: correct-pulse-expand 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  top: 50%;
+  width: 0.32rem;
+  height: 50%;
+  margin-left: -0.16rem;
+  transform-origin: 50% 0;
+  transform: rotate(var(--r));
 }
-@keyframes correct-pulse-expand {
-  0% { width: 10px; height: 10px; margin: -5px 0 0 -5px; opacity: 0.9; border-width: 4px; }
-  100% { width: 70vmin; height: 70vmin; margin: -35vmin 0 0 -35vmin; opacity: 0; border-width: 1px; }
+.viz-bar i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22%;
+  border-radius: 999px;
+  background: linear-gradient(0deg, #ffc24b, #f0458f);
+  transform-origin: 50% 0;
+  transform: scaleY(0.25);
+  opacity: 0.55;
 }
-@media (prefers-reduced-motion: reduce) {
-  .firework-particle, .correct-pulse { display: none; }
+.record-stage-sm .viz-bar i { height: 18%; opacity: 0.35; }
+body.fx .stage[data-status="playing"] .viz-bar i {
+  animation: viz-bounce var(--t, 0.9s) var(--ease-in-out) var(--d, 0s) infinite alternate;
+  opacity: 0.9;
+}
+body.fx .stage[data-status="idle"] .viz-bar i {
+  animation: viz-bounce calc(var(--t, 0.9s) * 3) var(--ease-in-out) var(--d, 0s) infinite alternate;
+}
+@keyframes viz-bounce {
+  from { transform: scaleY(0.2); }
+  to { transform: scaleY(1); }
 }
 
+/* Round-timer ring hugging the record's edge. */
+.timer-ring {
+  position: absolute;
+  width: 14rem;
+  height: 14rem;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.timer-track { fill: none; stroke: rgba(255, 255, 255, 0.1); stroke-width: 2.2; }
+.timer-progress {
+  fill: none;
+  stroke: #ffc24b;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 0;
+  filter: drop-shadow(0 0 4px rgba(255, 194, 75, 0.7));
+  transition: stroke 0.3s ease;
+}
+.timer-ring.critical .timer-progress { stroke: #f43f5e; filter: drop-shadow(0 0 6px rgba(244, 63, 94, 0.9)); }
+
+/* ---------- Lobby (idle) ---------- */
+.lobby { display: flex; flex-direction: column; align-items: center; gap: 1.6rem; }
+.lobby-hero { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; }
+.lobby h1 { font-size: 2.6rem; }
+#idle-hint { font-size: 1.15rem; min-height: 1.4em; transition: opacity 0.4s ease, transform 0.4s var(--ease-out); }
+#idle-hint.swap { opacity: 0; transform: translateY(0.4rem); }
+
+.join-card {
+  display: flex;
+  align-items: center;
+  gap: 1.8rem;
+  padding: 1.1rem 2rem 1.1rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1.6rem;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: fade-up 0.8s var(--ease-out) 0.15s both;
+}
+/* Fixed white — the generated QR PNG is dark modules on a transparent
+   background, so its backdrop must stay light in either theme. */
+.qr-frame { background: #ffffff; padding: 0.55rem; border-radius: 1rem; line-height: 0; }
+#qr { width: 9rem; height: 9rem; display: block; }
+.join-text { display: flex; flex-direction: column; gap: 0.35rem; text-align: start; }
+.join-title { font-family: var(--font-display); font-weight: 700; font-size: 1.5rem !important; color: var(--text); }
+.join-url { font-size: 1.05rem !important; font-weight: 700; color: var(--gold); text-align: start; }
+html[dir="rtl"] .join-url { text-align: end; }
+.join-count {
+  align-self: flex-start;
+  margin-top: 0.35rem;
+  font-size: 0.95rem !important;
+  font-weight: 700;
+  color: var(--good);
+  background: rgba(52, 211, 153, 0.12);
+  border-radius: 999px;
+  padding: 0.25em 0.8em;
+}
+
+/* ---------- Playing ---------- */
+#playing-subtext { font-weight: 600; }
+#playing-subtext.timer-critical { color: var(--bad); font-weight: 800; animation: subtext-pulse 0.5s ease-in-out infinite; }
+@keyframes subtext-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+#hint-text {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  font-size: 1.7rem;
+  color: var(--gold);
+  max-width: 26ch;
+}
+.tag-chip {
+  font-size: 1rem !important;
+  font-weight: 700;
+  color: var(--gold);
+  background: rgba(255, 194, 75, 0.12);
+  border: 1px solid rgba(255, 194, 75, 0.3);
+  border-radius: 999px;
+  padding: 0.3em 0.9em;
+}
+
+/* ---------- Wagering ---------- */
+.wager-title {
+  font-size: 4rem !important;
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ---------- Buzzed: full-stage takeover ---------- */
+/* Fixed to the viewport (not the stage) so the color flood and rays run
+   edge to edge behind the header and scoreboard too, instead of stopping in
+   a hard line at the stage's top edge. */
+.buzz-takeover {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+.buzz-takeover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(55% 65% at 50% 42%, var(--p1, #8b5cf6) 0%, transparent 70%),
+    radial-gradient(40% 50% at 72% 75%, var(--p2, #22d3ee) 0%, transparent 70%),
+    radial-gradient(40% 50% at 25% 70%, var(--p2, #22d3ee) 0%, transparent 70%);
+  opacity: 0.5;
+}
+.buzz-takeover.show {
+  opacity: 1;
+  visibility: visible;
+  animation: takeover-in 0.75s var(--ease-out) both;
+}
+@keyframes takeover-in {
+  from { clip-path: circle(0% at 50% 42%); }
+  to { clip-path: circle(140% at 50% 42%); }
+}
+.sunburst {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 240vmax;
+  height: 240vmax;
+  margin: -120vmax 0 0 -120vmax;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.06) 0deg 6deg, transparent 6deg 15deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 32%);
+  mask-image: radial-gradient(circle, #000 0%, transparent 32%);
+}
+body.fx .sunburst { animation: spin 80s linear infinite; }
+
+.buzzed-avatar { position: relative; margin-bottom: 0.4rem; }
+.buzzed-avatar .avatar {
+  font-size: 3.2rem;
+  box-shadow: 0 0 0 0.45rem rgba(255, 255, 255, 0.1), 0 1.5rem 4rem -0.5rem var(--a1);
+  animation: avatar-pop 0.7s var(--ease-spring) 0.1s both;
+}
+.buzzed-avatar::before,
+.buzzed-avatar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 0.2rem solid rgba(255, 255, 255, 0.55);
+  animation: ring-out 1.6s var(--ease-out) 0.3s infinite;
+}
+.buzzed-avatar::after { animation-delay: 1.1s; }
+@keyframes avatar-pop {
+  from { transform: scale(0.2) rotate(-20deg); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes ring-out {
+  from { transform: scale(1); opacity: 0.8; }
+  to { transform: scale(2.3); opacity: 0; }
+}
+
+#buzzed-name {
+  font-size: var(--name-size, 5.5rem);
+  font-weight: 800;
+  line-height: 1.05;
+  max-width: 16ch;
+  color: #fff;
+  text-shadow: 0 0.3rem 2.5rem rgba(0, 0, 0, 0.35);
+  overflow-wrap: anywhere;
+}
+html[data-theme="light"] #buzzed-name { color: var(--text); text-shadow: none; }
+#buzzed-name .ch {
+  display: inline-block;
+  white-space: pre;
+  animation: letter-rise 0.65s var(--ease-spring) both;
+  animation-delay: calc(var(--i) * 40ms + 0.2s);
+}
+#buzzed-name.whole { animation: letter-rise 0.7s var(--ease-spring) 0.2s both; }
+@keyframes letter-rise {
+  from { opacity: 0; transform: translateY(0.6em) rotate(6deg) scale(0.8); }
+  to { opacity: 1; transform: none; }
+}
+.buzzed-sub {
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 1.3rem !important;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text) !important;
+  opacity: 0.85;
+  animation: fade-up 0.6s var(--ease-out) 0.55s both;
+}
+html[dir="rtl"] .buzzed-sub { letter-spacing: 0; }
+#buzzed-tease { font-size: 1.05rem; opacity: 0.8; font-style: italic; }
+
+/* ---------- Correct stamp ---------- */
+.correct-stamp {
+  position: absolute;
+  left: 50%;
+  top: 20%;
+  z-index: 46;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: stamp-life 2.2s var(--ease-out) forwards;
+}
+.correct-stamp .stamp-main {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 3.4rem;
+  color: #03241a;
+  background: linear-gradient(135deg, #6ee7b7, #34d399 50%, #10b981);
+  padding: 0.25em 0.8em;
+  border-radius: 1.2rem;
+  box-shadow: 0 1.5rem 4rem -1rem rgba(16, 185, 129, 0.8), inset 0 2px 0 rgba(255, 255, 255, 0.5);
+  transform: rotate(-4deg);
+}
+.correct-stamp .stamp-tag {
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: #1d0f05;
+  background: #ffc24b;
+  border-radius: 999px;
+  padding: 0.25em 0.9em;
+}
+@keyframes stamp-life {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(2.2); }
+  14% { opacity: 1; transform: translate(-50%, -50%) scale(0.94); }
+  22% { transform: translate(-50%, -50%) scale(1); }
+  82% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -60%) scale(0.96); }
+}
+.screen-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: radial-gradient(60% 60% at 50% 45%, var(--glow, rgba(52, 211, 153, 0.35)), transparent 70%);
+  animation: screen-glow 1.1s ease-out forwards;
+}
+@keyframes screen-glow {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ---------- Slab banners (steal / takes the lead) ---------- */
+/* "Takes the lead" sits just above the scoreboard it's about, clear of the
+   Correct! stamp, which usually fires at the same moment. */
+.slab {
+  position: absolute;
+  left: 50%;
+  bottom: 3%;
+  z-index: 45;
+  pointer-events: none;
+  transform: translateX(-50%) skewX(-10deg);
+  padding: 0.55em 1.6em;
+  border-radius: 0.6rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.9rem;
+  white-space: nowrap;
+  color: var(--on-accent);
+  background: var(--grad-brand);
+  box-shadow: 0 1.5rem 3.5rem -1rem rgba(240, 69, 143, 0.7);
+  animation: slab-life 2.6s var(--ease-out) forwards;
+}
+.slab > span { display: inline-block; transform: skewX(10deg); }
+@keyframes slab-life {
+  0% { clip-path: inset(0 100% 0 0); opacity: 1; }
+  14% { clip-path: inset(0 0 0 0); }
+  84% { clip-path: inset(0 0 0 0); opacity: 1; }
+  100% { clip-path: inset(0 0 0 100%); opacity: 0.8; }
+}
+
+/* ---------- 3-2-1-GO ---------- */
+.go-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 46;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.go-num {
+  grid-area: 1 / 1;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 10rem;
+  line-height: 1;
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0.6rem 2rem rgba(240, 69, 143, 0.5));
+  animation: go-pop 0.5s var(--ease-out) both;
+}
+.go-ring {
+  grid-area: 1 / 1;
+  width: 14rem;
+  height: 14rem;
+  border-radius: 50%;
+  border: 0.3rem solid rgba(255, 194, 75, 0.8);
+  animation: ring-out 0.6s var(--ease-out) both;
+}
+@keyframes go-pop {
+  0% { opacity: 0; transform: scale(1.8); }
+  35% { opacity: 1; transform: scale(1); }
+  80% { opacity: 1; transform: scale(0.96); }
+  100% { opacity: 0; transform: scale(0.85); }
+}
+
+/* ---------- Reveal: broadcast lower-third ---------- */
+.reveal-caption {
+  position: absolute;
+  left: calc(16% + 1.4rem);
+  bottom: calc(5% + 1.4rem);
+  z-index: 10;
+  display: flex;
+  align-items: stretch;
+  max-width: calc(68% - 2.8rem);
+  border-radius: 0.9rem;
+  overflow: hidden;
+  /* Fixed dark backdrop regardless of theme — it floats over video. */
+  background: rgba(11, 8, 20, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 1.2rem 3rem -0.8rem rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: lt-in 0.75s var(--ease-out) 0.35s both;
+}
+html[dir="rtl"] .reveal-caption { left: auto; right: calc(16% + 1.4rem); }
+.lt-bar { width: 0.45rem; flex-shrink: 0; background: var(--grad-brand); }
+.lt-body { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.8rem 1.6rem 0.95rem 1.2rem; min-width: 0; }
+.lt-body > * { animation: fade-up 0.6s var(--ease-out) both; }
+.lt-label {
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #ffc24b;
+  animation-delay: 0.6s !important;
+}
+html[dir="rtl"] .lt-label { letter-spacing: 0; }
+#caption-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2.1rem;
+  line-height: 1.15;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation-delay: 0.7s;
+}
+#caption-artist { font-size: 1.2rem; font-weight: 600; color: #cfc6ec; animation-delay: 0.8s; }
+#caption-artist:empty { display: none; }
+@keyframes lt-in {
+  from { clip-path: inset(0 100% 0 0); transform: translateX(-1rem); }
+  to { clip-path: inset(0 0 0 0); transform: none; }
+}
+html[dir="rtl"] .reveal-caption { animation-name: lt-in-rtl; }
+@keyframes lt-in-rtl {
+  from { clip-path: inset(0 0 0 100%); transform: translateX(1rem); }
+  to { clip-path: inset(0 0 0 0); transform: none; }
+}
+/* One-shot shine across the title (extraAnimations only). */
+body.fx #caption-title.shimmer {
+  background: linear-gradient(110deg, #fff 40%, #ffc24b 50%, #fff 60%);
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: fade-up 0.6s var(--ease-out) 0.7s both, title-shimmer 1.6s ease-out 1.1s both;
+}
+@keyframes title-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -20% 0; }
+}
+
+#reveal-title { color: var(--gold); }
+
+.auto-advance-hint {
+  position: absolute;
+  top: calc(9% + 1rem);
+  right: calc(16% + 1rem);
+  z-index: 10;
+  margin: 0;
+  /* Fixed colors — this chip floats over video in either theme. */
+  background: rgba(11, 8, 20, 0.78);
+  color: #e9e3fb;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.45em 1.1em;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1rem;
+  backdrop-filter: blur(10px);
+  animation: fade-up var(--dur) var(--ease-out) both;
+}
+html[dir="rtl"] .auto-advance-hint { right: auto; left: calc(16% + 1rem); }
+.auto-advance-hint:empty { display: none; }
+
+/* ---------- Corner chips (mystery / wager) ---------- */
+.corner-chip {
+  position: absolute;
+  top: 0.4rem;
+  z-index: 10;
+  background: rgba(11, 8, 20, 0.72);
+  border: 1px solid rgba(255, 194, 75, 0.45);
+  color: #ffc24b;
+  font-weight: 800;
+  font-size: 1.05rem;
+  padding: 0.5em 1.15em;
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 2rem -0.6rem rgba(255, 194, 75, 0.5);
+  animation: chip-in 0.6s var(--ease-spring) both;
+}
+.mystery-banner { left: 2.4rem; }
+.wager-banner { right: 2.4rem; }
+@keyframes chip-in {
+  from { opacity: 0; transform: translateY(-0.8rem) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Paused ---------- */
 .paused-overlay {
   position: absolute;
   inset: 0;
@@ -647,449 +642,252 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.2rem;
-  background: rgba(22, 18, 31, 0.94);
-  color: #f4efe6; /* fixed, not inherited --text — see the .auto-advance-hint comment above */
+  gap: 2rem;
+  background: rgba(11, 8, 20, 0.8);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  color: #f6f2ff; /* fixed — dark backdrop in either theme */
   text-align: center;
+  animation: fade-in 0.4s ease both;
 }
-.paused-overlay h1 { font-size: 2.2rem; max-width: 20ch; }
-
-.mystery-banner {
-  position: absolute;
-  left: 4%;
-  top: 4%;
-  z-index: 10;
-  background: rgba(245, 185, 66, 0.15);
-  border: 1px solid rgba(245, 185, 66, 0.4);
-  color: var(--gold);
-  font-weight: 700;
-  font-size: 1.1rem;
-  padding: 0.5em 1.2em;
-  border-radius: 999px;
+.paused-overlay h1 { font-size: 2.4rem; max-width: 20ch; }
+.pause-glyph { display: flex; gap: 1.4rem; animation: breathe 2.4s var(--ease-in-out) infinite; }
+.pause-glyph span { width: 1.6rem; height: 6rem; border-radius: 0.6rem; background: var(--grad-brand); box-shadow: 0 0 3rem -0.5rem rgba(255, 122, 80, 0.7); }
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.92); opacity: 0.75; }
 }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
-.wager-banner {
-  position: absolute;
-  right: 4%;
-  top: 4%;
-  z-index: 10;
-  background: rgba(245, 185, 66, 0.15);
-  border: 1px solid rgba(245, 185, 66, 0.4);
-  color: var(--gold);
-  font-weight: 700;
-  font-size: 1.1rem;
-  padding: 0.5em 1.2em;
-  border-radius: 999px;
-}
-
-.vote-options-tv { display: flex; flex-direction: column; gap: 0.6rem; margin: 1rem 0; min-width: 320px; }
+/* ---------- Category vote ---------- */
+.vote-panel { display: flex; flex-direction: column; align-items: center; gap: 1.1rem; width: min(46rem, 80vw); }
+.vote-panel h2 { font-size: 2.2rem; }
+.vote-options-tv { width: 100%; display: flex; flex-direction: column; gap: 0.6rem; }
 .vote-option-tv {
+  --pct: 0%;
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.9rem;
+  gap: 1rem;
+  padding: 0.6rem 1.3rem 0.6rem 0.7rem;
   background: var(--surface);
-  border-radius: 12px;
-  padding: 0.5em 1em;
-  font-size: 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  overflow: hidden;
+  font-size: 1.3rem;
+  font-weight: 700;
+  animation: fade-up 0.5s var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
 }
+.vote-option-tv::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--pct);
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.4), rgba(34, 211, 238, 0.25));
+  transition: width 0.7s var(--ease-out);
+}
+.vote-option-tv > * { position: relative; }
 .vote-avatar {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.2em;
-  height: 2.2em;
+  width: 2.4rem;
+  height: 2.4rem;
   flex-shrink: 0;
   border-radius: 50%;
-  background: rgba(245, 185, 66, 0.15);
+  background: rgba(255, 255, 255, 0.1);
   font-size: 1.3rem;
 }
 .vote-option-tv .vote-name { flex: 1; text-align: start; }
-.vote-option-tv .count { color: var(--gold); font-weight: 700; }
-.vote-option-tv.winner { box-shadow: 0 0 0 2px var(--gold) inset; }
-.vote-option-tv.winner .vote-avatar { background: var(--gold); }
-
-.reveal-caption {
-  position: absolute;
-  left: 50%;
-  top: 4%;
-  transform: translateX(-50%);
-  z-index: 10;
-  background: rgba(22, 18, 31, 0.85);
-  padding: 0.5em 1.4em;
-  border-radius: 999px;
-  font-family: var(--font-fun);
-  font-size: 1.4rem;
-  white-space: nowrap;
-  animation: caption-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-#caption-title { color: #f5b942; font-weight: 600; } /* fixed, not var(--gold) — see the .auto-advance-hint comment near the top of this file */
-#caption-artist { color: #9c93b0; font-size: 0.85em; }
-#caption-artist:not(:empty)::before { content: " — "; }
-@keyframes caption-pop {
-  0% { transform: translateX(-50%) scale(0.85); opacity: 0; }
-  100% { transform: translateX(-50%) scale(1); opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .reveal-caption { animation: none; }
+.vote-option-tv .count { font-family: var(--font-display); color: var(--gold); font-weight: 800; font-variant-numeric: tabular-nums; }
+.vote-option-tv.winner { border-color: rgba(255, 194, 75, 0.7); box-shadow: 0 0 2.5rem -0.6rem rgba(255, 194, 75, 0.6); animation: winner-pop 0.6s var(--ease-spring) both; }
+.vote-option-tv.winner::before { background: linear-gradient(90deg, rgba(255, 194, 75, 0.5), rgba(255, 122, 80, 0.3)); }
+.vote-option-tv.loser { opacity: 0.45; }
+@keyframes winner-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+  100% { transform: scale(1.02); }
 }
 
-.overlay {
-  position: absolute;
-  inset: 0;
+/* ---------- Results / podium ---------- */
+.stage[data-status="results"] ~ .scoreboard { visibility: hidden; }
+#panel-results { gap: 0.7rem; }
+#panel-results h1 { font-size: 2.6rem; }
+.results { display: flex; flex-direction: column; align-items: center; gap: 1.1rem; width: min(62rem, 90vw); margin-top: 0.4rem; }
+.podium { display: flex; align-items: flex-end; justify-content: center; gap: 1rem; }
+.podium-slot { --h: 6rem; width: 12.5rem; display: flex; flex-direction: column; align-items: center; }
+.podium-slot.place-1 { --h: 9rem; width: 14rem; }
+.podium-slot.place-2 { --h: 6.3rem; }
+.podium-slot.place-3 { --h: 4.4rem; }
+.podium-player {
   display: flex;
+  flex-direction: column;
   align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.7rem;
+  max-width: 100%;
+  animation: podium-player-in 0.7s var(--ease-spring) both;
+  animation-delay: calc(var(--d) + 0.45s);
+}
+.podium-player .avatar { font-size: 1.9rem; }
+.place-1 .podium-player .avatar { font-size: 2.5rem; box-shadow: 0 0 0 0.3rem rgba(255, 194, 75, 0.5), 0 1rem 3rem -0.5rem rgba(255, 194, 75, 0.7); }
+.podium-crown { font-size: 2.2rem; line-height: 1; margin-bottom: -0.2rem; animation: crown-drop 0.8s var(--ease-spring) both; animation-delay: calc(var(--d) + 0.9s); }
+.podium-name { font-weight: 800; font-size: 1.2rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.podium-score { font-family: var(--font-display); font-weight: 800; font-size: 1.35rem; color: var(--gold); font-variant-numeric: tabular-nums; }
+.podium-block {
+  width: 100%;
+  height: var(--h);
+  border-radius: 1rem 1rem 0.4rem 0.4rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border);
+  border-bottom: none;
+  display: flex;
   justify-content: center;
-  background: var(--bg);
-  transition: opacity 0.5s ease;
+  padding-top: 0.5rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2.4rem;
+  color: rgba(255, 255, 255, 0.5);
+  transform-origin: 50% 100%;
+  animation: block-grow 0.75s var(--ease-out) both;
+  animation-delay: var(--d);
 }
-.overlay.hide {
-  opacity: 0;
-  pointer-events: none;
+html[data-theme="light"] .podium-block { color: rgba(40, 20, 80, 0.4); }
+.place-1 .podium-block {
+  background: linear-gradient(180deg, rgba(255, 194, 75, 0.65), rgba(255, 122, 80, 0.12));
+  border-color: rgba(255, 194, 75, 0.5);
+  color: #fff;
+  box-shadow: 0 0 4rem -0.8rem rgba(255, 194, 75, 0.65);
 }
-
-.panel { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.9rem; }
-.panel h1 { font-size: 3.2rem; max-width: 18ch; }
-.panel p { font-size: 1.3rem; }
-
-#buzzed-tease { font-size: 1rem; opacity: 0.75; font-style: italic; }
-
-#reveal-title, #reveal-artist { font-family: var(--font-fun); }
-#reveal-title { color: var(--gold); }
-/* A bright diagonal shine sweeps across the title once as it appears — a
-   common "unveiling" touch in real broadcast graphics packages, and
-   deliberately a ONE-SHOT (animation, not infinite) so it doesn't compete
-   with actually reading the answer afterward. Only under the
-   extraAnimations toggle (like every other flourish here) — added via a
-   class in tv.js rather than unconditionally, so the plain solid-gold
-   #reveal-title above stays the reliable fallback whenever it's off. */
-#reveal-title.shimmer {
-  background: linear-gradient(110deg, var(--gold) 40%, #fff 50%, var(--gold) 60%);
-  background-size: 250% 100%;
-  background-position: 100% 0;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: title-shimmer 1.4s ease-out 0.15s;
+.place-2 .podium-block { background: linear-gradient(180deg, rgba(196, 210, 235, 0.4), rgba(196, 210, 235, 0.06)); }
+.place-3 .podium-block { background: linear-gradient(180deg, rgba(232, 150, 96, 0.42), rgba(232, 150, 96, 0.06)); }
+@keyframes block-grow {
+  from { transform: scaleY(0); opacity: 0; }
+  to { transform: scaleY(1); opacity: 1; }
 }
-@keyframes title-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -20% 0; }
+@keyframes podium-player-in {
+  from { opacity: 0; transform: translateY(-2.2rem) scale(0.7); }
+  to { opacity: 1; transform: none; }
 }
-@media (prefers-reduced-motion: reduce) {
-  #reveal-title.shimmer { animation: none; background-position: -20% 0; }
+@keyframes crown-drop {
+  from { opacity: 0; transform: translateY(-2rem) rotate(-25deg) scale(0.5); }
+  to { opacity: 1; transform: rotate(-8deg); }
+}
+body.fx .place-1 .podium-player .avatar { animation: winner-glow 2.4s var(--ease-in-out) 2.4s infinite; }
+@keyframes winner-glow {
+  0%, 100% { box-shadow: 0 0 0 0.3rem rgba(255, 194, 75, 0.5), 0 1rem 3rem -0.5rem rgba(255, 194, 75, 0.7); }
+  50% { box-shadow: 0 0 0 0.5rem rgba(255, 194, 75, 0.35), 0 1rem 4.5rem 0 rgba(255, 194, 75, 0.85); }
 }
 
-#snippet-hint { color: var(--gold); font-size: 1.05rem; }
-
-#hint-text {
-  font-family: var(--font-fun);
-  letter-spacing: 0.15em;
-  font-size: 1.6rem;
-  color: var(--gold);
-  max-width: 24ch;
-}
-
-.record {
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  /* The groove pattern alone is perfectly rotationally symmetric, so
-     spinning it shows no visible motion — the diagonal shine streak is
-     what actually sells the rotation as it sweeps around. */
-  background:
-    linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.16) 49%, transparent 58%),
-    repeating-radial-gradient(circle at center, #100c18 0px, #100c18 2px, #1c1628 2px, #1c1628 5px);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-  position: relative;
-  margin-bottom: 0.5rem;
-}
-.record::after {
-  content: "";
-  position: absolute;
-  inset: 38%;
-  border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 0 5px var(--bg) inset;
-}
-.record::before {
-  content: "";
-  position: absolute;
-  inset: 47%;
-  border-radius: 50%;
-  background: var(--bg);
-  z-index: 1;
-}
-
-#panel-buzzed h1 { color: var(--gold); font-size: 4rem; position: relative; }
-#panel-buzzed h1::after {
-  content: "";
-  position: absolute;
-  inset: -25% -12%;
-  border: 3px solid var(--gold);
-  border-radius: 999px;
-  opacity: 0;
-  animation: buzz-shockwave 0.6s ease-out;
-}
-@keyframes buzz-shockwave {
-  0% { transform: scale(0.7); opacity: 0.8; }
-  100% { transform: scale(1.5); opacity: 0; }
-}
-
-.buzz-flash {
-  position: absolute;
-  inset: 0;
-  background: var(--gold);
-  opacity: 0;
-  z-index: 40;
-  pointer-events: none;
-  animation: buzz-flash 0.4s ease-out;
-}
-@keyframes buzz-flash {
-  0% { opacity: 0.35; }
-  100% { opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  #panel-buzzed h1::after { animation: none; }
-  .buzz-flash { display: none; }
-}
-
-/* Every panel switch gets the same entrance treatment — CSS animations
-   restart automatically whenever an element goes from display:none (via
-   the `hidden` attribute) to visible, so this needs no JS re-triggering. */
-.panel { animation: panel-enter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
-@keyframes panel-enter {
-  0% { transform: scale(0.92); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .panel { animation: none; }
-  #playing-subtext.timer-critical { animation: none; }
-}
-
-/* Fixed white, not var(--text) — the generated QR PNG itself is dark
-   modules on a transparent background (see server.js's QRCode.toBuffer
-   call), so its backdrop needs to stay light regardless of theme or the
-   dark modules would vanish against a dark backdrop in light mode. */
-#qr { border-radius: 12px; background: #ffffff; padding: 10px; }
-
-#idle-hint { min-height: 1.4em; transition: opacity 0.4s ease; }
-
-#overlay:has(#panel-idle:not([hidden]))::before {
-  content: "";
-  position: absolute;
-  inset: -10%;
-  z-index: -1;
-  background:
-    radial-gradient(circle at 30% 20%, rgba(245, 185, 66, 0.10), transparent 45%),
-    radial-gradient(circle at 70% 80%, rgba(255, 107, 91, 0.08), transparent 45%);
-  animation: idle-drift 18s ease-in-out infinite alternate;
-}
-@keyframes idle-drift {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(3%, -3%) scale(1.08); }
-}
-@media (prefers-reduced-motion: reduce) {
-  #overlay::before { animation: none; }
-}
-
-.idle-note {
-  position: absolute;
-  bottom: 8%;
-  font-size: 1.6rem;
-  color: rgba(245, 185, 66, 0.5);
-  pointer-events: none;
-  z-index: 5;
-  animation: idle-note-float linear forwards;
-}
-@keyframes idle-note-float {
-  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
-  15% { opacity: 0.8; }
-  100% { transform: translateY(-65vh) rotate(20deg); opacity: 0; }
-}
-
-#playing-subtext.timer-critical {
-  color: var(--bad);
-  font-weight: 700;
-  animation: subtext-pulse 0.5s ease-in-out infinite;
-}
-@keyframes subtext-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.12); }
-}
-
-.go-flash {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 46;
-  font-family: var(--font-fun);
-  font-weight: 700;
-  font-size: 5rem;
-  color: var(--gold);
-  text-shadow: 0 0 30px rgba(245, 185, 66, 0.6);
-  pointer-events: none;
-}
-.go-flash.go-flash-pop { animation: go-flash-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
-@keyframes go-flash-pop {
-  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
-  40% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
-  100% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
-}
-
-.lead-banner {
-  position: absolute;
-  left: 50%;
-  top: 22%;
-  transform: translate(-50%, -50%);
-  z-index: 45;
-  background: linear-gradient(135deg, var(--gold), #ffe27a);
-  color: #21170a;
-  font-family: var(--font-fun);
-  font-weight: 700;
-  font-size: 1.8rem;
-  padding: 0.5em 1.2em;
-  border-radius: 999px;
-  white-space: nowrap;
-  pointer-events: none;
-  animation: steal-banner-pop 1.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-.steal-banner {
-  position: absolute;
-  left: 50%;
-  top: 30%;
-  transform: translate(-50%, -50%);
-  z-index: 45;
-  background: linear-gradient(135deg, var(--coral), var(--gold));
-  color: #21170a;
-  font-family: var(--font-fun);
-  font-weight: 700;
-  font-size: 2.2rem;
-  padding: 0.5em 1.2em;
-  border-radius: 999px;
-  white-space: nowrap;
-  pointer-events: none;
-  animation: steal-banner-pop 1.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-@keyframes steal-banner-pop {
-  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
-  15% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
-  25% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-  85% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-  100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0; }
-}
-
-.confetti-piece {
-  position: fixed;
-  top: -20px;
-  width: 10px;
-  height: 16px;
-  z-index: 50;
-  pointer-events: none;
-  animation: confetti-fall linear forwards;
-}
-@keyframes confetti-fall {
-  to { transform: translateY(110vh) rotate(540deg); opacity: 0.3; }
-}
-
-.results-list {
+.results-rest { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 0.7rem; width: 100%; }
+.rest-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 0.6rem;
-  min-width: 320px;
-  max-width: 90vw;
-}
-.results-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  padding: 0.35rem 1rem 0.35rem 0.4rem;
   background: var(--surface);
-  border-radius: 12px;
-  padding: 0.7em 1.2em;
-  font-size: 1.3rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  animation: fade-up 0.5s var(--ease-out) both;
+  animation-delay: calc(2.2s + var(--i, 0) * 70ms);
 }
-.results-row.first { box-shadow: 0 0 0 2px var(--gold) inset; }
-/* Winner glow (extraAnimations) — a slow pulsing gold halo around the #1
-   row specifically, applied as its own class from tv.js rather than
-   unconditionally, so results still look complete and correct with
-   extraAnimations off (just the plain inset ring above, no pulse). */
-.results-row.first.winner-glow { animation: winner-glow-pulse 2.2s ease-in-out infinite; }
-@keyframes winner-glow-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px var(--gold) inset, 0 0 18px 2px rgba(245, 185, 66, 0.35); }
-  50% { box-shadow: 0 0 0 2px var(--gold) inset, 0 0 34px 8px rgba(245, 185, 66, 0.55); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .results-row.first.winner-glow { animation: none; }
-}
-.results-row .rank { color: var(--text-muted); width: 2ch; }
-.results-row .rname { flex: 1; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.results-row .rscore { color: var(--gold); font-weight: 700; }
+.rest-row .rank { color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 1.6ch; text-align: center; }
+.rest-row .avatar { font-size: 0.85rem; }
+.rest-row .rscore { font-family: var(--font-display); color: var(--gold); }
+.results-empty { font-size: 1.3rem; }
 
-.achievement-badges {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 1.2rem;
-  min-width: 320px;
-}
+.results-extras { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; animation: fade-up 0.6s var(--ease-out) 2.6s both; }
+.achievement-badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; max-width: 64rem; }
 .badge-row {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
-  background: rgba(245, 185, 66, 0.1);
-  border-radius: 10px;
-  padding: 0.5em 0.9em;
-  font-size: 1.05rem;
+  gap: 0.5rem;
+  background: rgba(255, 194, 75, 0.1);
+  border: 1px solid rgba(255, 194, 75, 0.25);
+  border-radius: 999px;
+  padding: 0.35em 1em 0.35em 0.7em;
+  font-size: 0.98rem;
 }
-.badge-icon { font-size: 1.3rem; }
+.badge-icon { font-size: 1.2rem; }
 .badge-text strong { color: var(--gold); }
-
-.session-stats {
-  margin-top: 1.2rem;
-  color: var(--text-muted);
-  font-size: 1.05rem;
-  line-height: 1.8;
-  text-align: center;
-}
+.session-stats { color: var(--text-muted); font-size: 1rem; text-align: center; display: flex; gap: 1.6rem; flex-wrap: wrap; justify-content: center; }
 .session-stats strong { color: var(--gold); }
 
+/* ---------- Scoreboard footer ---------- */
 .scoreboard {
+  position: relative;
+  z-index: 2;
   display: flex;
   gap: 0.6rem;
   justify-content: center;
   flex-wrap: wrap;
-  padding: 1.4rem 2rem 2rem;
+  padding: 0.8rem 2.4rem 1.4rem;
+  min-height: 4.6rem;
 }
-.scoreboard .pill { font-size: 1.05rem; }
-.scoreboard .pill.lead { box-shadow: 0 0 0 2px var(--gold) inset; }
-/* Idle/results "party wave" (extraAnimations) — a gentle staggered bob
-   across the scoreboard so the screen still feels alive during downtime,
-   not just when a round is actually live. Class + delays applied from
-   tv.js, only outside an actual round. */
-.scoreboard.party-wave .pill { animation: scoreboard-wave 2.4s ease-in-out infinite; }
-.scoreboard.party-wave .pill:nth-child(2) { animation-delay: 0.15s; }
-.scoreboard.party-wave .pill:nth-child(3) { animation-delay: 0.3s; }
-.scoreboard.party-wave .pill:nth-child(4) { animation-delay: 0.45s; }
-.scoreboard.party-wave .pill:nth-child(5) { animation-delay: 0.6s; }
-.scoreboard.party-wave .pill:nth-child(6) { animation-delay: 0.75s; }
-.scoreboard.party-wave .pill:nth-child(n+7) { animation-delay: 0.9s; }
-@keyframes scoreboard-wave {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
+.sb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.3rem 1rem 0.3rem 0.3rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-weight: 700;
+  font-size: 1.05rem;
+  transition: border-color var(--dur) ease, box-shadow var(--dur) ease, opacity var(--dur) ease, background-color var(--dur) ease;
 }
+.sb-chip .avatar { font-size: 0.95rem; }
+.sb-chip .sb-name { max-width: 12ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-chip .score { font-family: var(--font-display); font-weight: 800; color: var(--gold); min-width: 1.3ch; text-align: center; display: inline-block; font-variant-numeric: tabular-nums; }
+.sb-chip .score.score-pulse { animation: score-pulse 0.6s var(--ease-spring); }
+.sb-chip.lead { border-color: rgba(255, 194, 75, 0.6); box-shadow: 0 0 1.6rem -0.4rem rgba(255, 194, 75, 0.55); }
+.sb-chip .crown-mini { font-size: 0.95rem; margin-inline-start: -0.2rem; }
+.sb-chip.buzzing { border-color: rgba(255, 255, 255, 0.7); background: rgba(255, 255, 255, 0.16); box-shadow: 0 0 2rem -0.3rem var(--a1, #8b5cf6); }
+.sb-chip.offline { opacity: 0.45; }
+.sb-chip.enter { animation: chip-in 0.6s var(--ease-spring) both; }
+.team-tag { font-size: 0.8em; color: var(--gold); opacity: 0.9; }
+
+/* ---------- Particles ---------- */
+.confetti-piece {
+  position: fixed;
+  top: -4vh;
+  width: 0.7rem;
+  height: 1.1rem;
+  z-index: 50;
+  pointer-events: none;
+  border-radius: 2px;
+  will-change: transform;
+  animation: confetti-fall var(--t, 2.8s) cubic-bezier(0.3, 0.4, 0.6, 1) var(--delay, 0s) forwards;
+}
+.confetti-piece.round { width: 0.7rem; height: 0.7rem; border-radius: 50%; }
+.confetti-piece.ribbon { width: 0.4rem; height: 1.5rem; }
+@keyframes confetti-fall {
+  0% { transform: translate3d(0, 0, 0) rotateX(0deg) rotateZ(var(--r0, 0deg)); opacity: 1; }
+  100% { transform: translate3d(var(--dx, 0px), 112vh, 0) rotateX(900deg) rotateZ(calc(var(--r0, 0deg) + 420deg)); opacity: 0.85; }
+}
+
+.firework-particle {
+  position: fixed;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  z-index: 55;
+  pointer-events: none;
+  box-shadow: 0 0 0.8rem 0.25rem currentColor;
+  animation: firework-burst 1.4s var(--ease-out) forwards;
+}
+@keyframes firework-burst {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), calc(var(--ty) + 3rem)) scale(0.2); opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .scoreboard.party-wave .pill { animation: none; }
-}
-.team-tag { font-size: 0.8em; color: var(--gold); opacity: 0.85; }
-.scoreboard .score { color: var(--gold); font-weight: 700; display: inline-block; }
-.scoreboard .score.score-pulse { animation: score-pulse 0.5s ease; }
-@keyframes score-pulse {
-  0% { transform: scale(1); color: var(--gold); }
-  40% { transform: scale(1.6); color: var(--good); }
-  100% { transform: scale(1); color: var(--gold); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .scoreboard .score.score-pulse { animation: none; }
+  .aurora-blob, .viz-bar i, .sunburst { animation: none !important; }
+  .confetti-piece, .firework-particle, .screen-glow, .go-flash { display: none; }
 }

@@ -74,7 +74,7 @@ function join(name, team) {
   if (pinVal) currentPin = pinVal;
   localStorage.setItem('gtm_player_name', name);
   localStorage.setItem('gtm_player_team', currentTeam);
-  nameChip.textContent = name;
+  nameChip.innerHTML = avatarHtml(name) + `<span>${escapeHtml(name)}</span>`;
   pinError.textContent = '';
   nameScreen.hidden = true;
   buzzerScreen.hidden = false;
@@ -166,10 +166,15 @@ function playWrongSound() {
   } catch (e) { /* Web Audio unavailable — silently skip the sound */ }
 }
 
+let wrongFlashTimeout = null;
 socket.on('wrong', () => {
   playWrongSound();
   if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
   buzzBtn.classList.add('shake');
+  // Brief red wash behind the buzzer — see .flash-wrong in player.css.
+  document.body.classList.add('flash-wrong');
+  clearTimeout(wrongFlashTimeout);
+  wrongFlashTimeout = setTimeout(() => document.body.classList.remove('flash-wrong'), 900);
 });
 buzzBtn.addEventListener('animationend', (e) => {
   if (e.animationName === 'buzz-shake') buzzBtn.classList.remove('shake');
@@ -246,13 +251,24 @@ function renderWager(state) {
       wagerPlayerNameEl.textContent = wager.playerName || 'Someone';
     }
   } else {
-    buzzBtn.hidden = false;
-    statusText.hidden = false;
+    // Must respect an open category vote — renderCategoryVote() runs first
+    // and hides the buzzer for it, and unconditionally un-hiding it here
+    // used to put the buzzer back underneath the vote list.
+    const voteActive = state.roundStatus === 'idle' && !!state.categoryVote;
+    buzzBtn.hidden = voteActive;
+    statusText.hidden = voteActive;
   }
 }
 
 let prevMyScore = null;
 let wasArmed = false;
+let wasLocked = false;
+
+// Drives the full-screen color wash behind the buzzer (body[data-state] in
+// player.css): armed / locked / beaten / results / idle.
+function setScreenState(name) {
+  document.body.dataset.state = name;
+}
 
 socket.on('state', (state) => {
   const lang = state.language || 'en';
@@ -283,8 +299,13 @@ socket.on('state', (state) => {
     buzzBtn.disabled = true;
     buzzLabel.textContent = t('gamePaused', lang);
     statusText.textContent = '';
+    setScreenState('idle');
     return;
   }
+
+  const lockedNow = state.roundStatus === 'buzzed' && !!current && current.id === myId;
+  if (lockedNow && !wasLocked && navigator.vibrate) navigator.vibrate([30, 50, 30]);
+  wasLocked = lockedNow;
 
   // "Armed" = this player can buzz right now — pop the button so the exact
   // moment buzzing opens up is obvious, not just an instant disabled->enabled
@@ -294,6 +315,7 @@ socket.on('state', (state) => {
   if (armed && !wasArmed) buzzBtn.classList.add('armed');
   wasArmed = armed;
 
+  setScreenState('idle');
   if (state.roundStatus === 'idle') {
     buzzBtn.disabled = true;
     buzzLabel.textContent = t('getReady', lang);
@@ -307,6 +329,7 @@ socket.on('state', (state) => {
     } else if (buzzed) {
       buzzBtn.disabled = true;
       buzzBtn.classList.add('beaten');
+      setScreenState('beaten');
       buzzLabel.textContent = t('alreadyBuzzed', lang);
       statusText.textContent = t('someoneElsesTurn', lang);
     } else if (state.buzzingLocked) {
@@ -317,6 +340,7 @@ socket.on('state', (state) => {
       buzzBtn.disabled = false;
       buzzLabel.textContent = t('buzzBtnLabel', lang);
       statusText.textContent = t('buzzInAsap', lang);
+      setScreenState('armed');
     }
   } else if (state.roundStatus === 'buzzed') {
     buzzBtn.disabled = true;
@@ -324,8 +348,10 @@ socket.on('state', (state) => {
       buzzBtn.classList.add('locked');
       buzzLabel.textContent = t('lockedIn', lang);
       statusText.textContent = t('sayAnswerHostChecking', lang);
+      setScreenState('locked');
     } else {
       buzzBtn.classList.add('beaten');
+      setScreenState('beaten');
       const name = current ? current.name : t('someone', lang);
       buzzLabel.textContent = t('buzzedFirst', lang).replace('{name}', name);
       statusText.textContent = t('betterLuck', lang);
@@ -338,5 +364,6 @@ socket.on('state', (state) => {
     buzzBtn.disabled = true;
     buzzLabel.textContent = t('gameOver', lang);
     statusText.textContent = t('yourFinalScore', lang).replace('{n}', me ? me.score : 0);
+    setScreenState('results');
   }
 });

@@ -1,43 +1,92 @@
-body { min-height: 100vh; }
+body { min-height: 100vh; min-height: 100dvh; overflow-x: hidden; }
+
+/* ---------- State color wash ---------- */
+/* background-color (not a gradient) is what changes per state, so it can
+   actually transition — the radial mask turns the flat color into a soft
+   glow behind the buzzer. */
+.state-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: transparent;
+  -webkit-mask-image: radial-gradient(75% 50% at 50% 52%, #000 0%, transparent 75%);
+  mask-image: radial-gradient(75% 50% at 50% 52%, #000 0%, transparent 75%);
+  transition: background-color 0.5s ease;
+}
+body[data-state="armed"] .state-glow { background-color: rgba(255, 112, 80, 0.32); }
+body[data-state="locked"] .state-glow { background-color: rgba(52, 211, 153, 0.38); }
+body[data-state="beaten"] .state-glow { background-color: rgba(139, 92, 246, 0.2); }
+body[data-state="results"] .state-glow { background-color: rgba(255, 194, 75, 0.28); }
+body.flash-wrong .state-glow { background-color: rgba(244, 63, 94, 0.5); transition-duration: 0.1s; }
 
 .name-screen, .buzzer-screen {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
-  padding: env(safe-area-inset-top, 1.5rem) 1.5rem env(safe-area-inset-bottom, 1.5rem);
+  min-height: 100dvh;
+  padding: max(1.25rem, env(safe-area-inset-top)) 1.4rem max(1.25rem, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
 }
 
+/* ---------- Join screen ---------- */
 .name-screen {
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 1rem;
+  gap: 0.75rem;
 }
-.name-screen h1 { font-size: 2rem; }
-.name-screen input {
-  width: 100%;
-  max-width: 320px;
-  text-align: center;
-  font-size: 1.1rem;
-  padding: 0.9em;
+.name-screen > * { animation: rise-in 0.7s var(--ease-out) both; }
+.name-screen > :nth-child(2) { animation-delay: 0.08s; }
+.name-screen > :nth-child(3) { animation-delay: 0.16s; }
+.name-screen > :nth-child(4) { animation-delay: 0.24s; }
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
 }
-.name-screen button { width: 100%; max-width: 320px; padding: 0.9em; }
-#pin-row {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
+.join-hero { position: relative; width: 132px; height: 132px; margin-bottom: 0.8rem; }
+.join-hero::before {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 122, 80, 0.45), rgba(139, 92, 246, 0.2) 45%, transparent 70%);
+  animation: halo 3.2s var(--ease-in-out) infinite;
 }
+.join-hero .record { width: 100%; height: 100%; }
+@keyframes halo {
+  0%, 100% { transform: scale(0.92); opacity: 0.75; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+.name-screen h1 { font-size: 1.85rem; }
+.join-form { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.8rem; }
+.join-form input { width: 100%; text-align: center; font-size: 1.1rem; padding: 0.95em; }
+.join-form button { width: 100%; padding: 1em; font-size: 1.08rem; margin-top: 0.2rem; }
+#pin-row { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+#pin-error { color: var(--bad); }
 
+/* ---------- Buzzer screen ---------- */
 .buzzer-screen header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 0.5rem;
+  gap: 0.6rem;
+  padding-top: 0.4rem;
+  animation: rise-in 0.6s var(--ease-out) both;
 }
-.buzzer-screen header .pill { background: var(--surface-2); }
-.score-pill span { color: var(--gold); font-weight: 700; }
+.name-chip {
+  padding: 0.28em 1em 0.28em 0.28em;
+  font-size: 1rem;
+  max-width: 62vw;
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+}
+.name-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name-chip .avatar { font-size: 0.85rem; }
+.score-pill { font-size: 1rem; background: var(--surface); backdrop-filter: blur(10px); }
+.score-pill #my-score { font-family: var(--font-display); font-weight: 800; color: var(--gold); display: inline-block; font-variant-numeric: tabular-nums; }
+#my-score.score-pulse { animation: score-pulse 0.6s var(--ease-spring); }
 
 .buzzer-screen main {
   flex: 1;
@@ -45,105 +94,226 @@ body { min-height: 100vh; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.4rem;
+  gap: 1.6rem;
 }
 
+/* The buzzer: a bezel (.buzz-base) with a raised, glossy cap that
+   physically travels down when pressed — the 3D depth comes from a solid
+   "side" shadow under the cap that collapses as it moves. */
 .buzz-btn {
-  width: min(70vw, 300px);
-  height: min(70vw, 300px);
-  border-radius: 50%;
-  background: var(--gold);
-  color: #21170a;
-  font-family: var(--font-display);
-  font-size: 1.7rem;
-  font-weight: 700;
-  box-shadow: 0 20px 50px rgba(245, 185, 66, 0.25);
+  position: relative;
+  width: min(76vw, 330px);
+  height: min(76vw, 330px);
+  padding: 0;
   border: none;
+  border-radius: 50%;
+  background: none !important;
+  box-shadow: none !important;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
-.buzz-btn:active:not(:disabled) { transform: scale(0.96); }
+.buzz-btn:disabled { opacity: 1; cursor: default; }
+.buzz-btn:active:not(:disabled) { transform: none; }
+.buzz-base {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #2b2244, #110c1e);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08), inset 0 -6px 18px rgba(0, 0, 0, 0.5), 0 30px 60px -18px rgba(0, 0, 0, 0.85);
+}
+.buzz-cap {
+  --depth: 10px;
+  --side: #120d20;
+  position: absolute;
+  inset: 9%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  padding: 16%;
+  overflow: hidden;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  line-height: 1.25;
+  background: radial-gradient(circle at 50% 28%, #3b3159 0%, #261e3d 70%);
+  box-shadow: 0 var(--depth) 0 var(--side), inset 0 -10px 22px rgba(0, 0, 0, 0.35), inset 0 6px 14px rgba(255, 255, 255, 0.07);
+  transform: translateY(calc(var(--depth) * -1));
+  transition:
+    transform 0.12s var(--ease-out),
+    box-shadow 0.12s var(--ease-out),
+    background 0.35s ease,
+    color 0.35s ease;
+}
+/* Gloss highlight across the top of the cap. */
+.buzz-cap::before {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: 6%;
+  height: 34%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+#buzz-label { position: relative; }
 
-.buzz-btn:disabled {
-  background: var(--surface-2);
-  color: var(--text-muted);
-  box-shadow: none;
-  opacity: 1;
+/* Armed: the big red-hot button. */
+.buzz-btn:not(:disabled) .buzz-cap {
+  --side: #9c1f4a;
+  color: #2a0710;
+  font-weight: 800;
+  font-size: 2.6rem;
+  letter-spacing: 0.04em;
+  background: radial-gradient(circle at 50% 26%, #ffd27a 0%, #ff7a50 42%, #e0306f 100%);
+  box-shadow: 0 var(--depth) 0 var(--side), 0 26px 60px -14px rgba(255, 90, 80, 0.75), inset 0 -12px 26px rgba(120, 0, 40, 0.35), inset 0 8px 18px rgba(255, 255, 255, 0.45);
+}
+.buzz-btn:not(:disabled):active .buzz-cap {
+  transform: translateY(1px);
+  box-shadow: 0 0 0 var(--side), 0 10px 30px -12px rgba(255, 90, 80, 0.75), inset 0 -8px 20px rgba(120, 0, 40, 0.4), inset 0 8px 18px rgba(255, 255, 255, 0.4);
 }
 
-.buzz-btn.locked {
-  background: var(--coral);
-  color: #2a0d0e;
-  animation: pulse 0.9s ease-in-out infinite;
+/* Locked in: you got there first. */
+.buzz-btn.locked .buzz-cap {
+  --side: #04603f;
+  --depth: 3px;
+  color: #022c1c;
+  font-weight: 800;
+  font-size: 1.6rem;
+  background: radial-gradient(circle at 50% 26%, #c6f7e2 0%, #34d399 45%, #059669 100%);
+  box-shadow: 0 var(--depth) 0 var(--side), 0 0 70px -6px rgba(52, 211, 153, 0.85), inset 0 -10px 22px rgba(0, 60, 40, 0.3), inset 0 8px 18px rgba(255, 255, 255, 0.45);
+  animation: locked-pulse 1.4s var(--ease-in-out) infinite;
 }
-.buzz-btn.beaten {
-  background: var(--surface-2);
-  color: var(--text-muted);
+@keyframes locked-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.12); }
 }
 
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.04); }
+/* Beaten / waiting: pressed flat and dimmed. */
+.buzz-btn.beaten .buzz-cap {
+  --depth: 2px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 1.1rem;
 }
 
-.buzz-btn.armed { animation: buzz-armed 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+/* Expanding rings: invite a tap while armed, celebrate while locked. */
+.buzz-ring {
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 122, 80, 0.7);
+  opacity: 0;
+  pointer-events: none;
+}
+.buzz-btn:not(:disabled) .buzz-ring { animation: ring-out 1.8s var(--ease-out) infinite; }
+.buzz-btn:not(:disabled) .buzz-ring-2 { animation-delay: 0.9s; }
+.buzz-btn.locked .buzz-ring { border-color: rgba(52, 211, 153, 0.8); animation: ring-out 1.6s var(--ease-out) infinite; }
+.buzz-btn.locked .buzz-ring-2 { animation-delay: 0.8s; }
+@keyframes ring-out {
+  from { transform: scale(1); opacity: 0.85; }
+  to { transform: scale(1.35); opacity: 0; }
+}
+
+/* JS adds these for one-shot moments (and removes them on animationend). */
+.buzz-btn.armed { animation: buzz-armed 0.55s var(--ease-spring); }
 @keyframes buzz-armed {
-  0% { transform: scale(0.8); }
-  60% { transform: scale(1.08); }
+  0% { transform: scale(0.82); }
+  60% { transform: scale(1.06); }
   100% { transform: scale(1); }
 }
-
-.buzz-btn.shake { animation: buzz-shake 0.4s ease; }
+.buzz-btn.shake { animation: buzz-shake 0.45s ease; }
 @keyframes buzz-shake {
   0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-8px); }
-  40% { transform: translateX(8px); }
-  60% { transform: translateX(-6px); }
-  80% { transform: translateX(6px); }
+  20% { transform: translateX(-10px) rotate(-2deg); }
+  40% { transform: translateX(10px) rotate(2deg); }
+  60% { transform: translateX(-7px); }
+  80% { transform: translateX(7px); }
 }
 
-#status-text { text-align: center; max-width: 28ch; }
-#mystery-note { text-align: center; color: var(--gold); font-weight: 600; }
+.status-text {
+  text-align: center;
+  max-width: 30ch;
+  min-height: 2.8em;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.mystery-note {
+  text-align: center;
+  color: var(--gold);
+  font-weight: 800;
+  background: rgba(255, 194, 75, 0.12);
+  border: 1px solid rgba(255, 194, 75, 0.3);
+  border-radius: 999px;
+  padding: 0.35em 1em;
+}
 
-#wager-block { text-align: center; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 0.8rem; }
-#wager-block h2 { font-size: 1.3rem; }
-#wager-input { width: 100%; text-align: center; font-size: 1.4rem; padding: 0.7em; }
-#wager-submit-btn { width: 100%; padding: 0.9em; }
-#wager-waiting-block { text-align: center; }
+/* ---------- Sheets (wager / vote) ---------- */
+.sheet {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.3rem;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-lg);
+  animation: rise-in 0.5s var(--ease-out) both;
+}
+.sheet h2 { font-size: 1.25rem; }
+#wager-input { width: 100%; text-align: center; font-family: var(--font-display); font-weight: 800; font-size: 1.8rem; padding: 0.5em; }
+#wager-submit-btn { width: 100%; padding: 0.95em; }
 
-#vote-block { text-align: center; width: 100%; max-width: 360px; }
-#vote-block h2 { font-size: 1.2rem; margin-bottom: 0.8rem; }
-.vote-options-player { display: flex; flex-direction: column; gap: 0.6rem; }
+.vote-options-player { display: flex; flex-direction: column; gap: 0.55rem; }
 .vote-option-btn {
   width: 100%;
-  padding: 0.9em;
+  padding: 0.8em 1em 0.8em 0.6em;
   font-size: 1.05rem;
   background: var(--surface-2);
-  border-radius: 12px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.75rem;
+  text-align: start;
+  /* No entrance animation: player.js rebuilds these on every vote anyone
+     casts, which would replay it each time. */
 }
 .vote-option-btn .vote-avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.8em;
-  height: 1.8em;
+  width: 2em;
+  height: 2em;
   border-radius: 50%;
-  background: rgba(245, 185, 66, 0.15);
+  background: rgba(255, 255, 255, 0.1);
   font-size: 1.1rem;
   flex-shrink: 0;
 }
-.vote-option-btn.selected { background: var(--gold); color: #21170a; }
-.vote-option-btn.selected .vote-avatar { background: rgba(33, 23, 10, 0.15); }
+.vote-option-btn.selected {
+  background: var(--grad-brand);
+  color: var(--on-accent);
+  border-color: transparent;
+  box-shadow: 0 10px 26px -10px rgba(255, 122, 80, 0.7);
+}
+.vote-option-btn.selected .vote-avatar { background: rgba(255, 255, 255, 0.35); }
 
-#my-score { display: inline-block; }
-#my-score.score-pulse { animation: score-pulse 0.5s ease; }
-@keyframes score-pulse {
-  0% { transform: scale(1); color: var(--gold); }
-  40% { transform: scale(1.6); color: var(--good); }
-  100% { transform: scale(1); color: var(--gold); }
+/* ---------- Light theme tweaks ---------- */
+html[data-theme="light"] .buzz-base { background: linear-gradient(180deg, #e7e0f5, #cfc5e6); box-shadow: inset 0 2px 0 #fff, inset 0 -6px 18px rgba(40, 20, 80, 0.15), 0 30px 60px -18px rgba(40, 20, 80, 0.4); }
+html[data-theme="light"] .buzz-btn:disabled:not(.locked) .buzz-cap {
+  --side: #b9add6;
+  color: #625a7a;
+  background: radial-gradient(circle at 50% 28%, #ffffff 0%, #ece6f8 70%);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .buzz-btn.armed, .buzz-btn.shake, #my-score.score-pulse { animation: none; }
+  .join-hero::before, .buzz-ring, .buzz-btn.locked .buzz-cap { animation: none !important; }
 }

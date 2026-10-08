@@ -1,73 +1,147 @@
 .host-wrap {
-  max-width: 1100px;
+  max-width: 1120px;
   margin: 0 auto;
   /* Installed as a standalone PWA (see manifest-host.json), so a notch or
      home-indicator can otherwise sit right on top of the header/buttons —
      env() only resolves once the viewport meta has viewport-fit=cover. */
-  padding: max(1.6rem, env(safe-area-inset-top, 0px)) max(1.2rem, env(safe-area-inset-right, 0px)) max(3rem, env(safe-area-inset-bottom, 0px)) max(1.2rem, env(safe-area-inset-left, 0px));
+  padding: max(1.5rem, env(safe-area-inset-top, 0px)) max(1.1rem, env(safe-area-inset-right, 0px)) max(3rem, env(safe-area-inset-bottom, 0px)) max(1.1rem, env(safe-area-inset-left, 0px));
 }
 
+/* ---------- Header ---------- */
 .host-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  row-gap: 0.6rem;
-  margin-bottom: 1.2rem;
+  row-gap: 0.7rem;
+  margin-bottom: 1.3rem;
+  animation: host-rise 0.5s var(--ease-out) both;
 }
-.host-header h1 { font-size: 1.6rem; }
+.host-header h1 { font-size: 1.45rem; display: flex; align-items: center; gap: 0.35rem; }
 .header-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 480px) {
-  .host-header h1 { font-size: 1.35rem; }
+  .host-header h1 { font-size: 1.25rem; }
   .header-right { width: 100%; justify-content: flex-start; }
 }
-#conn-pill.online { background: rgba(116, 198, 157, 0.18); color: var(--good); }
-#conn-pill.offline { background: rgba(229, 72, 77, 0.18); color: var(--bad); }
-
-#round-status-pill.status-flash { animation: status-flash 0.5s ease; }
-@keyframes status-flash {
-  0% { background: var(--gold); color: #21170a; }
-  100% { background: var(--surface-2); color: var(--text); }
+#conn-pill { font-size: 0.85rem; }
+#conn-pill::before {
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: currentColor;
 }
-@media (prefers-reduced-motion: reduce) {
-  .buzz-row, #round-status-pill.status-flash { animation: none; }
-}
+#conn-pill.online { background: rgba(52, 211, 153, 0.14); border-color: rgba(52, 211, 153, 0.3); color: var(--good); }
+#conn-pill.offline { background: rgba(244, 63, 94, 0.14); border-color: rgba(244, 63, 94, 0.3); color: var(--bad); }
+#conn-pill.offline::before { animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
 
-.lang-toggle { display: flex; background: var(--surface-2); border-radius: 999px; padding: 3px; gap: 2px; }
+/* Segmented toggles (language, theme, play order) */
+.lang-toggle { display: flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
 .lang-toggle button {
   background: transparent;
-  padding: 0.35em 0.9em;
+  border: none;
+  padding: 0.38em 0.95em;
   font-size: 0.85rem;
   border-radius: 999px;
 }
-.lang-toggle button:hover { background: rgba(255, 255, 255, 0.06); }
-.lang-toggle button.active { background: var(--gold); color: #21170a; }
+.lang-toggle button.active {
+  background: var(--grad-brand);
+  color: var(--on-accent);
+  box-shadow: 0 4px 14px -6px rgba(255, 122, 80, 0.8);
+}
+@media (hover: hover) {
+  .lang-toggle button:hover:not(.active):not(:disabled) { background: rgba(255, 255, 255, 0.08); }
+}
+#mc-mode-toggle { font-size: 0.85rem; }
+#mc-mode-toggle.active { background: var(--grad-brand); color: var(--on-accent); border-color: transparent; }
 
+/* ---------- Layout ---------- */
 .grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1rem;
+  gap: 1.1rem;
+  /* start, not stretch: the Add-a-song card collapses during a live round,
+     and stretching it to its row-mate's height left a big empty box. */
+  align-items: start;
 }
 @media (min-width: 860px) {
   .grid { grid-template-columns: 1fr 1fr; }
   .join-card { grid-column: span 2; }
 }
-
-.card h2 { font-size: 1.1rem; margin-bottom: 0.8rem; }
-
-#add-song-body {
-  overflow: hidden;
-  max-height: 600px;
-  opacity: 1;
-  transition: max-height 0.35s ease, opacity 0.25s ease;
+.grid > .card { animation: host-rise 0.55s var(--ease-out) both; }
+.grid > .card:nth-child(2) { animation-delay: 0.04s; }
+.grid > .card:nth-child(3) { animation-delay: 0.08s; }
+.grid > .card:nth-child(4) { animation-delay: 0.12s; }
+.grid > .card:nth-child(n+5) { animation-delay: 0.16s; }
+@keyframes host-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
 }
-#add-song-card.collapsed #add-song-body { max-height: 0; opacity: 0; }
-#add-song-collapsed-hint { font-weight: 400; }
 
-.song-info { margin: 0.6rem 0; font-size: 1.05rem; }
-.song-info strong { color: var(--text); }
+.card h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.9rem;
+  letter-spacing: 0;
+}
 
-.buzz-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.8rem; }
+/* ---------- Current round ---------- */
+.round-card { position: relative; overflow: hidden; }
+.round-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--grad-brand);
+  opacity: 0.35;
+  transition: opacity var(--dur) ease;
+}
+.round-card:has(#round-status-pill[data-status="playing"])::before,
+.round-card:has(#round-status-pill[data-status="buzzed"])::before { opacity: 1; animation: live-bar 2s linear infinite; background-size: 200% 100%; }
+@keyframes live-bar { to { background-position: -200% 0; } }
+
+.round-card > .pill,
+.round-card > button { margin-inline-end: 0.35rem; margin-bottom: 0.4rem; vertical-align: middle; }
+
+#round-status-pill { text-transform: capitalize; font-size: 0.9rem; transition: background-color var(--dur) ease, color var(--dur) ease, border-color var(--dur) ease; }
+#round-status-pill::before {
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+#round-status-pill[data-status="playing"] { background: rgba(240, 69, 143, 0.15); border-color: rgba(240, 69, 143, 0.4); color: var(--pink); }
+#round-status-pill[data-status="playing"]::before { animation: live-dot 1.2s ease-in-out infinite; }
+#round-status-pill[data-status="buzzed"] { background: rgba(255, 194, 75, 0.16); border-color: rgba(255, 194, 75, 0.45); color: var(--gold); }
+#round-status-pill[data-status="revealed"] { background: rgba(52, 211, 153, 0.14); border-color: rgba(52, 211, 153, 0.4); color: var(--good); }
+#round-status-pill[data-status="results"] { background: rgba(139, 92, 246, 0.16); border-color: rgba(139, 92, 246, 0.45); color: var(--violet); }
+#round-status-pill[data-status="wagering"] { background: rgba(255, 194, 75, 0.16); border-color: rgba(255, 194, 75, 0.45); color: var(--gold); }
+@keyframes live-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.5; }
+}
+#round-status-pill.status-flash { animation: status-flash 0.6s var(--ease-spring); }
+@keyframes status-flash {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.song-info {
+  margin: 0.5rem 0 0.8rem;
+  font-size: 1.05rem;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.song-info strong { color: var(--text); font-weight: 800; }
+.song-info.muted { background: transparent; border-style: dashed; font-size: 0.95rem; }
+
+.buzz-list { display: flex; flex-direction: column; gap: 0.45rem; margin-bottom: 0.8rem; }
 .buzz-row {
   display: flex;
   align-items: center;
@@ -75,36 +149,64 @@
   flex-wrap: wrap;
   row-gap: 0.4rem;
   background: var(--surface-2);
-  border-radius: 10px;
-  padding: 0.5em 0.7em;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.45em 0.55em 0.45em 0.7em;
+  animation: buzz-row-in 0.4s var(--ease-spring);
 }
-.buzz-row { animation: buzz-row-in 0.3s ease; }
+.buzz-row:last-child { border-color: rgba(255, 194, 75, 0.5); box-shadow: 0 0 0 1px rgba(255, 194, 75, 0.25), 0 8px 24px -12px rgba(255, 194, 75, 0.6); }
 @keyframes buzz-row-in {
-  0% { transform: translateX(-12px); opacity: 0; }
-  100% { transform: translateX(0); opacity: 1; }
+  from { transform: translateX(-14px) scale(0.98); opacity: 0; }
+  to { transform: none; opacity: 1; }
 }
-.buzz-row .order { color: var(--gold); font-weight: 700; margin-right: 0.5em; }
+.buzz-who { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; min-width: 0; }
+.buzz-who .avatar { font-size: 0.8rem; }
+.buzz-row .order { color: var(--gold); font-weight: 800; font-family: var(--font-display); font-size: 0.9rem; }
 .buzz-row .actions { display: flex; gap: 0.5rem; }
-.buzz-row button { min-width: 3rem; min-height: 2.4rem; padding: 0.4em 0.9em; font-size: 1.05rem; }
+.buzz-row button { min-width: 3rem; min-height: 2.5rem; padding: 0.4em 0.9em; font-size: 1.05rem; }
 
-.round-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+.round-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
 
-.shortcuts-hint { margin-top: 0.6rem; }
+.shortcuts-hint { margin-top: 0.75rem; }
 .shortcuts-hint kbd {
   background: var(--surface-2);
-  border-radius: 5px;
-  padding: 0.1em 0.5em;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  padding: 0.05em 0.5em;
   font-family: var(--font-body);
+  font-weight: 700;
   font-size: 0.85em;
 }
 @media (hover: none) { .shortcuts-hint { display: none; } }
 
+#timer-pill, #snippet-pill, #start-offset-pill { background: rgba(255, 194, 75, 0.14); border-color: rgba(255, 194, 75, 0.3); color: var(--gold); }
+#auto-advance-pill { background: rgba(34, 211, 238, 0.12); border-color: rgba(34, 211, 238, 0.3); color: var(--cyan); }
+
+#playback-pill.ok { background: rgba(52, 211, 153, 0.14); border-color: rgba(52, 211, 153, 0.3); color: var(--good); }
+#playback-pill.pending { color: var(--text-muted); }
+#playback-pill.error { background: rgba(244, 63, 94, 0.14); border-color: rgba(244, 63, 94, 0.35); color: var(--bad); }
+
+#open-youtube-fallback-btn, #find-replacement-live-btn, #pause-btn { padding: 0.38em 0.95em; font-size: 0.85rem; border-radius: 999px; }
+#paused-pill { background: rgba(255, 194, 75, 0.14); border-color: rgba(255, 194, 75, 0.3); color: var(--gold); }
+#find-replacement-live-result:empty { display: none; }
+#find-replacement-live-result { margin-top: 0.5rem; }
+
+/* ---------- Add song ---------- */
+#add-song-body {
+  overflow: hidden;
+  max-height: 600px;
+  opacity: 1;
+  transition: max-height 0.4s var(--ease-out), opacity 0.25s ease;
+}
+#add-song-card.collapsed #add-song-body { max-height: 0; opacity: 0; }
+#add-song-collapsed-hint { font-weight: 500; font-family: var(--font-body); }
+
 .stack { display: flex; flex-direction: column; gap: 0.6rem; }
 .stack input { width: 100%; }
-.small { font-size: 0.85rem; }
 .small.warn { color: var(--gold); }
 
-.import-row { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--surface-2); }
+.import-row { margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px dashed var(--border-strong); }
 
 .timer-row {
   display: flex;
@@ -113,41 +215,31 @@
   gap: 0.6rem;
   margin-bottom: 0.8rem;
   font-size: 0.9rem;
+  font-weight: 600;
   color: var(--text-muted);
 }
-.timer-row input { width: 5rem; }
+.timer-row input { width: 5.2rem; text-align: center; font-weight: 700; }
 
 #play-order-row { flex-wrap: wrap; }
-#play-order-row #play-next-btn { margin-left: auto; }
+#play-order-row #play-next-btn { margin-inline-start: auto; }
 
 #game-limit-inputs { flex-wrap: wrap; }
 
-#timer-pill, #snippet-pill, #start-offset-pill { margin-left: 0.5rem; background: rgba(245, 185, 66, 0.18); color: var(--gold); }
+/* ---------- Playlist ---------- */
+.playlist-search { width: 100%; margin-bottom: 0.75rem; }
 
-#playback-pill { margin-left: 0.5rem; }
-#playback-pill.ok { background: rgba(116, 198, 157, 0.18); color: var(--good); }
-#playback-pill.pending { background: var(--surface-2); color: var(--text-muted); }
-#playback-pill.error { background: rgba(229, 72, 77, 0.18); color: var(--bad); }
-
-#open-youtube-fallback-btn, #find-replacement-live-btn, #pause-btn { margin-left: 0.5rem; padding: 0.35em 0.9em; font-size: 0.85rem; }
-#paused-pill { margin-left: 0.5rem; background: rgba(245, 185, 66, 0.18); color: var(--gold); }
-#find-replacement-live-result:empty { display: none; }
-#find-replacement-live-result { margin-top: 0.5rem; }
-
-.playlist-search { width: 100%; margin-bottom: 0.7rem; }
-
-.check-playlist-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.6rem; margin-bottom: 0.7rem; }
-#check-playlist-btn { font-size: 0.9rem; padding: 0.5em 0.9em; }
+.check-playlist-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.6rem; margin-bottom: 0.75rem; }
+#check-playlist-btn { font-size: 0.88rem; padding: 0.5em 0.95em; border-radius: 999px; }
 
 .broken-videos {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  background: rgba(229, 72, 77, 0.08);
-  border: 1px solid rgba(229, 72, 77, 0.25);
-  border-radius: 10px;
-  padding: 0.7em 0.8em;
-  margin-bottom: 0.7rem;
+  gap: 0.45rem;
+  background: rgba(244, 63, 94, 0.07);
+  border: 1px solid rgba(244, 63, 94, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.75em 0.85em;
+  margin-bottom: 0.75rem;
 }
 .broken-videos .broken-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem; }
 .broken-header-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
@@ -165,23 +257,32 @@
   justify-content: space-between;
   gap: 0.6rem;
   background: var(--surface-2);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 0.4em 0.7em;
 }
 .replacement-found .info { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85rem; }
 .replacement-found .actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
 .replacement-found button { padding: 0.25em 0.6em; font-size: 0.8rem; }
 
-.category-filter { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem; }
+.category-filter { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
 .category-filter button {
   background: var(--surface-2);
-  padding: 0.3em 0.8em;
+  padding: 0.32em 0.85em;
   font-size: 0.82rem;
   border-radius: 999px;
 }
-.category-filter button.active { background: var(--gold); color: #21170a; }
+.category-filter button.active { background: var(--grad-brand); color: var(--on-accent); border-color: transparent; }
 
-.playlist { display: flex; flex-direction: column; gap: 0.5rem; max-height: 340px; overflow-y: auto; }
+.playlist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-inline-end: 0.2rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
 .playlist-row {
   display: flex;
   align-items: center;
@@ -189,45 +290,44 @@
   flex-wrap: wrap;
   gap: 0.5rem 0.6rem;
   background: var(--surface-2);
-  border-radius: 10px;
-  padding: 0.6em 0.8em;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.6em 0.7em 0.6em 0.6em;
+  transition: border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+@media (hover: hover) {
+  .playlist-row:hover { border-color: var(--border-strong); }
 }
 .playlist-row.sortable-ghost { outline: 2px dashed var(--gold); outline-offset: -2px; opacity: 0.4; }
-.playlist-row.sortable-chosen { background: #372a54; }
-.playlist-row .grip { cursor: grab; color: var(--text-muted); flex-shrink: 0; touch-action: none; }
+.playlist-row.sortable-chosen { background: rgba(139, 92, 246, 0.2); box-shadow: var(--shadow-md); }
+.playlist-row .grip { cursor: grab; color: var(--text-muted); flex-shrink: 0; touch-action: none; padding: 0.2em; }
 /* flex-basis 140px (not the default 0% from flex:1) so info never gets
-   squeezed to nothing when actions has a lot in it (points input, wager
-   toggle, play button or the wager player-picker, remove) — with wager mode
-   + point values both on that can add up to more than a phone-width row has
-   room for, so actions wraps onto its own full-width line under it instead
-   of overflowing sideways. */
+   squeezed to nothing when actions has a lot in it — with wager mode +
+   point values both on, actions wraps onto its own line instead of
+   overflowing sideways. */
 .playlist-row .info { min-width: 0; flex: 1 1 140px; }
-.playlist-row .info .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.playlist-row .info .t { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mystery-badge { display: inline-block; }
-.playlist-row .info .a { color: var(--text-muted); font-size: 0.9rem; }
+.playlist-row .info .a { color: var(--text-muted); font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .playlist-row .info .cat {
   display: inline-block;
-  color: var(--gold);
-  font-size: 0.78rem;
-  background: rgba(245, 185, 66, 0.12);
+  color: var(--violet);
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(139, 92, 246, 0.14);
   border-radius: 999px;
-  padding: 0.05em 0.6em;
-  margin-top: 0.25em;
+  padding: 0.08em 0.65em;
+  margin-top: 0.3em;
 }
-.playlist-row.played { opacity: 0.55; }
+.playlist-row.played { opacity: 0.5; }
+.playlist-row.played .info .t::after { content: " ✓"; color: var(--good); }
 .playlist-row .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; flex-shrink: 0; align-items: center; justify-content: flex-end; }
-.playlist-row button { padding: 0.4em 0.8em; font-size: 0.9rem; min-height: 2.4rem; }
+.playlist-row button { padding: 0.4em 0.85em; font-size: 0.9rem; min-height: 2.4rem; }
 .wager-toggle { background: var(--surface); font-size: 0.95rem; padding: 0.3em 0.6em; }
-.wager-toggle.active { background: var(--gold); }
+.wager-toggle.active { background: var(--grad-brand); }
 .wager-picker { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .wager-picker select {
-  font-family: var(--font-body);
-  background: var(--surface);
-  border: 1px solid var(--surface-2);
-  color: var(--text);
-  border-radius: 8px;
   padding: 0.4em 0.6em;
-  font-size: 16px; /* below 16px, iOS Safari auto-zooms the page on focus */
   flex: 1 1 auto;
   min-width: 0;
   max-width: 10rem;
@@ -239,25 +339,12 @@
   padding: 0.3em;
   font-size: 16px; /* below 16px, iOS Safari auto-zooms the page on focus */
   text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--surface-2);
   color: var(--gold);
-  font-weight: 700;
-  border-radius: 8px;
+  font-weight: 800;
   flex-shrink: 0;
 }
 
-/* Bigger touch targets on a phone-sized host screen — this control panel is
-   most often run from the host's own phone mid-party, not a desktop. */
-@media (max-width: 600px) {
-  .playlist-row button { padding: 0.55em 1em; font-size: 1rem; }
-  .buzz-row button { min-width: 3.2rem; min-height: 2.6rem; font-size: 1.1rem; }
-  .score-row .actions button { width: 3rem; height: 3rem; font-size: 1.4rem; }
-  .score-row .actions button.danger { width: 2.3rem; height: 2.3rem; font-size: 1.05rem; }
-  .score-row .actions { gap: 1.3rem; }
-  .score-adjust { gap: 0.6rem; }
-}
-
+/* ---------- Scoreboard ---------- */
 .host-scoreboard { display: flex; flex-direction: column; gap: 0.5rem; }
 .score-row {
   display: flex;
@@ -266,17 +353,29 @@
   flex-wrap: wrap;
   row-gap: 0.4rem;
   background: var(--surface-2);
-  border-radius: 10px;
-  padding: 0.5em 0.8em;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5em 0.6em 0.5em 0.55em;
 }
-.score-row .name { display: flex; align-items: center; gap: 0.5em; min-width: 0; overflow-wrap: anywhere; }
-.score-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+.score-row .name { display: flex; align-items: center; gap: 0.6em; min-width: 0; overflow-wrap: anywhere; font-weight: 700; }
+.avatar-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.avatar-wrap .avatar { font-size: 0.95rem; }
+.score-row .dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  border: 2px solid var(--surface-solid);
+}
 .score-row .dot.connected { background: var(--good); }
 .team-tag {
   display: inline-block;
   font-size: 0.75rem;
   color: var(--gold);
-  background: rgba(245, 185, 66, 0.12);
+  background: rgba(255, 194, 75, 0.12);
   border-radius: 999px;
   padding: 0.05em 0.6em;
 }
@@ -296,18 +395,30 @@
 /* The remove button is destructive and sits right next to the score
    controls the host is repeatedly tapping — kept visibly smaller and set
    further apart so a fast tap meant for +/- can't land on it by accident. */
-.score-row .actions button.danger { width: 2.2rem; height: 2.2rem; font-size: 1rem; }
-.score-row .pts { color: var(--gold); font-weight: 700; min-width: 2ch; text-align: center; display: inline-block; }
-.score-row .pts.score-pulse { animation: score-pulse 0.5s ease; }
-@keyframes score-pulse {
-  0% { transform: scale(1); color: var(--gold); }
-  40% { transform: scale(1.6); color: var(--good); }
-  100% { transform: scale(1); color: var(--gold); }
+.score-row .actions button.danger { width: 2.2rem; height: 2.2rem; font-size: 0.95rem; }
+.score-row .pts {
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-weight: 700;
+  min-width: 2ch;
+  text-align: center;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
 }
-@media (prefers-reduced-motion: reduce) {
-  .score-row .pts.score-pulse { animation: none; }
+.score-row .pts.score-pulse { animation: score-pulse 0.6s var(--ease-spring); }
+
+/* Bigger touch targets on a phone-sized host screen — this control panel is
+   most often run from the host's own phone mid-party, not a desktop. */
+@media (max-width: 600px) {
+  .playlist-row button { padding: 0.55em 1em; font-size: 1rem; }
+  .buzz-row button { min-width: 3.2rem; min-height: 2.7rem; font-size: 1.1rem; }
+  .score-row .actions button { width: 3rem; height: 3rem; font-size: 1.4rem; }
+  .score-row .actions button.danger { width: 2.3rem; height: 2.3rem; font-size: 1rem; }
+  .score-row .actions { gap: 1.3rem; }
+  .score-adjust { gap: 0.6rem; }
 }
 
+/* ---------- Game options ---------- */
 #options-toggle {
   display: flex;
   align-items: center;
@@ -315,23 +426,82 @@
   cursor: pointer;
   user-select: none;
 }
-#options-toggle .chevron { transition: transform 0.25s ease; color: var(--text-muted); font-size: 0.9em; }
+#options-toggle .chevron { transition: transform var(--dur) var(--ease-out); color: var(--text-muted); font-size: 0.9em; }
 #options-card.collapsed #options-toggle .chevron { transform: rotate(-90deg); }
 .options-list {
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0.35rem;
   overflow: hidden;
   max-height: 2000px;
   opacity: 1;
-  transition: max-height 0.35s ease, opacity 0.25s ease;
+  transition: max-height 0.4s var(--ease-out), opacity 0.25s ease;
 }
 #options-card.collapsed .options-list { max-height: 0; opacity: 0; }
-.option-row { display: flex; gap: 0.7rem; align-items: flex-start; cursor: pointer; }
-.option-row input[type="checkbox"] { width: 1.3rem; height: 1.3rem; margin-top: 0.15rem; flex-shrink: 0; accent-color: var(--gold); }
+.option-row {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  cursor: pointer;
+  padding: 0.55rem 0.6rem;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-fast) ease;
+}
+@media (hover: hover) {
+  .option-row:hover { background: var(--surface-2); }
+}
 .option-row:has(input:disabled) { cursor: not-allowed; opacity: 0.5; }
 .option-row strong { font-size: 0.95rem; }
+.option-row .muted.small { line-height: 1.45; }
 
+/* Checkboxes drawn as iOS-style switches. */
+.option-row input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 2.6rem;
+  height: 1.5rem;
+  margin: 0.1rem 0 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  cursor: inherit;
+  transition: background-color var(--dur) ease, border-color var(--dur) ease, box-shadow var(--dur) ease;
+}
+.option-row input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(1.5rem - 6px);
+  height: calc(1.5rem - 6px);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: transform var(--dur) var(--ease-spring);
+}
+.option-row input[type="checkbox"]:checked {
+  background: var(--grad-brand);
+  border-color: transparent;
+  box-shadow: 0 4px 14px -6px rgba(255, 122, 80, 0.8);
+}
+.option-row input[type="checkbox"]:checked::before { transform: translateX(1.1rem); }
+/* Vote setup reuses .options-list for its category checkboxes — keep those
+   as plain checkboxes, a switch per category would read oddly. */
+#vote-category-checks input[type="checkbox"] {
+  -webkit-appearance: auto;
+  appearance: auto;
+  width: 1.2rem;
+  height: 1.2rem;
+  background: none;
+  border: none;
+  box-shadow: none;
+  accent-color: var(--gold);
+}
+#vote-category-checks input[type="checkbox"]::before { display: none; }
+
+/* ---------- Category vote / presets / log / preflight ---------- */
 #category-vote-card #vote-setup .options-list { margin-bottom: 0.8rem; }
 #category-vote-card .timer-row { margin-bottom: 0.8rem; }
 .vote-tally { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.6rem 0; }
@@ -340,10 +510,11 @@
   align-items: center;
   justify-content: space-between;
   background: var(--surface-2);
-  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   padding: 0.5em 0.8em;
 }
-.vote-row span:last-child { color: var(--gold); font-weight: 700; }
+.vote-row span:last-child { color: var(--gold); font-weight: 800; }
 #vote-result p { margin-bottom: 0.6rem; }
 #vote-result strong { color: var(--gold); }
 
@@ -354,36 +525,37 @@
   justify-content: space-between;
   gap: 0.6rem;
   background: var(--surface-2);
-  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   padding: 0.6em 0.8em;
 }
 .preset-row .info { min-width: 0; }
-.preset-row .info .t { font-weight: 600; }
+.preset-row .info .t { font-weight: 700; }
 .preset-row .actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
 .preset-row button { padding: 0.35em 0.8em; font-size: 0.85rem; }
 
 #action-log-card h2 { display: flex; align-items: center; justify-content: space-between; }
 .small-link {
   background: none;
+  border: none;
   color: var(--text-muted);
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 600;
   padding: 0.2em 0.5em;
 }
-.small-link:hover { color: var(--text); background: var(--surface-2); }
 .action-log { display: flex; flex-direction: column; gap: 0.3rem; max-height: 260px; overflow-y: auto; }
 .action-log-row {
   display: flex;
   gap: 0.6rem;
   font-size: 0.88rem;
-  padding: 0.3em 0;
-  border-bottom: 1px solid var(--surface-2);
+  padding: 0.35em 0;
+  border-bottom: 1px solid var(--border);
 }
 .action-log-row:last-child { border-bottom: none; }
 .action-log-row .time { color: var(--text-muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
 #preflight-btn { width: 100%; }
-.preflight-verdict { font-weight: 700; margin: 0.7rem 0 0.5rem; }
+.preflight-verdict { font-weight: 800; margin: 0.8rem 0 0.5rem; }
 .preflight-verdict.ok { color: var(--good); }
 .preflight-verdict.bad { color: var(--bad); }
 .preflight-checks { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; }
@@ -391,12 +563,9 @@
 .preflight-checks li.bad { color: var(--bad); }
 .preflight-checks li.skip { opacity: 0.7; }
 
-#mc-mode-toggle.active { background: var(--gold); color: #21170a; }
-
 /* MC Mode: a stripped-down view for handing the phone to a guest host —
-   only the live round controls and scoreboard, nothing that manages the
-   playlist/settings for the whole game. Purely a CSS/JS toggle on this one
-   device (see host.js) — the underlying cards are untouched, just hidden. */
+   only the live round controls and scoreboard. Purely a CSS/JS toggle on
+   this one device (see host.js) — the underlying cards are untouched. */
 body.mc-mode #add-song-card,
 body.mc-mode #playlist-card,
 body.mc-mode #options-card,
@@ -411,9 +580,10 @@ body.mc-mode .grid { grid-template-columns: 1fr; max-width: 480px; margin: 0 aut
 body.mc-mode .round-actions button { font-size: 1.15rem; padding: 0.9em 1.3em; }
 body.mc-mode .buzz-row button { font-size: 1.2rem; min-height: 3rem; }
 
-.join-card { text-align: center; }
-/* Fixed white, not var(--text) — see the matching #qr comment in tv.css:
-   the generated QR PNG is dark modules on a transparent background, so its
-   backdrop needs to stay light regardless of theme. */
-.join-card img { border-radius: 10px; background: #ffffff; padding: 8px; margin: 0.6rem 0 1rem; }
-.join-actions { display: flex; justify-content: center; gap: 0.6rem; flex-wrap: wrap; }
+/* ---------- Join card ---------- */
+.join-card { text-align: center; display: flex; flex-direction: column; align-items: center; }
+#join-url { font-weight: 700; color: var(--gold); }
+/* Fixed white — the generated QR PNG is dark modules on a transparent
+   background, so its backdrop needs to stay light regardless of theme. */
+.join-card img { border-radius: 14px; background: #ffffff; padding: 9px; margin: 0.7rem 0 0.6rem; box-shadow: var(--shadow-md); }
+.join-actions { display: flex; justify-content: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.8rem; }

@@ -5,99 +5,108 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Guess the Music — TV</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@500;600;700&family=Vazirmatn:wght@500;600;700&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Vazirmatn:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/tv.css">
 <link rel="icon" type="image/svg+xml" href="/logo.svg">
 <link rel="icon" href="/icons/icon-192.png">
-<meta name="theme-color" content="#16121f">
+<meta name="theme-color" content="#0b0814">
 </head>
 <body>
+  <!-- Slow-drifting color field behind everything (motion only under the
+       extraAnimations toggle — see the .fx class in tv.css). Pure
+       atmosphere: never over anything that needs reading. -->
+  <div class="aurora" aria-hidden="true">
+    <span class="aurora-blob b1"></span>
+    <span class="aurora-blob b2"></span>
+    <span class="aurora-blob b3"></span>
+  </div>
+
   <div class="tv-wrap">
     <header class="tv-header">
-      <div class="brand"><img src="/logo.svg" alt="" class="logo-mark" width="32" height="32"> <span data-i18n="brand">Guess the Music</span></div>
+      <div class="brand"><img src="/logo.svg" alt="" class="logo-mark" width="40" height="40"> <span data-i18n="brand">Guess the Music</span></div>
+      <div class="header-chip" id="header-join-chip" hidden></div>
     </header>
 
-    <main class="stage" id="stage">
-      <!-- Ambient glow (extraAnimations toggle — cosmetic only). First in
-           the DOM / lowest z-index so it sits behind the video and every
-           panel, only visible in the margins around them — soft, slow,
-           pure background atmosphere, never over anything that needs
-           reading. -->
-      <div class="ambient-glow" id="ambient-glow" aria-hidden="true" hidden>
-        <span class="glow-pool glow-pool-1"></span>
-        <span class="glow-pool glow-pool-2"></span>
-        <span class="glow-pool glow-pool-3"></span>
-      </div>
-
-      <!-- Laser beams (extraAnimations toggle — cosmetic only). Same layer
-           as the ambient glow above (behind the video, lowest z-index) —
-           thin sweeping club-style beams pivoting from just above the top
-           edge, visible in the margins around the video rather than
-           crossing over it or any readable text. -->
-      <div class="laser-beams" id="laser-beams" aria-hidden="true" hidden>
-        <span class="laser-beam laser-beam-1"></span>
-        <span class="laser-beam laser-beam-2"></span>
-        <span class="laser-beam laser-beam-3"></span>
-        <span class="laser-beam laser-beam-4"></span>
-      </div>
-
+    <main class="stage" id="stage" data-status="idle">
+      <!-- Hidden (opacity 0, still playing audio) during every state except
+           'revealed' — that's what keeps the title/artist burned into most
+           music videos off screen while people are guessing. -->
       <div class="video-box">
         <div id="yt-player"></div>
       </div>
 
       <div class="overlay" id="overlay">
+        <!-- Full-stage color flood + sunburst behind the buzzed panel, tinted
+             to the buzzing player's own avatar color. -->
+        <div class="buzz-takeover" id="buzz-takeover" aria-hidden="true">
+          <div class="sunburst"></div>
+        </div>
+
         <!-- idle state -->
         <div class="panel" id="panel-idle">
-          <!-- Category vote: swaps in for the whole idle panel (record,
-               heading, and the join block below) while a vote is active —
-               otherwise the record + "waiting for next round" heading eat
-               the vertical space the vote list needs and it clips against
-               the scoreboard footer. Same "swap the panel's own content
-               into two variants" idea as idle-join-block already used. -->
-          <div id="idle-waiting-block">
-            <div class="record spin" aria-hidden="true"></div>
-            <h1 data-i18n="waitingRound">Waiting for the next round…</h1>
-            <div id="idle-join-block">
-              <p data-i18n="scanToBuzz">Scan to grab a buzzer:</p>
-              <img id="qr" alt="QR code to join as a player" width="180" height="180">
-              <p class="muted" id="join-url"></p>
+          <!-- Category vote swaps in for the whole idle lobby while a vote is
+               active — the lobby block and the vote list don't both fit. -->
+          <div id="idle-waiting-block" class="lobby">
+            <div class="lobby-hero">
+              <div class="record-stage record-stage-sm">
+                <div class="viz-ring" aria-hidden="true"></div>
+                <div class="record spin" aria-hidden="true"></div>
+              </div>
+              <h1 data-i18n="waitingRound">Waiting for the next round…</h1>
               <p class="muted" id="idle-hint"></p>
+            </div>
+            <div id="idle-join-block" class="join-card">
+              <div class="qr-frame"><img id="qr" alt="QR code to join as a player" width="200" height="200"></div>
+              <div class="join-text">
+                <span class="eyebrow" data-i18n="joinEyebrow">Join the game</span>
+                <p class="join-title" data-i18n="scanWithCamera">Scan with your phone camera</p>
+                <p class="join-url" id="join-url" dir="ltr"></p>
+                <p class="join-count" id="join-count" hidden></p>
+              </div>
             </div>
           </div>
 
-          <div id="category-vote-panel" hidden>
+          <div id="category-vote-panel" class="vote-panel" hidden>
             <h2 id="vote-heading">🗳️ Vote for the next category!</h2>
             <div id="vote-options-tv" class="vote-options-tv"></div>
-            <p class="muted small" id="vote-tv-status"></p>
+            <p class="muted" id="vote-tv-status"></p>
           </div>
         </div>
 
         <!-- playing state -->
         <div class="panel" id="panel-playing" hidden>
-          <div class="record spin" aria-hidden="true"></div>
+          <div class="record-stage">
+            <div class="viz-ring" aria-hidden="true"></div>
+            <svg class="timer-ring" id="timer-ring" viewBox="0 0 100 100" aria-hidden="true" hidden>
+              <circle class="timer-track" cx="50" cy="50" r="47"></circle>
+              <circle class="timer-progress" id="timer-progress" cx="50" cy="50" r="47" pathLength="100"></circle>
+            </svg>
+            <div class="record spin" aria-hidden="true"></div>
+          </div>
           <h1 data-i18n="nowPlaying">Now playing…</h1>
           <p id="playing-subtext">Buzz in on your phone!</p>
           <p id="hint-text" hidden></p>
-          <p id="snippet-hint" hidden></p>
+          <p id="snippet-hint" class="tag-chip" hidden></p>
         </div>
 
         <!-- wagering state (Daily Double: chosen player is deciding an amount) -->
         <div class="panel" id="panel-wagering" hidden>
-          <div class="record" aria-hidden="true"></div>
-          <h1>💰 Daily Double!</h1>
+          <h1 class="wager-title">💰 Daily Double!</h1>
           <p id="wagering-subtext">—</p>
         </div>
 
         <!-- buzzed state -->
         <div class="panel" id="panel-buzzed" hidden>
-          <div class="record" aria-hidden="true"></div>
+          <div class="buzzed-avatar" id="buzzed-avatar"></div>
           <h1 id="buzzed-name">—</h1>
-          <p data-i18n="buzzedInFirst">buzzed in first!</p>
+          <p class="buzzed-sub" data-i18n="buzzedInFirst">buzzed in first!</p>
           <p id="buzzed-tease" hidden></p>
         </div>
 
-        <!-- revealed state -->
+        <!-- revealed state (fades with the overlay so the video shows; the
+             persistent lower-third caption below carries the answer) -->
         <div class="panel" id="panel-revealed" hidden>
           <p class="muted" data-i18n="theSongWas">The song was</p>
           <h1 id="reveal-title">—</h1>
@@ -106,122 +115,39 @@
 
         <!-- results state -->
         <div class="panel" id="panel-results" hidden>
+          <span class="eyebrow" data-i18n="gameOverEyebrow">Game over</span>
           <h1 data-i18n="finalScores">🏆 Final Scores</h1>
-          <div id="results-list" class="results-list"></div>
-          <div id="achievement-badges" class="achievement-badges" hidden></div>
-          <div id="session-stats" class="session-stats" hidden></div>
-        </div>
-      </div>
-
-      <!-- Also outside .overlay for the same reason as the hint below: needs
-           to stay visible through 'playing' → 'buzzed' → 'revealed' as one
-           continuous banner for that round, not tied to a single panel. -->
-      <div class="mystery-banner" id="mystery-banner" hidden></div>
-      <div class="wager-banner" id="wager-banner" hidden></div>
-
-      <!-- Lives outside .overlay: the overlay fades out entirely during the
-           'revealed' state to show the real video, but this hint needs to
-           stay visible then. -->
-      <p class="muted auto-advance-hint" id="auto-advance-hint"></p>
-
-      <!-- Also outside .overlay, for the same reason: the big reveal panel
-           fades away with the overlay almost immediately, which was too
-           quick to actually read — this stays up for the whole 'revealed'
-           state as a persistent caption. -->
-      <div class="reveal-caption" id="reveal-caption" hidden>
-        <span id="caption-title"></span><span id="caption-artist"></span>
-      </div>
-
-      <!-- Cartoon mascot companion (extraAnimations toggle — cosmetic
-           only). Also outside .overlay: it needs to stay visible and keep
-           reacting through every roundStatus, 'revealed' included. Built
-           entirely from the same gradient recipe as .record (a face on the
-           record, not a new asset), plus CSS-only eyes/mouth/arms that
-           swap per data-expression instead of separate SVG art. -->
-      <div class="mascot" id="mascot" data-expression="idle" hidden>
-        <div class="mascot-arm mascot-arm-l"></div>
-        <div class="mascot-arm mascot-arm-r"></div>
-        <div class="mascot-head">
-          <div class="mascot-face">
-            <span class="mascot-eye mascot-eye-l"></span>
-            <span class="mascot-eye mascot-eye-r"></span>
+          <div id="results-list" class="results"></div>
+          <div class="results-extras">
+            <div id="achievement-badges" class="achievement-badges" hidden></div>
+            <div id="session-stats" class="session-stats" hidden></div>
           </div>
-          <span class="mascot-cheek mascot-cheek-l"></span>
-          <span class="mascot-cheek mascot-cheek-r"></span>
-          <span class="mascot-mouth"></span>
         </div>
-        <div class="mascot-hat"></div>
       </div>
 
-      <!-- Equalizer bars (extraAnimations toggle — cosmetic only). Flanks
-           the video in its own 20%-margin side gutters (see .video-box's
-           inset). Not real audio analysis — a YouTube iframe embed is
-           cross-origin, so there's no way to tap its actual audio data via
-           Web Audio API; this is a lively randomized bounce instead, shown
-           only while a song is actually audibly playing. -->
-      <div class="equalizer equalizer-left" id="equalizer-left" aria-hidden="true" hidden>
-        <span></span><span></span><span></span><span></span><span></span>
-      </div>
-      <div class="equalizer equalizer-right" id="equalizer-right" aria-hidden="true" hidden>
-        <span></span><span></span><span></span><span></span><span></span>
+      <!-- Outside .overlay: these need to stay visible through
+           'playing' → 'buzzed' → 'revealed' as one continuous banner, and
+           .overlay fades out entirely during 'revealed'. -->
+      <div class="corner-chip mystery-banner" id="mystery-banner" hidden></div>
+      <div class="corner-chip wager-banner" id="wager-banner" hidden></div>
+
+      <p class="auto-advance-hint" id="auto-advance-hint"></p>
+
+      <!-- Broadcast-style lower third, up for the whole 'revealed' state. -->
+      <div class="reveal-caption" id="reveal-caption" hidden>
+        <span class="lt-bar" aria-hidden="true"></span>
+        <div class="lt-body">
+          <span class="lt-label" data-i18n="theSongWas">The song was</span>
+          <span id="caption-title"></span>
+          <span id="caption-artist"></span>
+        </div>
       </div>
 
-      <!-- Party light orbs spawn here dynamically (extraAnimations toggle,
-           idle/results only) — same spawn-one-at-a-time-and-remove-on-
-           animationend pattern as the idle screen's floating notes below,
-           just drifting up the far side edges instead: outside the
-           video-box's own margins and nowhere near the centered panel
-           content (the join QR in particular), so there's no layout
-           collision to chase as that content's height changes. -->
-
-      <!-- Groove dancers (extraAnimations toggle — cosmetic only). A second
-           attempt at "dancing characters" after an earlier stick-figure
-           crowd read as clip-art — chunky rounded shapes built from the
-           same gradient language as the mascot/disco ball instead of thin
-           lines, just 2 of them (not 5) so each one gets to actually look
-           designed. Same far-edge placement as the party orbs above (well
-           outside the video-box's margins, clear of the centered join QR),
-           only during 'idle'/'results'. -->
-      <div class="groove-dancer groove-dancer-left" id="groove-dancer-left" aria-hidden="true" hidden>
-        <div class="groove-spot"></div>
-        <div class="groove-arm groove-arm-l"></div>
-        <div class="groove-arm groove-arm-r"></div>
-        <div class="groove-body"></div>
-        <div class="groove-head"><span class="groove-eye"></span><span class="groove-eye"></span></div>
-        <div class="groove-leg groove-leg-l"></div>
-        <div class="groove-leg groove-leg-r"></div>
-      </div>
-      <div class="groove-dancer groove-dancer-right" id="groove-dancer-right" aria-hidden="true" hidden>
-        <div class="groove-spot"></div>
-        <div class="groove-arm groove-arm-l"></div>
-        <div class="groove-arm groove-arm-r"></div>
-        <div class="groove-body"></div>
-        <div class="groove-head"><span class="groove-eye"></span><span class="groove-eye"></span></div>
-        <div class="groove-leg groove-leg-l"></div>
-        <div class="groove-leg groove-leg-r"></div>
-      </div>
-
-      <!-- Disco ball (extraAnimations toggle — cosmetic only). Hangs from
-           the top, off-center — clear of the centered reveal caption and
-           the corner mystery/wager banners without needing to hide or move
-           for either. Same "no new asset" CSS-only approach as the mascot
-           — the spinning-facets look comes from animating the tiled
-           gradient's background-position rather than rotating the whole
-           circle, so individual facets appear to catch the light as they
-           slide past, not just the ball as a whole spinning uniformly. -->
-      <div class="disco-ball" id="disco-ball" aria-hidden="true" hidden>
-        <div class="disco-ball-glow"></div>
-        <div class="disco-ball-sphere"></div>
-        <span class="disco-sparkle s1"></span>
-        <span class="disco-sparkle s2"></span>
-        <span class="disco-sparkle s3"></span>
-      </div>
-
-      <!-- Sits above everything else (even the mascot) while paused — the
-           whole point of a pause is a clean, unambiguous break screen. -->
+      <!-- Sits above everything else while paused — a clean, unambiguous
+           break screen. -->
       <div class="paused-overlay" id="paused-overlay" hidden>
-        <div class="record spin" aria-hidden="true"></div>
-        <h1 data-i18n="gamePaused">Game paused — back in a moment!</h1>
+        <div class="pause-glyph" aria-hidden="true"><span></span><span></span></div>
+        <h1 data-i18n="pausedTitle">Game paused — back in a moment!</h1>
       </div>
     </main>
 

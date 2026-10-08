@@ -1,56 +1,83 @@
 /* ---------- Tokens ---------- */
 :root {
-  --bg: #16121f;
-  --surface: #221b33;
-  --surface-2: #2c2340;
-  --text: #f4efe6;
-  --text-muted: #9c93b0;
-  --gold: #f5b942;
+  --bg: #0b0814;
+  --bg-2: #140e24;
+  --surface: rgba(255, 255, 255, 0.055);
+  --surface-2: rgba(255, 255, 255, 0.09);
+  --surface-solid: #1a1430;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #f6f2ff;
+  --text-muted: #a69cc4;
+  --gold: #ffc24b;
   --coral: #ff6b5b;
-  --good: #74c69d;
-  --bad: #e5484d;
+  --pink: #f0458f;
+  --violet: #8b5cf6;
+  --cyan: #22d3ee;
+  --good: #34d399;
+  --bad: #f43f5e;
 
-  --font-display: "Fraunces", Georgia, serif;
-  --font-body: "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-fun: "Fredoka", var(--font-display);
+  --grad-brand: linear-gradient(135deg, #ffc24b 0%, #ff7a50 50%, #f0458f 100%);
+  --grad-cool: linear-gradient(135deg, #8b5cf6 0%, #22d3ee 100%);
+  --on-accent: #1d0f05;
 
-  --radius: 18px;
+  --font-display: "Unbounded", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-fun: var(--font-display);
+
+  --radius: 20px;
+  --radius-sm: 12px;
+  --shadow-lg: 0 24px 60px -12px rgba(0, 0, 0, 0.55);
+  --shadow-md: 0 10px 30px -8px rgba(0, 0, 0, 0.45);
+
+  /* Motion tokens — every animation in the app pulls from these, so the
+     whole thing moves with one consistent "feel" (fast-out, soft-landing
+     for UI, a small overshoot spring for celebratory pops). */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 0.16s;
+  --dur: 0.32s;
+  --dur-slow: 0.6s;
 }
 
-/* Vazirmatn covers Farsi glyphs that Fraunces/Space Grotesk don't — swap
-   the font tokens under it when the page is set to RTL (Farsi). Targeting
-   `html[dir="rtl"]` rather than `:root` gives this higher specificity than
-   the :root definitions above, so it cleanly overrides them everywhere
-   they're used via var(). */
+/* Vazirmatn covers Farsi glyphs that Unbounded/Plus Jakarta Sans don't —
+   swap the font tokens under it when the page is set to RTL (Farsi).
+   `html[dir="rtl"]` has higher specificity than :root, so it cleanly
+   overrides the tokens everywhere they're used via var(). */
 html[dir="rtl"] {
-  --font-display: "Vazirmatn", var(--font-body);
-  --font-body: "Vazirmatn", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-fun: "Vazirmatn", var(--font-body);
+  --font-display: "Vazirmatn", system-ui, sans-serif;
+  --font-body: "Vazirmatn", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-fun: "Vazirmatn", system-ui, sans-serif;
 }
 
-/* Light theme (host:setTheme, mirrors the language toggle exactly — a
-   shared state.theme broadcast to host/tv/player alike, same "in-memory
-   only, defaults fresh on restart" treatment as state.language). Same
-   attribute-selector-overrides-:root technique as the RTL block above, so
-   it cleanly wins everywhere a token is used via var() with zero changes
-   needed in host.css/tv.css/player.css themselves.
-   --gold/--good/--coral are darkened here, not left as-is: they're used as
-   plain TEXT color in dozens of places (scores, pills, titles) sitting on
-   a neutral/tinted-neutral surface, and the bright dark-mode versions have
-   under 2:1 contrast against white — nowhere near readable. A handful of
-   TV elements intentionally keep a fixed dark backdrop regardless of theme
-   (the paused overlay, the reveal caption, the auto-advance hint) — those
-   pin their own text to fixed colors instead of these tokens, see tv.css. */
+/* Light theme (host:setTheme — a shared state.theme broadcast to
+   host/tv/player alike). Same attribute-overrides-:root technique as the
+   RTL block above. Accent colors are darkened here because they're used as
+   plain TEXT color in many places, and the bright dark-mode versions don't
+   have enough contrast against a light background. A handful of TV
+   elements deliberately keep a fixed dark backdrop regardless of theme
+   (the paused overlay, the reveal lower-third, the auto-advance chip) — see
+   tv.css. */
 html[data-theme="light"] {
-  --bg: #ffffff;
-  --surface: #f5f2ea;
-  --surface-2: #eae4d5;
-  --text: #1e1832;
-  --text-muted: #6b6478;
-  --gold: #9c6b00;
-  --coral: #c9432f;
-  --good: #1f8a5c;
-  --bad: #c62828;
+  --bg: #f6f3fc;
+  --bg-2: #ece6f8;
+  --surface: rgba(255, 255, 255, 0.75);
+  --surface-2: rgba(40, 20, 80, 0.06);
+  --surface-solid: #ffffff;
+  --border: rgba(40, 20, 80, 0.1);
+  --border-strong: rgba(40, 20, 80, 0.18);
+  --text: #1b1233;
+  --text-muted: #625a7a;
+  --gold: #a26a00;
+  --coral: #c8402c;
+  --pink: #b8256a;
+  --violet: #6d3fe0;
+  --cyan: #0e7f93;
+  --good: #0f8a5c;
+  --bad: #c81e44;
+  --shadow-lg: 0 24px 60px -18px rgba(40, 20, 80, 0.3);
+  --shadow-md: 0 10px 30px -12px rgba(40, 20, 80, 0.25);
   color-scheme: light;
 }
 
@@ -58,15 +85,234 @@ html[data-theme="light"] {
 
 /* Any element using the `hidden` attribute must actually hide, regardless
    of a more specific class also setting its own `display` value (e.g.
-   `.pill { display: inline-flex }` ties in specificity with the browser's
-   default `[hidden] { display: none }` and wins by being declared later —
-   found via .panel/.pill/.name-screen/.buzzer-screen all being affected). */
+   `.pill { display: inline-flex }` would otherwise win over the browser's
+   default `[hidden] { display: none }`). */
 [hidden] { display: none !important; }
 
-/* Join-PIN gate screen (host.html and player.html's name-screen use this
-   for their PIN field) — mirrors player.css's .name-screen sizing so both
-   pages' gates look consistent without host.html needing to load
-   player.css just for this. */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  /* min-height, not height — a fixed height:100% on both html and body is
+     the classic cause of "content below the fold is unreachable" on a
+     standalone-display PWA (host.html installs as one). */
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background:
+    radial-gradient(1200px 700px at 10% -10%, rgba(139, 92, 246, 0.16), transparent 60%),
+    radial-gradient(900px 600px at 110% 110%, rgba(240, 69, 143, 0.12), transparent 60%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+  background-attachment: fixed;
+}
+html[data-theme="light"] body {
+  background:
+    radial-gradient(1200px 700px at 10% -10%, rgba(139, 92, 246, 0.12), transparent 60%),
+    radial-gradient(900px 600px at 110% 110%, rgba(255, 122, 80, 0.1), transparent 60%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+}
+
+.logo-mark { vertical-align: middle; margin-inline-end: 0.2em; }
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+p { margin: 0; color: var(--text-muted); }
+
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ---------- Buttons ---------- */
+button {
+  font-family: var(--font-body);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 0.7em 1.2em;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) ease,
+    box-shadow var(--dur) var(--ease-out),
+    opacity var(--dur-fast) ease;
+}
+button:active:not(:disabled) { transform: scale(0.96); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+button.primary {
+  background: var(--grad-brand);
+  color: var(--on-accent);
+  border-color: transparent;
+  box-shadow: 0 8px 24px -8px rgba(255, 122, 80, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+button.danger {
+  background: rgba(244, 63, 94, 0.14);
+  color: var(--bad);
+  border-color: rgba(244, 63, 94, 0.3);
+}
+button.good {
+  background: var(--good);
+  color: #03241a;
+  border-color: transparent;
+  box-shadow: 0 8px 20px -8px rgba(52, 211, 153, 0.6);
+}
+
+/* Hover only where a real pointer exists. On a phone, :hover "sticks" to
+   whatever was last tapped — that used to repaint the player's big buzz
+   button (and any primary button) in the plain hover color after a single
+   tap, making an armed buzzer look disabled. */
+@media (hover: hover) {
+  button:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.14); }
+  html[data-theme="light"] button:hover:not(:disabled) { background-color: rgba(40, 20, 80, 0.1); }
+  button.primary:hover:not(:disabled) { background: var(--grad-brand); box-shadow: 0 12px 30px -8px rgba(255, 122, 80, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.35); transform: translateY(-1px); }
+  button.danger:hover:not(:disabled) { background-color: rgba(244, 63, 94, 0.24); }
+  button.good:hover:not(:disabled) { background-color: #4ee2ab; }
+}
+
+/* ---------- Inputs ---------- */
+/* 16px is the minimum to stop iOS Safari auto-zooming the page on focus. */
+input[type="text"], input[type="url"], input[type="number"], select {
+  font-family: var(--font-body);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 0.7em 0.95em;
+  font-size: 16px;
+  font-weight: 500;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur) var(--ease-out), background-color var(--dur-fast) ease;
+}
+input[type="text"]:focus, input[type="url"]:focus, input[type="number"]:focus, select:focus {
+  outline: none;
+  border-color: rgba(255, 194, 75, 0.6);
+  box-shadow: 0 0 0 4px rgba(255, 194, 75, 0.15);
+}
+input::placeholder { color: var(--text-muted); opacity: 0.8; }
+
+/* ---------- Surfaces ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  /* Grid items default to min-width: auto, which refuses to shrink below
+     the content's min-content size — on a narrow phone that blows the whole
+     card out wider than the viewport. */
+  min-width: 0;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35em 0.9em;
+  font-weight: 700;
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+.pill.gold { background: rgba(255, 194, 75, 0.14); border-color: rgba(255, 194, 75, 0.3); color: var(--gold); }
+
+.muted { color: var(--text-muted); }
+.small { font-size: 0.85rem; }
+
+/* ---------- Player avatar (shared by tv/player/host — see avatars.js) ---------- */
+.avatar {
+  --a1: #8b5cf6;
+  --a2: #22d3ee;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2em;
+  height: 2em;
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--a1), var(--a2));
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1em;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4px 12px -4px var(--a1);
+}
+.avatar > span { font-size: 0.85em; }
+
+/* ---------- Vinyl record (logo language, reused on tv + player) ---------- */
+.record {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+  /* The groove pattern alone is perfectly rotationally symmetric, so
+     spinning it shows no visible motion — the two light streaks are what
+     actually sell the rotation as they sweep around. */
+  background:
+    conic-gradient(from 20deg, transparent 0 8%, rgba(255, 255, 255, 0.14) 12%, transparent 17% 52%, rgba(255, 255, 255, 0.09) 57%, transparent 62%),
+    repeating-radial-gradient(circle at center, #0c0914 0 1.5px, #19132a 1.5px 4px);
+  box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 0 0 6px #0c0914;
+}
+.record::after {
+  content: "";
+  position: absolute;
+  inset: 34%;
+  border-radius: 50%;
+  background: var(--grad-brand);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25), 0 0 24px rgba(255, 122, 80, 0.35);
+}
+.record::before {
+  content: "";
+  position: absolute;
+  inset: 47.5%;
+  border-radius: 50%;
+  background: #0c0914;
+  z-index: 1;
+}
+
+.spin { animation: spin 3.2s linear infinite; }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Shared score bump, used on every scoreboard. */
+@keyframes score-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.45); color: var(--good); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- Join-PIN gate (host.html; player.html has its own name screen) ---------- */
 .pin-gate {
   min-height: 100vh;
   padding: env(safe-area-inset-top, 1.5rem) 1.5rem env(safe-area-inset-bottom, 1.5rem);
@@ -77,7 +323,7 @@ html[data-theme="light"] {
   text-align: center;
   gap: 1rem;
 }
-.pin-gate h1 { font-size: 2rem; }
+.pin-gate h1 { font-size: 1.8rem; }
 .pin-gate input {
   width: 100%;
   max-width: 320px;
@@ -85,114 +331,13 @@ html[data-theme="light"] {
   font-size: 1.1rem;
   padding: 0.9em;
 }
-.pin-gate button { width: 100%; max-width: 320px; padding: 0.9em; }
-
-html, body {
-  margin: 0;
-  padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-body);
-  /* min-height, not height — a fixed height:100% on both html and body is
-     the classic cause of "content below the fold is unreachable" on a
-     standalone-display PWA (host.html installs as one — see
-     manifest-host.json): the page still needs to grow taller than one
-     viewport and stay scrollable once its content (now several long cards
-     deep on the host page) exceeds it, which a bare height doesn't
-     guarantee the way min-height does. */
-  min-height: 100%;
-  -webkit-font-smoothing: antialiased;
-}
-
-body {
-  background-image:
-    radial-gradient(circle at 20% 0%, rgba(245, 185, 66, 0.06), transparent 55%),
-    radial-gradient(circle at 85% 100%, rgba(255, 107, 91, 0.05), transparent 50%);
-}
-
-.logo-mark { vertical-align: middle; margin-inline-end: 0.15em; }
-
-h1, h2, h3 { font-family: var(--font-display); font-weight: 600; margin: 0; }
-
-p { margin: 0; color: var(--text-muted); }
-
-button {
-  font-family: var(--font-body);
-  border: none;
-  cursor: pointer;
-  color: var(--text);
-  background: var(--surface-2);
-  border-radius: 12px;
-  padding: 0.7em 1.2em;
-  font-size: 1rem;
-  font-weight: 600;
-  transition: transform 0.12s ease, background 0.12s ease;
-}
-button:hover { background: #372a54; }
-button:active { transform: scale(0.97); }
-button:disabled { opacity: 0.4; cursor: not-allowed; }
-button:focus-visible, a:focus-visible, input:focus-visible {
-  outline: 3px solid var(--gold);
-  outline-offset: 2px;
-}
-
-button.primary { background: var(--gold); color: #21170a; }
-button.primary:hover { background: #ffc966; }
-button.danger { background: var(--bad); color: #2a0d0e; }
-button.danger:hover { background: #ff6a6d; }
-button.good { background: var(--good); color: #0d2417; }
-
-/* type="number" was missing here entirely — every number field (round
-   timer, snippet length, auto-advance, vote duration, per-song points, the
-   player's wager amount) fell back to the browser's raw unstyled control:
-   no dark background, no border-radius, a tiny default font. 16px is also
-   the minimum to stop iOS Safari auto-zooming the page in on focus. */
-input[type="text"], input[type="url"], input[type="number"] {
-  font-family: var(--font-body);
-  background: var(--surface);
-  border: 1px solid var(--surface-2);
-  color: var(--text);
-  border-radius: 10px;
-  padding: 0.65em 0.9em;
-  font-size: 16px;
-}
-input::placeholder { color: var(--text-muted); }
-
-.card {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 1.2rem;
-  /* Grid items default to min-width: auto, which refuses to shrink below
-     the content's min-content size — on a narrow phone that blows the
-     whole card (and the page) out wider than the viewport instead of
-     letting the content wrap/scroll/ellipsis inside it like it's supposed
-     to. Same fix already used locally for .playlist-row .info etc., just
-     needed at this top level too. */
-  min-width: 0;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5em;
-  background: var(--surface-2);
-  border-radius: 999px;
-  padding: 0.35em 0.9em;
-  font-weight: 600;
-}
-.pill.gold { background: rgba(245, 185, 66, 0.18); color: var(--gold); }
-
-.muted { color: var(--text-muted); }
-
-.spin {
-  animation: spin 3.2s linear infinite;
-}
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+.pin-gate button { width: 100%; max-width: 320px; padding: 0.95em; }
 
 @media (prefers-reduced-motion: reduce) {
   .spin { animation: none; }
-  * { transition: none !important; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

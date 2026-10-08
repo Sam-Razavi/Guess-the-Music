@@ -34,10 +34,11 @@ The song plays through the TV while a spinning record hides the video. The first
 ![TV while a song is playing](docs/screenshots/05-tv-playing.png)
 ![TV showing who buzzed in first](docs/screenshots/07-tv-buzzed.png)
 
-The host sees who buzzed and awards (or withholds) the point with one tap.
+On the phones, the buzzer lights up the moment buzzing opens, and turns green for whoever got there first. The host sees who buzzed and awards (or withholds) the point with one tap.
 
 <p>
-  <img src="docs/screenshots/08-player-buzzed.png" width="260" alt="Player phone after buzzing in" />
+  <img src="docs/screenshots/06-player-buzzer.png" width="260" alt="Player phone with the buzzer armed" />
+  <img src="docs/screenshots/08-player-buzzed.png" width="260" alt="Player phone after buzzing in first" />
 </p>
 
 ![Host view with a buzz-in](docs/screenshots/09-host-buzzed.png)
@@ -49,10 +50,32 @@ A right answer gets confetti and a chime. **Reveal answer** fades the record awa
 ![TV revealing the song](docs/screenshots/11-tv-reveal.png)
 
 ### 6. Final scores
-When the host is done (or a score/round limit is hit), the TV shows the final ranking, with optional achievement badges and all-time records.
+When the host is done (or a score/round limit is hit), the TV builds a podium (third, then second, then the winner), with optional achievement badges and all-time records.
 
 ![TV final scores](docs/screenshots/12-tv-results.png)
-![Host view at the results screen](docs/screenshots/13-host-results.png)
+
+### More moments
+A few of the optional game modes, all switched on from the host page:
+
+**Category voting** — players vote on their phones and the TV bars fill up live.
+
+![TV category vote](docs/screenshots/13-tv-category-vote.png)
+
+<p>
+  <img src="docs/screenshots/14-player-category-vote.png" width="260" alt="Player phone voting for a category" />
+</p>
+
+**Steal mechanic** — after a wrong answer, the next player to buzz and get it right steals a bonus point.
+
+![TV steal](docs/screenshots/15-tv-steal.png)
+
+**Daily Double** — flag a song as wager-eligible and one player risks their own score on it.
+
+![TV Daily Double](docs/screenshots/16-tv-daily-double.png)
+
+**Farsi and light theme** — the TV, phones and host can switch language and theme live from the host page, with full right-to-left layout.
+
+![TV in Farsi with the light theme](docs/screenshots/17-tv-farsi-light.png)
 
 There's a lot more behind the **Game options** card on the host page — steal mechanic, speed bonus, per-song point values, team mode, blind mode, karaoke-style title hints, a mystery modifier round, category voting, wager rounds, snippet mode, pause, setlist presets, Farsi/English, and more.
 

@@ -43,6 +43,17 @@ const translations = {
     gamePaused: '⏸ Game paused — back in a moment!',
     joinPinPlaceholder: 'Join PIN',
     incorrectPin: 'Incorrect PIN — try again.',
+
+    joinEyebrow: 'Join the game',
+    scanWithCamera: 'Scan with your phone camera',
+    playersJoined: '{n} joined',
+    gameOverEyebrow: 'Game over',
+    correctStamp: 'Correct!',
+    speedBonusTag: '⚡ Speed bonus',
+    takesTheLead: '{name} takes the lead!',
+    stoleIt: '{name} stole it!',
+    youreIn: "You're in!",
+    pausedTitle: 'Game paused — back in a moment!',
   },
   fa: {
     brand: 'حدس آهنگ',
@@ -88,6 +99,17 @@ const translations = {
     gamePaused: '⏸ بازی متوقف شد — به‌زودی برمی‌گردیم!',
     joinPinPlaceholder: 'پین ورود',
     incorrectPin: 'پین اشتباه است — دوباره تلاش کن.',
+
+    joinEyebrow: 'ورود به بازی',
+    scanWithCamera: 'با دوربین گوشی اسکن کن',
+    playersJoined: '{n} نفر وارد شدند',
+    gameOverEyebrow: 'بازی تمام شد',
+    correctStamp: 'درسته!',
+    speedBonusTag: '⚡ امتیاز سرعت',
+    takesTheLead: '{name} جلو افتاد!',
+    stoleIt: '{name} دزدید!',
+    youreIn: 'وارد شدی!',
+    pausedTitle: 'بازی متوقف شد — به‌زودی برمی‌گردیم!',
   },
 };
 

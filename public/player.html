@@ -5,64 +5,77 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Guess the Music — Buzzer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@500;600;700&family=Vazirmatn:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Vazirmatn:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css">
 <link rel="stylesheet" href="/css/player.css">
 <link rel="manifest" href="/manifest-player.json">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="/logo.svg">
 <link rel="icon" href="/icons/icon-192.png">
-<meta name="theme-color" content="#16121f">
+<meta name="theme-color" content="#0b0814">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GTM Buzzer">
 </head>
-<body>
+<body data-state="idle">
+  <!-- Full-screen color wash that changes with the player's situation
+       (armed / locked in / beaten / wrong) — see body[data-state] in
+       player.css. -->
+  <div class="state-glow" aria-hidden="true"></div>
 
   <!-- name entry (shown once, or when editing) -->
   <div class="name-screen" id="name-screen">
-    <h1><img src="/logo.svg" alt="" class="logo-mark" width="44" height="44"> <span data-i18n="brand">Guess the Music</span></h1>
-    <p data-i18n="whatShouldTvCallYou">What should the TV call you?</p>
-    <input type="text" id="name-input" maxlength="24" placeholder="Your name" data-i18n-placeholder="yourNamePlaceholder" autocomplete="off">
-    <input type="text" id="team-input" maxlength="24" placeholder="Team name (optional)" autocomplete="off">
-    <div id="pin-row" hidden>
-      <input type="text" id="pin-input" inputmode="numeric" autocomplete="off" data-i18n-placeholder="joinPinPlaceholder" placeholder="Join PIN">
-      <p class="muted small" id="pin-error"></p>
+    <div class="join-hero" aria-hidden="true">
+      <div class="record spin"></div>
     </div>
-    <button class="primary" id="name-submit" data-i18n="joinGame">Join the game</button>
+    <h1 data-i18n="brand">Guess the Music</h1>
+    <p data-i18n="whatShouldTvCallYou">What should the TV call you?</p>
+    <div class="join-form">
+      <input type="text" id="name-input" maxlength="24" placeholder="Your name" data-i18n-placeholder="yourNamePlaceholder" autocomplete="off">
+      <input type="text" id="team-input" maxlength="24" placeholder="Team name (optional)" autocomplete="off">
+      <div id="pin-row" hidden>
+        <input type="text" id="pin-input" inputmode="numeric" autocomplete="off" data-i18n-placeholder="joinPinPlaceholder" placeholder="Join PIN">
+        <p class="muted small" id="pin-error"></p>
+      </div>
+      <button class="primary" id="name-submit" data-i18n="joinGame">Join the game</button>
+    </div>
   </div>
 
   <!-- main buzzer screen -->
   <div class="buzzer-screen" id="buzzer-screen" hidden>
     <header>
-      <button class="pill" id="name-chip">Player</button>
+      <button class="pill name-chip" id="name-chip">Player</button>
       <div class="pill score-pill"><span id="my-score">0</span> <span data-i18n="pts">pts</span></div>
     </header>
 
     <main>
-      <div id="wager-block" hidden>
+      <div id="wager-block" class="sheet" hidden>
         <h2>💰 Daily Double!</h2>
         <p>You get an exclusive crack at this one — no one else can buzz. How much do you wager?</p>
         <input type="number" id="wager-input" min="0" step="1" value="0">
         <p class="muted small" id="wager-max-hint"></p>
         <button class="primary" id="wager-submit-btn">Lock in wager</button>
       </div>
-      <div id="wager-waiting-block" hidden>
+      <div id="wager-waiting-block" class="sheet" hidden>
         <p class="muted">🎲 <strong id="wager-player-name"></strong> is setting a wager…</p>
       </div>
 
-      <div id="vote-block" hidden>
+      <div id="vote-block" class="sheet" hidden>
         <h2 id="vote-heading">🗳️ Vote for the next category!</h2>
         <div id="vote-options-player" class="vote-options-player"></div>
         <p class="muted small" id="vote-player-status"></p>
       </div>
 
       <button id="buzz-btn" class="buzz-btn" disabled>
-        <span id="buzz-label">Get ready…</span>
+        <span class="buzz-ring" aria-hidden="true"></span>
+        <span class="buzz-ring buzz-ring-2" aria-hidden="true"></span>
+        <span class="buzz-base" aria-hidden="true"></span>
+        <span class="buzz-cap"><span id="buzz-label">Get ready…</span></span>
       </button>
-      <p class="muted" id="mystery-note" hidden></p>
-      <p class="muted" id="status-text">Waiting for the host to start a round…</p>
+      <p class="mystery-note" id="mystery-note" hidden></p>
+      <p class="status-text" id="status-text">Waiting for the host to start a round…</p>
     </main>
   </div>
 
