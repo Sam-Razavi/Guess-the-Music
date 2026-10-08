@@ -191,6 +191,10 @@ socket.on('addSongWarning', ({ message }) => {
   addError.textContent = message;
   addError.classList.add('warn');
 });
+// A successful add clears the "Checking…" note once the new row arrives.
+socket.on('state', () => {
+  if (addError.textContent === 'Checking the video…' && !addError.classList.contains('warn')) addError.textContent = '';
+});
 
 // Auto-search once per distinct error occurrence — saves the host a click
 // at exactly the moment it matters most (a song just failed mid-party),
@@ -367,6 +371,21 @@ function parseYoutubeId(raw) {
   return null;
 }
 
+// A song the server refused (can't play on the TV, or already in the
+// playlist). The form was already cleared on submit, so put the link back —
+// the host can swap the URL for a different upload without retyping the rest.
+let lastAddAttempt = null;
+socket.on('addSongRejected', ({ message }) => {
+  addError.textContent = message;
+  addError.classList.add('warn');
+  if (lastAddAttempt) {
+    document.getElementById('yt-input').value = lastAddAttempt.ytRaw;
+    document.getElementById('title-input').value = lastAddAttempt.title;
+    document.getElementById('artist-input').value = lastAddAttempt.artist;
+    document.getElementById('category-input').value = lastAddAttempt.category;
+  }
+});
+
 document.getElementById('add-song-btn').addEventListener('click', () => {
   const ytRaw = document.getElementById('yt-input').value;
   const title = document.getElementById('title-input').value.trim();
@@ -382,8 +401,9 @@ document.getElementById('add-song-btn').addEventListener('click', () => {
     addError.textContent = 'Give the song a title so you can pick it later.';
     return;
   }
-  addError.textContent = '';
+  addError.textContent = 'Checking the video…';
   addError.classList.remove('warn');
+  lastAddAttempt = { ytRaw, title, artist, category };
   socket.emit('host:addSong', { youtubeId, title, artist, category });
   document.getElementById('yt-input').value = '';
   document.getElementById('title-input').value = '';

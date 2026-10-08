@@ -110,9 +110,15 @@ Keep this terminal running for the whole game night — closing it stops the gam
 
 On the host page, paste a YouTube link (or just the video ID) plus the title, and add it to the playlist. The title/artist are only ever shown to you — the TV and players never see them until you reveal.
 
+### Only playable songs get in
+
+When you add a song by hand, the app checks it with the YouTube API **before** adding it, and refuses videos that won't play on the TV: embedding disabled by the owner, age-restricted, blocked in your country, or missing/private. The message says which, and your form stays filled so you can paste a different upload (an "Artist - Topic" or lyric-video version often works). Playlist import applies the same checks. To catch country blocks, set `PLAYBACK_REGION` in `.env` to your 2-letter country code (e.g. `SE`) — see `.env.example`. With no `YOUTUBE_API_KEY` the song is still added, with a note that it couldn't be verified.
+
 ### Decade, genre and difficulty filters
 
 Every song can carry a **genre** (the category tag), a **decade**, and a **difficulty** (easy / medium / hard). The playlist card has a filter row for each, with live counts, and they combine — e.g. *1980s + Easy + Rock* — on top of the search box. The filters also decide what **Play next**, **Random** and auto-advance pick from, so you can run a whole "90s hip-hop, medium" round without hunting through the list. Tap a song's difficulty badge to change it if you disagree with the rating.
+
+Genres come from one fixed list (19 international ones plus Persian Pop, Persian Rock, Persian Hip-Hop, Persian Traditional, Persian Folk, Bandari, Persian Dance, Persian Jazz, Persian Electronic and Persian Alternative), so the filter row stays tidy. Turn on **Auto-tag new songs** in Game options and a newly added song gets its genre, year and difficulty filled in automatically (only the blanks — it never overrides what you typed).
 
 A big playlist only renders the first 100 matching songs at a time (**Show more** loads the next page), so it stays fast with thousands of songs.
 

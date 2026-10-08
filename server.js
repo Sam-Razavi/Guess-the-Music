@@ -754,32 +754,50 @@ function getAnthropicClient() {
   return anthropicClient;
 }
 
-// Best-effort category suggestion from an LLM — deliberately not limited to
-// genre: whichever of genre/mood/era/origin most usefully distinguishes the
-// song is what gets suggested, since a party playlist filter benefits from
-// all of those. Haiku, low effort, thinking off — this is a trivial
-// single-tag classification, not a task that needs reasoning. Fails
-// silently (returns null) on missing config or any error — this is a
-// convenience only and must never block adding a song or an import; always
-// "suggested category, host can override", never a guarantee.
-async function suggestCategory(title, artist) {
+// The genre list the playlist's filters are built around (host.js shows these
+// as the Genre chips). Auto-tagging only ever suggests from this list, so new
+// songs land in the same buckets as the rest of the playlist instead of
+// inventing one-off tags ("Sassy Pop") that clutter the filter row.
+const GENRES_INTERNATIONAL = ['Pop', 'Rock', 'Classical', 'Metal', 'Alternative', 'Hip-Hop', 'R&B & Soul', 'Funk & Disco', 'Electronic', 'Country', 'Folk', 'Jazz', 'Blues', 'Reggae', 'Latin', 'K-Pop', 'Gospel', 'World', 'Soundtrack'];
+const GENRES_PERSIAN = ['Persian Pop', 'Persian Rock', 'Persian Hip-Hop', 'Persian Traditional', 'Persian Folk', 'Bandari', 'Persian Dance', 'Persian Jazz', 'Persian Electronic', 'Persian Alternative'];
+const ALL_GENRES = [...GENRES_INTERNATIONAL, ...GENRES_PERSIAN];
+
+// Best-effort tags for a song from an LLM: { category (a genre from
+// ALL_GENRES), year, difficulty }. Haiku, low effort, thinking off — a quick
+// classification, not a reasoning task. Difficulty is how recognizable the
+// song is to a mixed party crowd (>=8 easy, 5-7 medium, <=4 hard) — the host
+// can change it from the badge on the playlist row. Fails silently (returns
+// null) on missing config, a bad reply, or any error: this is a convenience
+// only and must never block adding a song or an import — always "suggested,
+// host can override", never a guarantee.
+async function suggestSongTags(title, artist) {
   const client = getAnthropicClient();
   if (!client) return null;
   try {
     const song = artist ? `"${title}" by ${artist}` : `"${title}"`;
     const response = await client.messages.create({
       model: 'claude-haiku-5-5',
-      max_tokens: 20,
+      max_tokens: 80,
       thinking: { type: 'disabled' },
       output_config: { effort: 'low' },
       messages: [{
         role: 'user',
-        content: `Suggest ONE short category tag (1-3 words) for the song ${song}, for a party music-guessing game's playlist filter. Pick whichever kind of tag best distinguishes this song — a genre (e.g. "Rock", "Pop"), a mood (e.g. "Happy", "Sad"), an era (e.g. "80s", "90s"), or an origin/language (e.g. "Persian", "Spanish") — whichever is most useful, not necessarily genre. Reply with ONLY the tag itself, no punctuation, no explanation.`,
+        content: `Tag the song ${song} for a music-guessing party game. Reply with ONLY a JSON object: {"genre": ..., "year": ..., "recog": ...}.
+- genre: exactly one of: ${ALL_GENRES.join(', ')}. Use the "Persian ..." genres (and Bandari) only for Persian-language/Iranian songs; Persian Traditional = classical/dastgah, Persian Folk = regional folk, Persian Dance = upbeat party pop.
+- year: the year the song was first released (integer).
+- recog: integer 1-10, how likely a mixed-age party crowd could name it within ~10 seconds (10 = everyone, 4 = only fans, 1 = obscure).`,
       }],
     });
     const block = response.content.find(b => b.type === 'text');
-    const tag = block && block.text.trim();
-    return tag ? tag.slice(0, 30) : null;
+    if (!block) return null;
+    const parsed = JSON.parse(block.text.trim().replace(/^```(?:json)?|```$/g, '').trim());
+    if (!ALL_GENRES.includes(parsed.genre)) return null;
+    const recog = Math.round(Number(parsed.recog));
+    return {
+      category: parsed.genre,
+      year: parsed.year,
+      difficulty: Number.isFinite(recog) ? (recog >= 8 ? 'easy' : recog >= 5 ? 'medium' : 'hard') : '',
+    };
   } catch (e) {
     return null;
   }
@@ -839,15 +857,26 @@ function extractPlaylistId(input) {
 // true if any batch's own API call failed (bad key, quota exceeded, network
 // issue) — see the two fail-open/fail-closed notes below for why those are
 // handled differently, and why the caller needs to know which happened.
+//
+// "Embeddable" here means "will actually play on the TV", which is more than
+// the owner's embeddable flag: an age-restricted video can't be embedded
+// either, and a video blocked in the country the kiosk PC is in plays as
+// "unavailable". The region check only runs when PLAYBACK_REGION (a 2-letter
+// country code, e.g. SE) is set in .env — the server has no way to know
+// where it is. `reasons` (id -> short human reason) explains each exclusion
+// so add-time checks can say WHY instead of just refusing.
+const PLAYBACK_REGION = (process.env.PLAYBACK_REGION || '').trim().toUpperCase();
+
 async function checkEmbeddable(apiKey, videoIds) {
   const embeddable = new Set();
+  const reasons = new Map();
   let hadApiError = false;
   for (let i = 0; i < videoIds.length; i += 50) {
     const batch = videoIds.slice(i, i + 50);
     if (!batch.length) continue;
     try {
       const apiUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
-      apiUrl.searchParams.set('part', 'status');
+      apiUrl.searchParams.set('part', 'status,contentDetails');
       apiUrl.searchParams.set('id', batch.join(','));
       apiUrl.searchParams.set('key', apiKey);
       const r = await fetch(apiUrl);
@@ -865,8 +894,19 @@ async function checkEmbeddable(apiKey, videoIds) {
       const seen = new Set();
       for (const item of data.items || []) {
         seen.add(item.id);
-        if (item.status && item.status.embeddable !== false) embeddable.add(item.id);
+        const cd = item.contentDetails || {};
+        const region = cd.regionRestriction || null;
+        if (!item.status || item.status.embeddable === false) {
+          reasons.set(item.id, "the video's owner has disabled embedding");
+        } else if (cd.contentRating && cd.contentRating.ytRating === 'ytAgeRestricted') {
+          reasons.set(item.id, 'the video is age-restricted');
+        } else if (PLAYBACK_REGION && region && ((region.blocked && region.blocked.includes(PLAYBACK_REGION)) || (region.allowed && !region.allowed.includes(PLAYBACK_REGION)))) {
+          reasons.set(item.id, `the video is blocked in your country (${PLAYBACK_REGION})`);
+        } else {
+          embeddable.add(item.id);
+        }
       }
+      batch.forEach(id => { if (!seen.has(id)) reasons.set(id, "the video doesn't exist or is private"); });
       // An id the API didn't return at all means that video is gone —
       // deleted, made private, or otherwise no longer exists publicly (this
       // used to fail OPEN here on the theory that a missing id was some rare
@@ -878,7 +918,7 @@ async function checkEmbeddable(apiKey, videoIds) {
       batch.forEach(id => embeddable.add(id));
     }
   }
-  return { embeddable, hadApiError };
+  return { embeddable, hadApiError, reasons };
 }
 
 // Looks for a differently-uploaded copy of the same song when the current
@@ -989,8 +1029,8 @@ app.post('/api/import-playlist', async (req, res) => {
         const batch = playable.slice(i, i + CONCURRENCY);
         await Promise.all(batch.map(async (s) => {
           try {
-            const suggested = await suggestCategory(s.title, s.artist);
-            if (suggested) s.category = suggested;
+            const tags = await suggestSongTags(s.title, s.artist);
+            if (tags) Object.assign(s, tags);
           } catch (e) { /* non-blocking */ }
         }));
       }
@@ -1199,35 +1239,52 @@ io.on('connection', (socket) => {
   });
 
   socket.on('host:addSong', async ({ youtubeId, title, artist, category, year, decade, difficulty }) => {
-    if (!youtubeId) return;
-    const song = makeSong(youtubeId, title, artist, category, { year, decade, difficulty });
+    if (!youtubeId || typeof youtubeId !== 'string') return;
+    const id = youtubeId.trim();
+    if (state.playlist.some(s => s.youtubeId === id)) {
+      socket.emit('addSongRejected', { youtubeId: id, message: 'That video is already in the playlist.' });
+      return;
+    }
+
+    // Verify the video will really play on the TV BEFORE adding it, so a
+    // broken song never reaches the playlist (it used to be added first and
+    // merely warned about afterwards, which is how unplayable songs ended up
+    // in rounds). Only a definite "can't play" blocks the add: with no API
+    // key configured, or if the check itself errors (bad key, quota), the
+    // song is still added with a heads-up that it wasn't verified — manual
+    // add must keep working with zero YouTube API setup.
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    let unverified = null;
+    if (!apiKey) {
+      unverified = "Added, but this couldn't be checked for embedding — add YOUTUBE_API_KEY to .env so the app can verify videos.";
+    } else {
+      const { embeddable, hadApiError, reasons } = await checkEmbeddable(apiKey, [id]);
+      if (hadApiError) {
+        unverified = "Added, but the YouTube check failed (network or quota), so it couldn't be verified as playable.";
+      } else if (!embeddable.has(id)) {
+        socket.emit('addSongRejected', {
+          youtubeId: id,
+          message: `Not added — ${reasons.get(id) || "this video can't be played on the TV"}. Try a different upload (an "Artist - Topic" or lyric-video version often works).`,
+        });
+        return;
+      }
+    }
+
+    const song = makeSong(id, title, artist, category, { year, decade, difficulty });
     state.playlist.push(song);
     savePlaylist();
     broadcast();
+    if (unverified) socket.emit('addSongWarning', { youtubeId: id, message: unverified });
 
-    // Best-effort only — manual add works with zero YouTube API setup
-    // today, and should keep working the same way with none configured.
-    const apiKey = process.env.YOUTUBE_API_KEY;
-    if (apiKey) {
-      const id = youtubeId.trim();
+    // Auto-tagging — fills only what the host left blank (genre, year/decade,
+    // difficulty); never overwrites a choice they made themselves.
+    if (state.settings.autoCategories && (!song.category || !song.decade || !song.difficulty)) {
       try {
-        const { embeddable } = await checkEmbeddable(apiKey, [id]);
-        if (!embeddable.has(id)) {
-          socket.emit('addSongWarning', {
-            youtubeId: id,
-            message: "Heads up: this video has embedding disabled by its owner and likely won't play on the TV.",
-          });
-        }
-      } catch (e) { /* non-blocking — the song's already added either way */ }
-    }
-
-    // Auto-category suggestion — only when the host didn't already type
-    // one themselves; never overwrites a manual choice.
-    if (state.settings.autoCategories && !song.category) {
-      try {
-        const suggested = await suggestCategory(song.title, song.artist);
-        if (suggested && !song.category) {
-          song.category = suggested;
+        const tags = await suggestSongTags(song.title, song.artist);
+        if (tags) {
+          if (!song.category) song.category = tags.category;
+          if (!song.decade) Object.assign(song, sanitizeSongTags({ year: tags.year, difficulty: song.difficulty }));
+          if (!song.difficulty && DIFFICULTIES.includes(tags.difficulty)) song.difficulty = tags.difficulty;
           savePlaylist();
           broadcast();
         }
