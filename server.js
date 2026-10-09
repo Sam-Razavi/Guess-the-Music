@@ -40,6 +40,8 @@ const DEFAULT_STATS = {
 };
 
 const DEFAULT_SETTINGS = {
+  autoRevealOnCorrect: true,   // ✅ Correct also reveals the song and ends the round
+  wrongPenalty: true,          // ❌ Wrong takes 1 point from the player who answered
   stealMechanic: false,
   speedBonus: false,
   pointValues: false,
@@ -576,18 +578,45 @@ function currentSong() {
   return state.currentIndex >= 0 ? state.playlist[state.currentIndex] : null;
 }
 
+// Reveals the current song: marks it played, ends the round's timers and
+// (optionally) schedules the auto-advance to the next song. Shared by the
+// host's Reveal button and the automatic reveal after ✅ Correct. The caller
+// broadcasts.
+function revealRound(autoAdvanceSeconds) {
+  // Snapshot the round timer that was active for the song just revealed,
+  // so an auto-started next round can reuse the same duration — not
+  // read back from a persisted field, since the host's timer input may
+  // change before auto-advance actually fires.
+  const priorTimerSeconds = state.roundTimer ? state.roundTimer.seconds : 0;
+  clearAutoAdvance();
+  if (state.currentIndex >= 0) {
+    state.playlist[state.currentIndex].played = true;
+    state.roundsPlayed += 1;
+    savePlaylist();
+  }
+  state.roundStatus = 'revealed';
+  clearRoundTimer();
+
+  // May immediately overwrite 'revealed' with 'results' if this round just
+  // crossed the round-limit — deliberate: the limit is enforced the moment
+  // the round that hits it gets revealed, not deferred to the next one.
+  checkGameLimit();
+  const seconds = Number(autoAdvanceSeconds);
+  if (state.roundStatus === 'revealed' && seconds > 0) scheduleAutoAdvance(seconds, priorTimerSeconds);
+}
+
 // Judges a buzz-in wrong: remembers it on the buzz entry (so the host and TV
 // keep showing the verdict), notes that this round had a miss (what arms the
 // steal bonus), buzzes that player's own phone, shows "Wrong!" on the TV and
 // logs it. Safe to call twice for the same buzz — it only fires once.
-function applyWrongVerdict(entry) {
+function applyWrongVerdict(entry, penalty = 0) {
   if (!entry || entry.verdict) return false;
   entry.verdict = 'wrong';
   state.roundHadMiss = true;
   const p = state.players[entry.id];
   // Targeted at that player's actual socket, not broadcast to everyone.
   if (p && p.socketId) io.to(p.socketId).emit('wrong');
-  io.to('tv').emit('wrong', { name: displayName(entry.name) });
+  io.to('tv').emit('wrong', { name: displayName(entry.name), penalty });
   const song = currentSong();
   logAction(`❌ ${entry.name} answered wrong${song ? ` on "${song.title}"` : ''}`);
   return true;
@@ -947,9 +976,10 @@ async function checkEmbeddable(apiKey, videoIds) {
   const embeddable = new Set();
   const reasons = new Map();
   let hadApiError = false;
-  for (let i = 0; i < videoIds.length; i += 50) {
-    const batch = videoIds.slice(i, i + 50);
-    if (!batch.length) continue;
+  const batches = [];
+  for (let i = 0; i < videoIds.length; i += 50) batches.push(videoIds.slice(i, i + 50));
+  const checkBatch = async (batch) => {
+    if (!batch.length) return;
     try {
       const apiUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
       apiUrl.searchParams.set('part', 'status,contentDetails');
@@ -964,7 +994,7 @@ async function checkEmbeddable(apiKey, videoIds) {
         // everything's fine when nothing was verified at all.
         hadApiError = true;
         batch.forEach(id => embeddable.add(id));
-        continue;
+        return;
       }
       const data = await r.json();
       const seen = new Set();
@@ -993,7 +1023,15 @@ async function checkEmbeddable(apiKey, videoIds) {
       hadApiError = true;
       batch.forEach(id => embeddable.add(id));
     }
-  }
+  };
+  // A few batches in flight at once. The batches are independent, and a
+  // 2,000+ song playlist is ~45 of them — one after another that took ~15
+  // seconds, long enough for the pre-flight / broken-video buttons to look
+  // hung (and for a flaky phone connection to give up on the request).
+  let nextBatch = 0;
+  await Promise.all(Array.from({ length: Math.min(6, batches.length) }, async () => {
+    while (nextBatch < batches.length) await checkBatch(batches[nextBatch++]);
+  }));
   return { embeddable, hadApiError, reasons };
 }
 
@@ -1602,15 +1640,19 @@ io.on('connection', (socket) => {
   socket.on('host:markWrong', ({ id } = {}) => {
     const current = state.buzzOrder[state.buzzOrder.length - 1];
     if (state.paused || state.roundStatus !== 'buzzed' || !current || current.id !== id || current.verdict) return;
-    applyWrongVerdict(current);
-
+    // What this miss costs: a Daily Double loses the wager; an ordinary round
+    // loses 1 point when "Wrong costs a point" is on. (Reset buzzers marks a
+    // buzz wrong too but never costs anything — it's the host's no-penalty way
+    // to let others try.) Scores may go below zero.
     const wagerAmount = state.wager && state.wager.amount != null ? state.wager.amount : 0;
-    if (wagerAmount > 0) {
+    const loss = state.wager ? wagerAmount : (state.settings.wrongPenalty ? 1 : 0);
+    applyWrongVerdict(current, loss);
+    if (loss > 0) {
       const team = state.settings.teamMode ? teamOf(id) : '';
       const recipients = team ? Object.keys(state.players).filter(pid => teamOf(pid) === team) : [id];
-      recipients.forEach(pid => { state.players[pid].score -= wagerAmount; });
+      recipients.forEach(pid => { state.players[pid].score -= loss; });
       savePlayers();
-      logAction(`-${wagerAmount} ${state.players[id].name} (lost the Daily Double wager)`);
+      logAction(`-${loss} ${state.players[id].name} (${state.wager ? 'lost the Daily Double wager' : 'wrong answer'})`);
     }
 
     // Steal: wrong answers reopen buzzing for the players who haven't had a
@@ -1651,31 +1693,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('host:revealAnswer', ({ autoAdvanceSeconds } = {}) => {
-    // Snapshot the round timer that was active for the song just revealed,
-    // so an auto-started next round can reuse the same duration — not
-    // read back from a persisted field, since the host's timer input may
-    // change before auto-advance actually fires.
-    const priorTimerSeconds = state.roundTimer ? state.roundTimer.seconds : 0;
-    clearAutoAdvance();
-    if (state.currentIndex >= 0) {
-      state.playlist[state.currentIndex].played = true;
-      state.roundsPlayed += 1;
-      savePlaylist();
-    }
-    state.roundStatus = 'revealed';
-    clearRoundTimer();
-
-    // May immediately overwrite 'revealed' with 'results' above if this
-    // round just crossed the round-limit — deliberate: the limit is
-    // enforced the moment the round that hits it gets revealed, not
-    // deferred to the next one.
-    checkGameLimit();
-    if (state.roundStatus === 'revealed' && autoAdvanceSeconds > 0) scheduleAutoAdvance(autoAdvanceSeconds, priorTimerSeconds);
-
+    revealRound(autoAdvanceSeconds);
     broadcast();
   });
 
-  socket.on('host:awardPoint', ({ id, delta }) => {
+  socket.on('host:awardPoint', ({ id, delta, autoAdvanceSeconds }) => {
     if (state.players[id]) {
       // Confetti/chime on the TV only for the natural "they got it right"
       // case — the current buzz-in leader (the most recent buzzer, not
@@ -1752,6 +1774,11 @@ io.on('connection', (socket) => {
       }
 
       checkGameLimit();
+      // ✅ Correct also reveals the song (unless this very award just ended the
+      // game by hitting the score limit — then results are already showing).
+      if (isNaturalCorrectAward && state.settings.autoRevealOnCorrect && state.roundStatus === 'buzzed') {
+        revealRound(autoAdvanceSeconds);
+      }
       broadcast();
     }
   });

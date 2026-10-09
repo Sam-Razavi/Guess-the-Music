@@ -923,3 +923,7 @@ body.fx .place-1 .podium-player .avatar { animation: winner-glow 2.4s var(--ease
   80% { transform: translateX(-0.4rem); }
 }
 @media (prefers-reduced-motion: reduce) { .overlay.shake { animation: none; } }
+
+/* Numbers stay left-to-right even on the right-to-left (Farsi) page — otherwise
+   a negative score like -1 is laid out as "1-". */
+.sb-chip .score, .podium-score, .rest-row .rscore, .count { direction: ltr; unicode-bidi: isolate; }

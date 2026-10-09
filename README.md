@@ -106,6 +106,10 @@ Keep this terminal running for the whole game night — closing it stops the gam
 - **You (the host):** open `host.html` on your own phone or laptop — this is your control panel, so keep the song titles secret from the TV screen. Hosting from your phone? Tip: open `host.html`, then use your browser's **"Add to Home Screen"** option — it installs as a proper app icon and opens full-screen next time, no browser address bar or re-typing the URL. Players can do the same with `player.html`.
 - **Players:** scan the QR code shown on the TV (or open the `player.html` link) on their own phones, type a name, and they're in.
 
+### Keeping phone screens awake
+
+Player and host pages ask the phone to keep its screen on while the page is open — a small note under the buzzer says "Your screen stays on while you play". It starts on the first tap (joining counts) and comes back after switching apps. Because the game runs over plain `http` on your WiFi, the browser's modern Wake Lock feature isn't available, so it uses a hidden looping video instead (the bundled MIT-licensed [NoSleep.js](https://github.com/richtr/NoSleep.js)). If the phone refuses — most often **Low Power Mode on iPhone** or Battery Saver on Android — the note switches to a warning; the sure-fire fix is to set **Auto-Lock / Screen timeout to Never** in the phone's settings for the party. Pressing the side button or leaving the page still locks it, as always.
+
 ## 3. Add songs
 
 On the host page, paste a YouTube link (or just the video ID) plus the title, and add it to the playlist. The title/artist are only ever shown to you — the TV and players never see them until you reveal.
@@ -132,8 +136,8 @@ Tip: pick videos that don't show the song title on screen (plain "official audio
 2. The TV shows a spinning record and starts playing the audio; players' buzzers light up.
 3. First phone to tap **BUZZ** locks the buzzer — their name pops up on the TV.
 4. Judge their answer out loud, then:
-   - **✅ Correct:** hit **Correct** next to their name. The TV shows a "Correct!" stamp and the points are added.
-   - **❌ Wrong:** hit **Wrong**. The TV and that player's phone show it. With the **Steal mechanic** option on, buzzing then reopens for everyone who hasn't had a turn (their buzzers say STEAL!, and a correct steal earns a bonus point). With it off, buzzing stays closed — reveal the answer, or hit **Reset buzzers** to let the others try. (A player who already went can't buzz twice on the same song.)
+   - **✅ Correct:** hit **Correct** next to their name. The points are added, the TV shows a "Correct!" stamp, and the song is revealed automatically ("Ann got it!") — the round is over. (Turn off *Reveal the song on Correct* in Game options to reveal by hand.)
+   - **❌ Wrong:** hit **Wrong**. The player loses 1 point (shown on the TV as "Cat −1"; scores can go below zero) and the TV and their phone show it. With the **Steal mechanic** option on, buzzing then reopens for everyone who hasn't had a turn (their buzzers say STEAL!, and a correct steal earns a bonus point). With it off, buzzing stays closed — reveal the answer, or hit **Reset buzzers** to let the others try. **Reset buzzers never costs points.** (Turn off *Wrong costs a point* in Game options for a penalty-free game; a Daily Double always loses the wager.)
 5. Hit **Reveal answer** to show the real title/artist and video on the TV.
 6. Hit **Close round** and pick the next song.
 

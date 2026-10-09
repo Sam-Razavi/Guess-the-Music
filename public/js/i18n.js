@@ -54,6 +54,9 @@ const translations = {
     stoleIt: '{name} stole it!',
     youreIn: "You're in!",
     pausedTitle: 'Game paused — back in a moment!',
+    gotIt: '✅ {name} got it!',
+    awakeOn: '🔆 Your screen stays on while you play',
+    awakeFail: "⚠️ Couldn't keep the screen on — set Auto-Lock / Screen timeout to Never in your phone's settings",
 
     wrongStamp: 'Wrong!',
     verdictCorrect: '✅ Correct!',
@@ -154,6 +157,9 @@ const translations = {
     stoleIt: '{name} دزدید!',
     youreIn: 'وارد شدی!',
     pausedTitle: 'بازی متوقف شد — به‌زودی برمی‌گردیم!',
+    gotIt: '✅ {name} درست گفت!',
+    awakeOn: '🔆 صفحه‌ی گوشی در طول بازی روشن می‌ماند',
+    awakeFail: '⚠️ نشد صفحه را روشن نگه دارم — در تنظیمات گوشی، قفل خودکار / زمان خاموشی صفحه را روی «هرگز» بگذار',
 
     wrongStamp: 'اشتباه!',
     verdictCorrect: '✅ درسته!',

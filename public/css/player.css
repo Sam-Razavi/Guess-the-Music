@@ -317,3 +317,10 @@ html[data-theme="light"] .buzz-btn:disabled:not(.locked) .buzz-cap {
 @media (prefers-reduced-motion: reduce) {
   .join-hero::before, .buzz-ring, .buzz-btn.locked .buzz-cap { animation: none !important; }
 }
+
+/* Same for the player's own score (it can now be negative after a wrong answer). */
+#my-score { direction: ltr; unicode-bidi: isolate; }
+
+/* "your screen stays on" note under the status text */
+.awake-note { text-align: center; max-width: 30ch; font-size: 0.82rem; font-weight: 600; color: var(--good); opacity: 0.85; }
+.awake-note.fail { color: var(--gold); }

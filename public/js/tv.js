@@ -31,6 +31,7 @@ const autoAdvanceHintEl = document.getElementById('auto-advance-hint');
 const revealCaptionEl = document.getElementById('reveal-caption');
 const captionTitleEl = document.getElementById('caption-title');
 const captionArtistEl = document.getElementById('caption-artist');
+const captionLabelEl = document.querySelector('#reveal-caption .lt-label');
 const mysteryBannerEl = document.getElementById('mystery-banner');
 const wagerBannerEl = document.getElementById('wager-banner');
 const wageringSubtextEl = document.getElementById('wagering-subtext');
@@ -456,9 +457,10 @@ socket.on('correct', (data) => celebrate(data));
 function playWrongSound() {
   playTones([[196, 0, 0.2], [147, 0.18, 0.4]], 'sawtooth', 0.16);
 }
-socket.on('wrong', ({ name } = {}) => {
+socket.on('wrong', ({ name, penalty } = {}) => {
   spawnScreenGlow('rgba(244, 63, 94, 0.42)');
-  spawnStamp(t('wrongStamp', currentLang), name ? [name] : [], 'wrong');
+  // "Sara −1": who missed and what it cost them.
+  spawnStamp(t('wrongStamp', currentLang), name ? [name + (penalty > 0 ? ' \u2212' + penalty : '')] : [], 'wrong');
   playWrongSound();
   if (!reduceMotion) {
     overlay.classList.remove('shake');
@@ -854,6 +856,10 @@ socket.on('state', (state) => {
     captionTitleEl.classList.toggle('shimmer', fxOn(state));
     captionArtistEl.textContent = artist;
     revealCaptionEl.hidden = false;
+    // After a ✅ Correct the lower-third names who got it, instead of the plain
+    // "The song was" label.
+    const winner = [...state.buzzOrder].reverse().find(b => b.verdict === 'correct');
+    captionLabelEl.textContent = winner ? t('gotIt', currentLang).replace('{name}', winner.name) : t('theSongWas', currentLang);
   } else {
     revealCaptionEl.hidden = true;
   }

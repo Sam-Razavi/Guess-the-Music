@@ -1,5 +1,14 @@
 const socket = io();
 
+// Keep the host's phone/laptop screen on too (see keepawake.js) — arms on the first tap.
+const awakePill = document.getElementById('awake-pill');
+KeepAwake.onChange = (s) => {
+  awakePill.hidden = s !== 'on' && s !== 'failed';
+  awakePill.textContent = s === 'on' ? '🔆 screen stays on' : '⚠️ screen may lock — set Auto-Lock to Never';
+  awakePill.classList.toggle('gold', s === 'failed');
+};
+KeepAwake.arm();
+
 // Join-PIN gate (optional — see .env.example's JOIN_PIN). A URL param wins
 // over a remembered one, same reasoning as player.js: a freshly-shared link
 // should always take precedence over a stale value from a previous game.
@@ -9,6 +18,34 @@ let currentPin = new URLSearchParams(location.search).get('pin') || localStorage
 // PIN check on /api applies to the host page too.
 function apiFetch(url, opts = {}) {
   return fetch(url, { ...opts, headers: { ...(opts.headers || {}), 'x-join-pin': currentPin } });
+}
+
+// POST to an /api route with a time limit, one automatic retry if the network
+// hiccups, and an error that says WHAT went wrong. The pre-flight and
+// broken-video buttons used to show "Could not reach the server" for any
+// failure at all — including a slow answer or a reply the page couldn't use —
+// which made a real problem impossible to tell from a flaky connection.
+async function apiPost(url, timeoutMs = 90000) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), timeoutMs);
+    try {
+      const r = await apiFetch(url, { method: 'POST', signal: ctl.signal });
+      let data = null;
+      try { data = await r.json(); } catch (e) { /* not JSON */ }
+      if (!r.ok) return { ok: false, status: r.status, error: (data && data.error) || `the server answered with an error (HTTP ${r.status})` };
+      if (!data) return { ok: false, status: r.status, error: 'the server sent a reply the page could not read' };
+      return { ok: true, data };
+    } catch (e) {
+      lastError = e.name === 'AbortError' ? `no answer after ${Math.round(timeoutMs / 1000)} seconds` : (e.message || 'network error');
+      if (e.name === 'AbortError') break; // already waited long enough — don't wait again
+      await new Promise(res => setTimeout(res, 800));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return { ok: false, error: `couldn't reach the server (${lastError}) — check this device is on the same WiFi as the PC and try again` };
 }
 
 // Re-registering on every 'connect' (not just once at load) matters because
@@ -463,19 +500,19 @@ checkPlaylistBtn.addEventListener('click', async () => {
   checkPlaylistStatus.textContent = 'Checking…';
   brokenVideosList.innerHTML = '';
   try {
-    const r = await apiFetch('/api/check-playlist', { method: 'POST' });
-    const data = await r.json();
-    if (!r.ok) {
-      checkPlaylistStatus.textContent = data.error || 'Check failed.';
+    const res = await apiPost('/api/check-playlist');
+    if (!res.ok) {
+      checkPlaylistStatus.textContent = res.error;
       return;
     }
+    const data = res.data;
     renderBrokenVideos(data.broken);
     let statusMsg = data.broken.length ? `Found ${data.broken.length} that won't play.` : 'All songs check out.';
     if (data.checkError) statusMsg = `⚠️ ${data.checkError}` + (data.broken.length ? ` (${data.broken.length} confirmed broken so far.)` : '');
     checkPlaylistStatus.textContent = statusMsg;
     checkPlaylistStatus.classList.toggle('warn', !!data.checkError);
   } catch (e) {
-    checkPlaylistStatus.textContent = 'Could not reach the server — try again.';
+    checkPlaylistStatus.textContent = `The check ran, but the page could not show its result (${e.message}).`;
   } finally {
     checkPlaylistBtn.disabled = false;
   }
@@ -556,8 +593,12 @@ preflightBtn.addEventListener('click', async () => {
   preflightBtn.disabled = true;
   preflightResults.innerHTML = '<p class="muted small">Checking…</p>';
   try {
-    const r = await apiFetch('/api/preflight', { method: 'POST' });
-    const data = await r.json();
+    const res = await apiPost('/api/preflight');
+    if (!res.ok) {
+      preflightResults.innerHTML = `<p class="preflight-verdict bad">⚠️ Pre-flight check failed</p><p class="muted small">${escapeHtml(res.error)}</p>`;
+      return;
+    }
+    const data = res.data;
     preflightResults.innerHTML = `
       <p class="preflight-verdict ${data.ready ? 'ok' : 'bad'}">${data.ready ? '✅ Ready to go!' : '⚠️ Not quite ready'}</p>
       <ul class="preflight-checks">
@@ -570,7 +611,7 @@ preflightBtn.addEventListener('click', async () => {
       </ul>
     `;
   } catch (e) {
-    preflightResults.innerHTML = '<p class="muted small">Could not reach the server — try again.</p>';
+    preflightResults.innerHTML = `<p class="muted small">The check ran, but the page could not show its result (${escapeHtml(e.message)}).</p>`;
   } finally {
     preflightBtn.disabled = false;
   }
@@ -786,8 +827,8 @@ function renderRound(state) {
     let right;
     if (awaitingVerdict) {
       right = `<div class="actions">
-          <button class="good" data-award="${b.id}:${songPoints}" ${state.paused ? 'disabled' : ''}>✅ Correct +${songPoints}</button>
-          <button class="danger" data-wrong="${b.id}" ${state.paused ? 'disabled' : ''}>❌ Wrong${wagerOn ? ` −${songPoints}` : ''}</button>
+          <button class="good" title="Awards the points${state.settings && state.settings.autoRevealOnCorrect ? ' and reveals the song' : ''}" data-award="${b.id}:${songPoints}" ${state.paused ? 'disabled' : ''}>✅ Correct +${songPoints}</button>
+          <button class="danger" data-wrong="${b.id}" ${state.paused ? 'disabled' : ''}>❌ Wrong${wagerOn ? ` −${songPoints}` : (state.settings && state.settings.wrongPenalty ? ' −1' : '')}</button>
         </div>`;
     } else if (b.verdict === 'correct') {
       right = '<span class="verdict-chip ok">✅ Correct</span>';
@@ -809,7 +850,7 @@ function renderRound(state) {
     btn.addEventListener('click', () => {
       const [id, delta] = btn.dataset.award.split(':');
       buzzOrderList.querySelectorAll('button').forEach(b => { b.disabled = true; }); // one verdict per buzz — no double-clicks
-      socket.emit('host:awardPoint', { id, delta: Number(delta) });
+      socket.emit('host:awardPoint', { id, delta: Number(delta), autoAdvanceSeconds: Number(autoAdvanceInput.value) || 0 });
     });
   });
   buzzOrderList.querySelectorAll('[data-wrong]').forEach(btn => {

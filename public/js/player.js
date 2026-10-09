@@ -10,6 +10,18 @@ function getPlayerId() {
 const myId = getPlayerId();
 const socket = io();
 
+// Keep the phone's screen on while playing (see keepawake.js). It can only start
+// from a tap, so it arms itself on the first one — joining or buzzing counts.
+const awakeNoteEl = document.getElementById('awake-note');
+function renderAwakeNote() {
+  const s = KeepAwake.status;
+  awakeNoteEl.hidden = s !== 'on' && s !== 'failed';
+  awakeNoteEl.classList.toggle('fail', s === 'failed');
+  awakeNoteEl.textContent = s === 'on' ? t('awakeOn', lastLang) : s === 'failed' ? t('awakeFail', lastLang) : '';
+}
+KeepAwake.onChange = renderAwakeNote;
+KeepAwake.arm();
+
 // Join-PIN gate (optional — see .env.example's JOIN_PIN). A URL param wins
 // over a remembered one so a freshly-shared/QR'd link always takes
 // precedence over a stale value from a previous game that used a different
@@ -286,6 +298,7 @@ socket.on('state', (state) => {
   if (currentPin) localStorage.setItem('gtm_pin', currentPin);
   applyTranslations(lang);
   document.documentElement.dataset.theme = state.theme || 'dark';
+  renderAwakeNote();
   renderMysteryNote(state);
   renderCategoryVote(state);
   renderWager(state);
@@ -380,7 +393,10 @@ socket.on('state', (state) => {
     }
   } else if (state.roundStatus === 'revealed') {
     buzzBtn.disabled = true;
-    buzzLabel.textContent = t('roundOver', lang);
+    // If my answer was the right one, keep celebrating through the reveal.
+    const iWon = state.buzzOrder.some(b => b.id === myId && b.verdict === 'correct');
+    buzzLabel.textContent = iWon ? t('verdictCorrect', lang) : t('roundOver', lang);
+    if (iWon) { buzzBtn.classList.add('locked'); setScreenState('locked'); }
     statusText.textContent = t('waitingRound', lang);
   } else if (state.roundStatus === 'results') {
     buzzBtn.disabled = true;

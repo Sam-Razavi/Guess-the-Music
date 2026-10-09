@@ -46,6 +46,7 @@
         </div>
         <button class="pill" id="mc-mode-toggle" title="Simplified view for a guest MC — hides playlist/settings, keeps just the round controls and scoreboard. Stays local to this device.">🎤 MC Mode</button>
         <div class="pill" id="conn-pill">connecting…</div>
+        <div class="pill" id="awake-pill" hidden></div>
       </div>
     </header>
 
@@ -159,6 +160,14 @@
       <section class="card" id="options-card">
         <h2 id="options-toggle">Game options <span class="chevron">▾</span></h2>
         <div class="options-list">
+          <label class="option-row">
+            <input type="checkbox" data-setting="autoRevealOnCorrect">
+            <span><strong>Reveal the song on Correct</strong><br><span class="muted small">Pressing ✅ Correct also reveals the song on the TV and ends the round (auto-advance still applies). Turn off to reveal by hand.</span></span>
+          </label>
+          <label class="option-row">
+            <input type="checkbox" data-setting="wrongPenalty">
+            <span><strong>Wrong costs a point</strong><br><span class="muted small">Pressing ❌ Wrong takes 1 point from the player who answered (a Daily Double loses the wager instead). Scores can go below zero. Reset buzzers never costs points.</span></span>
+          </label>
           <label class="option-row">
             <input type="checkbox" data-setting="stealMechanic">
             <span><strong>Steal mechanic</strong><br><span class="muted small">The ❌ Wrong button reopens buzzing for everyone who has not had a turn — whoever steals it gets a bonus point. With this off, Wrong just shows on the TV and buzzing stays closed (Reset buzzers still lets others try).</span></span>
@@ -309,6 +318,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/vendor/NoSleep.min.js"></script>
+  <script src="/js/keepawake.js"></script>
   <script src="/js/avatars.js"></script>
   <script src="/js/host.js"></script>
 </body>
