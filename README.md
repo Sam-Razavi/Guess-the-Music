@@ -43,11 +43,15 @@ On the phones, the buzzer lights up the moment buzzing opens, and turns green fo
 
 ![Host view with a buzz-in](docs/screenshots/09-host-buzzed.png)
 
-### 5. Correct answer, then the reveal
-A right answer gets confetti and a chime. **Reveal answer** fades the record away to show the real video along with the title and artist.
+### 5. Correct or wrong, then the reveal
+Hit **Correct** and the TV celebrates with confetti and a chime, then fades the record away to show the real video along with the title and artist. (You can also press **Reveal answer** yourself.)
 
 ![TV celebrating a correct answer](docs/screenshots/10-tv-correct.png)
 ![TV revealing the song](docs/screenshots/11-tv-reveal.png)
+
+Hit **Wrong** and that player loses a point; the TV stamps it red and their phone shakes. With the steal mechanic on, buzzing reopens for everyone who hasn't had a turn.
+
+![TV showing a wrong answer](docs/screenshots/18-tv-wrong.png)
 
 ### 6. Final scores
 When the host is done (or a score/round limit is hit), the TV builds a podium (third, then second, then the winner), with optional achievement badges and all-time records.
