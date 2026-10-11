@@ -659,6 +659,35 @@ html[dir="rtl"] .auto-advance-hint { right: auto; left: calc(16% + 1rem); }
 }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
+/* ---------- Autoplay gate ----------
+   Only when the browser refused to start the song by itself. Sits above the
+   round panels but below the pause screen; a full-stage button so a click
+   anywhere on the TV (or Enter/Space) counts. */
+.sound-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  padding: 2rem;
+  border: 0;
+  cursor: pointer;
+  text-align: center;
+  font: inherit;
+  background: rgba(11, 8, 20, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: #f6f2ff; /* fixed — dark backdrop in either theme */
+  animation: fade-in 0.35s var(--ease-out, ease-out) both;
+}
+.sound-gate[hidden] { display: none; }
+.sound-glyph { font-size: 5.5rem; line-height: 1; animation: breathe 2s var(--ease-in-out) infinite; }
+.sound-title { font-family: var(--font-display); font-size: 3rem; font-weight: 800; max-width: 18ch; }
+.sound-sub { font-size: 1.35rem; opacity: 0.75; max-width: 34ch; }
+
 /* ---------- Category vote ---------- */
 .vote-panel { display: flex; flex-direction: column; align-items: center; gap: 1.1rem; width: min(46rem, 80vw); }
 .vote-panel h2 { font-size: 2.2rem; }

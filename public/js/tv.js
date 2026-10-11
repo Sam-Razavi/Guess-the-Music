@@ -89,7 +89,11 @@ let latestState = null;
 function syncVideo(state) {
   if (!state || !player || typeof player.loadVideoById !== 'function') return;
 
-  if (state.currentSong && state.currentSong.youtubeId && state.roundStatus === 'playing'
+  // Not only 'playing': a TV that (re)loads mid-round — kiosk relaunch, PC reboot,
+  // a crash-resume — can open straight into 'buzzed' or 'revealed' and must still
+  // pick the song up. In the normal flow loadedYoutubeId already matches, so this
+  // is a no-op and the song just keeps playing through a buzz-in and the reveal.
+  if (state.currentSong && state.currentSong.youtubeId && ['playing', 'buzzed', 'revealed'].includes(state.roundStatus)
       && state.currentSong.youtubeId !== loadedYoutubeId) {
     loadedYoutubeId = state.currentSong.youtubeId;
     // Object form — startSeconds is how the "start at N seconds in" option
@@ -97,6 +101,7 @@ function syncVideo(state) {
     player.loadVideoById({ videoId: state.currentSong.youtubeId, startSeconds: state.startOffsetSeconds || 0 });
     player.playVideo();
     ensurePlaybackStarted();
+    watchPlaybackStart();
   }
 
   if (state.roundStatus === 'idle') {
@@ -133,6 +138,56 @@ function ensurePlaybackStarted(attempt = 0) {
     ensurePlaybackStarted(attempt + 1);
   }, 700);
 }
+
+// ---- autoplay gate ----
+// Chrome refuses to start sound on a page nobody has clicked yet unless it was
+// launched with --autoplay-policy=no-user-gesture-required (scripts/launch-kiosk.ps1
+// does; an ordinary Chrome window does not). A blocked player raises no error —
+// it just sits "unstarted" — which from the couch looks like a song that loads
+// forever. So: if a round that should be playing never reaches PLAYING, say what
+// is wrong and ask for one click. That click marks the page user-activated for
+// good, so every later song starts by itself with no gate.
+const soundGateEl = document.getElementById('sound-gate');
+let playWatchdog = null;
+const WATCHDOG_MS = 2500;
+const WATCHDOG_GIVE_UP_MS = 20000; // a genuinely slow connection can sit in 'buffering' a while — don't nag forever
+
+function setSoundGate(on) {
+  if (soundGateEl.hidden === !on) return;
+  soundGateEl.hidden = !on;
+  if (on) reportPlayerStatus('blocked', 'Autoplay is blocked on the TV — click the TV screen once (or press any key) to start the sound');
+}
+
+function watchPlaybackStart(startedAt = Date.now()) {
+  clearTimeout(playWatchdog);
+  playWatchdog = setTimeout(() => {
+    if (!player || typeof player.getPlayerState !== 'function') return;
+    if (!latestState || latestState.roundStatus !== 'playing' || latestState.paused) return;
+    const s = player.getPlayerState();
+    if (s === 1) return;                                // PLAYING — all good
+    if (s === -1 || s === 5) { setSoundGate(true); return; } // UNSTARTED / CUED: it never began, i.e. blocked
+    if (Date.now() - startedAt < WATCHDOG_GIVE_UP_MS) watchPlaybackStart(startedAt); // still buffering — look again
+  }, WATCHDOG_MS);
+}
+
+// The unlocking gesture. The IFrame API gives no hook for "the user clicked", so
+// listen on the page itself. Capture phase + never stopPropagation: this must not
+// swallow a click that something else on the TV wants.
+function unlockSound() {
+  if (soundGateEl.hidden || !player || typeof player.playVideo !== 'function') return;
+  player.playVideo();
+  // playVideo() on a player that already gave up isn't always enough — if it still
+  // hasn't started a moment later, load the song fresh now that we have a gesture.
+  setTimeout(() => {
+    if (soundGateEl.hidden || !latestState || !latestState.currentSong) return;
+    const s = player.getPlayerState();
+    if (s !== 1 && s !== 3) {
+      player.loadVideoById({ videoId: latestState.currentSong.youtubeId, startSeconds: latestState.startOffsetSeconds || 0 });
+      player.playVideo();
+    }
+  }, 1200);
+}
+['pointerdown', 'keydown'].forEach(type => document.addEventListener(type, unlockSound, true));
 
 // Lets the host see whether a song is *actually* playing, not just that the
 // round's game-state is 'playing' — the two can disagree (silently stuck
@@ -174,7 +229,13 @@ function createPlayer() {
     },
     events: {
       onReady: () => syncVideo(latestState),
-      onStateChange: (e) => reportPlayerStatus(YT_STATE_NAMES[e.data] || 'unknown'),
+      onStateChange: (e) => {
+        if (e.data === 1) setSoundGate(false); // it's playing — whatever blocked it is cleared
+        reportPlayerStatus(YT_STATE_NAMES[e.data] || 'unknown');
+      },
+      // Fires when the browser itself says it blocked playback (newer API builds);
+      // the watchdog above covers builds/browsers that stay silent.
+      onAutoplayBlocked: () => { if (latestState && latestState.roundStatus === 'playing') setSoundGate(true); },
       onError: (e) => reportPlayerStatus('error', YT_ERROR_MESSAGES[e.data] || `Playback error (code ${e.data})`),
     },
   });
@@ -896,6 +957,7 @@ socket.on('state', (state) => {
   // ---- pause/resume: covers the whole screen and actually pauses playback,
   // not just a visual overlay. ----
   pausedOverlayEl.hidden = !state.paused;
+  if (state.roundStatus !== 'playing' || state.paused) setSoundGate(false); // only ever relevant while a song is meant to be playing
   if (player && typeof player.pauseVideo === 'function' && typeof player.playVideo === 'function') {
     if (state.paused) {
       player.pauseVideo();

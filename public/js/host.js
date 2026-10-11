@@ -268,6 +268,7 @@ socket.on('playerStatus', ({ status, message }) => {
   else if (status === 'playing') setPlaybackPill('🔊 Playing', 'ok');
   else if (status === 'buffering') setPlaybackPill('⏳ Buffering…', 'pending');
   else if (status === 'paused') setPlaybackPill('⏸ Paused', 'pending');
+  else if (status === 'blocked') setPlaybackPill('🔇 TV needs one click to start sound — click its screen once', 'error');
   else if (status === 'unstarted' || status === 'cued') setPlaybackPill('⏳ Loading…', 'pending');
   else playbackPill.hidden = true;
 });

@@ -144,6 +144,15 @@
         </div>
       </div>
 
+      <!-- Shown only when the browser blocked autoplay (a plain Chrome window,
+           not the kiosk launcher's) — see the "autoplay gate" in tv.js. A real
+           button so Enter/Space work as well as a click or tap. -->
+      <button class="sound-gate" id="sound-gate" type="button" hidden>
+        <span class="sound-glyph" aria-hidden="true">🔊</span>
+        <span class="sound-title" data-i18n="soundGateTitle">Click anywhere to start the music</span>
+        <span class="sound-sub" data-i18n="soundGateSub">Your browser blocked autoplay. One click and every song plays by itself from then on.</span>
+      </button>
+
       <!-- Sits above everything else while paused — a clean, unambiguous
            break screen. -->
       <div class="paused-overlay" id="paused-overlay" hidden>

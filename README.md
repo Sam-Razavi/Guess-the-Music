@@ -106,7 +106,7 @@ Keep this terminal running for the whole game night — closing it stops the gam
 
 ## 2. Set it up
 
-- **TV:** open the Android TV's browser and go to the `tv.html` link above. Tap the **"Tap once to enable sound"** button once so the browser is allowed to autoplay audio for the rest of the session.
+- **TV:** open the Android TV's browser and go to the `tv.html` link above. Browsers block sound until someone clicks the page, so if a round starts and the TV shows **"Click anywhere to start the music"**, click (or press any key) once — after that every song plays by itself for the rest of the session. The host page also shows "🔇 TV needs one click to start sound" while it's waiting. (The always-on kiosk PC below launches Chrome with autoplay allowed, so it never asks.)
 - **You (the host):** open `host.html` on your own phone or laptop — this is your control panel, so keep the song titles secret from the TV screen. Hosting from your phone? Tip: open `host.html`, then use your browser's **"Add to Home Screen"** option — it installs as a proper app icon and opens full-screen next time, no browser address bar or re-typing the URL. Players can do the same with `player.html`.
 - **Players:** scan the QR code shown on the TV (or open the `player.html` link) on their own phones, type a name, and they're in.
 
@@ -211,6 +211,8 @@ powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Guess
 ```
 
 To exit kiosk mode, `Alt+F4` the Chrome window (or kill it from Task Manager).
+
+> **Songs stuck on "Loading…" on the TV?** That's almost always Chrome blocking autoplay because the TV page is open in an *ordinary* Chrome window instead of the kiosk launcher above (only the launcher passes `--autoplay-policy=no-user-gesture-required`). The TV now shows a "Click anywhere to start the music" screen when it happens — one click fixes it until the page is reloaded — but the lasting fix is to close the ordinary window and re-open the TV with the `launch-kiosk.ps1` command above.
 
 ### YouTube playlist import (optional)
 
