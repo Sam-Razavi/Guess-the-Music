@@ -34,7 +34,11 @@
            'revealed' — that's what keeps the title/artist burned into most
            music videos off screen while people are guessing. -->
       <div class="video-box">
-        <div id="yt-player"></div>
+        <!-- Two players: the round plays on one while the other quietly preloads the
+             song coming up next, so a round can start the instant the countdown ends
+             (see "YouTube players" in tv.js). Only the active one is ever visible. -->
+        <div class="yt-slot is-active"><div id="yt-player"></div></div>
+        <div class="yt-slot"><div id="yt-player-b"></div></div>
       </div>
 
       <div class="overlay" id="overlay">

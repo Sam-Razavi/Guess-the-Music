@@ -65,6 +65,8 @@ const DEFAULT_SETTINGS = {
   scoreLimitValue: 0,    // score at which a player/team ends the game early (0 = off) — see checkGameLimit()
   roundLimitValue: 0,    // rounds played at which the game ends early (0 = off) — see checkGameLimit()
   easterEggMahtab: false,
+  easterEggMina: false,
+  fadeBetweenSongs: true,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -286,6 +288,8 @@ const state = {
   theme: 'dark',                  // 'dark' | 'light' — TV/player/host display theme, set by the host; same in-memory-only, resets-on-restart treatment as language
   playFilter: { category: '', decade: '', difficulty: '' }, // narrows which unplayed songs pickNextSong() draws from — mirrors the host's playlist filter chips; '' = no filter on that axis. In-memory only, same as playOrder.
   playOrder: 'sequential',        // 'sequential' | 'random' — order pickNextSong() picks from for auto-advance/host:playNext; same in-memory-only treatment as language/theme. Manually clicking Play on a specific song always ignores this and just plays that song.
+  upNextId: null,                  // random order only: the song pickNextSong() will hand out next, chosen ahead of time so the TV can preload it — see peekNextSong()
+  nextRoundOptions: null,          // {timerSeconds, snippetSeconds, startOffsetSeconds} — what the host's round-option boxes say right now (host:setNextRoundOptions); used by auto-advance and for the TV's preload. In-memory only.
   autoAdvance: null,               // {endsAt} | null — pending auto-start of the next unplayed song; doesn't survive a restart, see saveRoundState()
   settings: loadSettings(),       // host-toggleable game options — see DEFAULT_SETTINGS
   roundHadMiss: canResumeRound ? !!savedRound.roundHadMiss : false, // true once resetBuzzers has fired this round — powers the steal-mechanic bonus
@@ -353,11 +357,41 @@ function matchesPlayFilter(song) {
     && (!f.difficulty || song.difficulty === f.difficulty);
 }
 
-function pickNextSong() {
+// The song Play next / auto-advance will start next. In random order the pick is made
+// ahead of time and kept (state.upNextId) until it's played or stops fitting the
+// filter, so the TV can preload exactly that song while the current one plays.
+function peekNextSong() {
   const unplayed = state.playlist.filter(s => !s.played && matchesPlayFilter(s));
-  if (!unplayed.length) return null;
-  if (state.playOrder === 'random') return unplayed[Math.floor(Math.random() * unplayed.length)];
-  return unplayed[0];
+  if (!unplayed.length) { state.upNextId = null; return null; }
+  if (state.playOrder !== 'random') return unplayed[0];
+  const kept = state.upNextId && unplayed.find(s => s.id === state.upNextId);
+  if (kept) return kept;
+  const pick = unplayed[Math.floor(Math.random() * unplayed.length)];
+  state.upNextId = pick.id;
+  return pick;
+}
+
+function pickNextSong() {
+  return peekNextSong();
+}
+
+function upNextForTv() {
+  if (state.roundStatus === 'results' || state.roundStatus === 'wagering') return null;
+  const next = peekNextSong();
+  if (!next) return null;
+  const o = state.nextRoundOptions;
+  const offset = !state.settings.startOffset ? 0 : (o ? o.startOffsetSeconds : state.startOffsetSeconds);
+  return { youtubeId: next.youtubeId, startOffsetSeconds: offset || 0 };
+}
+
+// Round options for a round that starts without the host pressing a button (auto-
+// advance): whatever the host's boxes say now, or — if no host page has reported
+// them yet — the same as the round just played.
+function nextRoundOptionsOr(fallbackTimerSeconds) {
+  const o = state.nextRoundOptions;
+  return o
+    ? { timerSeconds: o.timerSeconds, snippetSeconds: o.snippetSeconds, startOffsetSeconds: o.startOffsetSeconds }
+    : { timerSeconds: fallbackTimerSeconds, snippetSeconds: state.snippetSeconds, startOffsetSeconds: state.startOffsetSeconds };
 }
 
 // Shared by host:showResults and checkGameLimit() below (an early, automatic
@@ -420,11 +454,12 @@ function scheduleAutoAdvance(seconds, nextRoundTimerSeconds) {
     // it, same as those manual actions would.
     if (state.roundStatus === 'revealed' && !state.paused) {
       const next = pickNextSong();
-      // The next song starts the way the one just revealed did: same round timer,
-      // same snippet length, same "start at N seconds" — those last two used to be
+      // Round timer, snippet length and "start at N seconds" come from the host's
+      // boxes (or, failing that, the round just revealed). The last two used to be
       // dropped here, so with auto-advance on every song after the first started
       // from the beginning no matter what offset the host had set.
-      if (next) startRound(next.id, nextRoundTimerSeconds, state.snippetSeconds, undefined, state.startOffsetSeconds);
+      const o = nextRoundOptionsOr(nextRoundTimerSeconds);
+      if (next) startRound(next.id, o.timerSeconds, o.snippetSeconds, undefined, o.startOffsetSeconds);
     }
     broadcast();
   }, seconds * 1000);
@@ -713,9 +748,23 @@ const MAHTAB_TEASES = {
 // Applied only at display time — the suffix follows whichever language the
 // host currently has selected (shared state.language, same as every other
 // TV/player-facing string), not the viewer's own device.
+// ---------- Easter egg: Mina ----------
+// Same idea, gentler: "Mina" is shown as "Mina jan" and "مینا" as "مینا جان" — the
+// suffix follows the script the name was typed in, so it never comes out half
+// English, half Persian. Display-only, like the Mahtab one.
+function minaSuffix(name) {
+  if (!name) return null;
+  const n = name.trim();
+  if (n.toLowerCase() === 'mina') return 'jan';
+  return n.replace(/[يى]/g, 'ی').replace(/ك/g, 'ک') === 'مینا' ? 'جان' : null;
+}
+
 function displayName(name) {
-  if (!state.settings.easterEggMahtab || !isMahtabName(name)) return name;
-  return `${name} ${state.language === 'fa' ? 'شوهری' : 'Shohari'}`;
+  if (state.settings.easterEggMahtab && isMahtabName(name)) {
+    return `${name} ${state.language === 'fa' ? 'شوهری' : 'Shohari'}`;
+  }
+  const mina = state.settings.easterEggMina ? minaSuffix(name) : null;
+  return mina ? `${name.trim()} ${mina}` : name;
 }
 
 function mahtabTease() {
@@ -795,6 +844,7 @@ function payloadFor(role) {
       currentIndex: state.currentIndex,
       playOrder: state.playOrder,
       playFilter: state.playFilter,
+      nextRoundOptions: state.nextRoundOptions,
       // "Double points" reuses the points-per-song pipeline exactly — just
       // overriding the runtime value shown/awarded for this one round. The
       // song's own stored points field never changes.
@@ -839,6 +889,10 @@ function payloadFor(role) {
             hint: showHint ? buildHintMask(song.title, state.hintRevealedIndices) : null,
           }
         : null,
+      // The song Play next / auto-advance would start, for the TV's second (hidden)
+      // player to preload so that round can start the instant the countdown ends.
+      // TV only — it's the next answer, so it never goes to phones.
+      upNext: upNextForTv(),
     };
   }
 
@@ -1812,6 +1866,18 @@ io.on('connection', (socket) => {
     if (order !== 'sequential' && order !== 'random') return;
     state.playOrder = order;
     broadcast();
+  });
+
+  // The host page reports its round-option boxes (timer, snippet, start offset)
+  // whenever they change, so auto-advance uses what the host typed and the TV can
+  // preload the next song at the right start point.
+  socket.on('host:setNextRoundOptions', (o) => {
+    if (!o || typeof o !== 'object') return;
+    const n = (v, max) => Math.min(max, Math.max(0, Math.floor(Number(v) || 0)));
+    const next = { timerSeconds: n(o.timerSeconds, 3600), snippetSeconds: n(o.snippetSeconds, 600), startOffsetSeconds: n(o.startOffsetSeconds, 3600) };
+    const prev = state.nextRoundOptions;
+    state.nextRoundOptions = next;
+    if (!prev || prev.startOffsetSeconds !== next.startOffsetSeconds) broadcast();
   });
 
   // Starts whichever unplayed song pickNextSong() picks next, honoring

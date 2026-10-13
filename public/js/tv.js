@@ -82,6 +82,96 @@ let player = null;
 let loadedRoundKey = null; // which ROUND's song is loaded — see roundKeyOf()
 let latestState = null;
 
+// ---- YouTube players: two of them ----
+// `player` is always the one the current round plays on; `spare` is the other. While a
+// round plays, the spare preloads the song coming up next (the server sends it as
+// state.upNext): loaded muted, frozen on its first frame at the right start point. When
+// that round starts the two swap roles — nothing left to load, so the music starts the
+// moment the countdown ends — and the previous song fades out on the old one. If the
+// host starts some other song, it's loaded on the spare the normal way (still with the
+// countdown hold below). If the second player never comes up, everything still works on
+// one player, just without the preloading.
+let spare = null;
+let spareSong = null;    // what the spare holds: { youtubeId, offset, frozen, ready, failed }
+let ducked = null;       // the previous round's player, playing quietly under the countdown until GO
+let lastReleaseAt = 0;   // when the current round's music was let go — preloading waits a moment after it
+
+function isReady(p) { return !!(p && p.__ready && typeof p.loadVideoById === 'function'); }
+function isSounding(p) { if (!isReady(p)) return false; const s = p.getPlayerState(); return s === 1 || s === 3; }
+
+function showOnly(p) {
+  const frame = isReady(p) && typeof p.getIframe === 'function' ? p.getIframe() : null;
+  if (!frame) return;
+  document.querySelectorAll('.yt-slot').forEach(slot => slot.classList.toggle('is-active', slot === frame.parentElement));
+}
+
+// ---- fades (the "Fade out between songs" game option) ----
+const fades = new Map(); // player -> interval
+function fadeOn(state) { return !!(state && state.settings && state.settings.fadeBetweenSongs); }
+function cancelFade(p) { const h = fades.get(p); if (h) { clearInterval(h); fades.delete(p); } }
+// Ramps p's volume to `to` (0–100) over `ms` along a quarter-cosine (sounds smoother than a
+// straight line), then calls `then`.
+function fadeVolume(p, to, ms, then) {
+  cancelFade(p);
+  if (!isReady(p)) { if (then) then(); return; }
+  const from = typeof p.getVolume === 'function' ? p.getVolume() : 100;
+  const t0 = Date.now();
+  const h = setInterval(() => {
+    const k = Math.min(1, (Date.now() - t0) / ms);
+    p.setVolume(Math.round(to + (from - to) * Math.cos(k * Math.PI / 2)));
+    if (k >= 1) { clearInterval(h); fades.delete(p); if (then) then(); }
+  }, 60);
+  fades.set(p, h);
+}
+
+// Done with a player's song: fade it out over `ms` (0 = right away), stop it, and put its
+// volume back for whatever it plays next. Freeing the spare is also the cue to preload.
+function retire(p, ms) {
+  if (!isReady(p)) return;
+  const done = () => {
+    try { p.stopVideo(); p.setVolume(100); } catch (e) { /* player torn down */ }
+    if (p === spare) setTimeout(() => maybePreload(latestState), 300);
+  };
+  if (ms > 0 && isSounding(p)) fadeVolume(p, 0, ms, done);
+  else { cancelFade(p); done(); }
+}
+
+// The previous round's player when a new round takes over: with fading on it ducks to a
+// quiet bed under the countdown and finishes fading as the new song comes in (see
+// prerollRelease); without a countdown it crossfades; with fading off it just stops.
+function letGoOf(p, state) {
+  if (!isReady(p) || p === player) return;
+  if (!fadeOn(state) || !isSounding(p)) { retire(p, 0); return; }
+  if (preroll.active) { fadeVolume(p, 25, 1700); ducked = p; }
+  else retire(p, 2500);
+}
+
+// Preload state.upNext on the spare — muted, frozen on its first frame at the start point.
+function maybePreload(state) {
+  if (!state || !state.upNext || !isReady(spare) || fades.has(spare) || spare === ducked) return;
+  if (preroll.active) return; // the current round is still getting its own song ready
+  const since = Date.now() - lastReleaseAt;
+  if (state.roundStatus === 'playing' && since < 1500) { setTimeout(() => maybePreload(latestState), 1600 - since); return; }
+  const want = { youtubeId: state.upNext.youtubeId, offset: state.upNext.startOffsetSeconds || 0 };
+  if (spareSong && spareSong.youtubeId === want.youtubeId && (spareSong.offset === want.offset || spareSong.failed)) return;
+  if (!spareSong && isSounding(spare)) return; // something audible is still on it
+  spareSong = { ...want, frozen: false, ready: false, failed: false };
+  spare.mute();
+  spare.setVolume(100);
+  spare.loadVideoById({ videoId: want.youtubeId, startSeconds: want.offset });
+}
+
+function onSpareState(p, e) {
+  if (p !== spare || !spareSong || spareSong.ready || spareSong.failed) return;
+  if (e.data === 1 && !spareSong.frozen) {
+    spareSong.frozen = true;
+    p.pauseVideo();
+    p.seekTo(spareSong.offset, true);
+  } else if (e.data === 2 && spareSong.frozen) {
+    spareSong.ready = true;
+  }
+}
+
 // A round's identity: its song AND when it started. Keying on the song alone meant
 // that starting the same song again (a replay, or re-testing a start offset) looked
 // like "already loaded" and carried on from wherever the player was.
@@ -115,6 +205,8 @@ function prerollRelease() {
   const waiting = preroll.onReady; // a countdown still waiting on "1" — let it finish
   preroll.onReady = null;
   if (player && typeof player.unMute === 'function') {
+    cancelFade(player);
+    player.setVolume(100);
     player.unMute();
     if (!(latestState && latestState.paused)) { // while paused the overlay owns playback; resuming plays it
       player.playVideo();
@@ -122,6 +214,10 @@ function prerollRelease() {
       watchPlaybackStart();
     }
   }
+  // The previous song, kept quietly under the countdown, bows out as this one comes in.
+  if (ducked) { retire(ducked, 900); ducked = null; }
+  lastReleaseAt = Date.now();
+  setTimeout(() => maybePreload(latestState), 1600);
   if (waiting) waiting();
 }
 
@@ -148,24 +244,62 @@ function syncVideo(state) {
   if (state.currentSong && state.currentSong.youtubeId && ['playing', 'buzzed', 'revealed'].includes(state.roundStatus)
       && roundKeyOf(state) !== loadedRoundKey) {
     loadedRoundKey = roundKeyOf(state);
-    // A held start (see "start of a round" above) loads muted — muted autoplay is
-    // always allowed — and is frozen at its first frame in onStateChange; anything
-    // else loads and plays straight away.
-    if (preroll.active) player.mute(); else player.unMute();
-    // Object form — startSeconds is how the "start at N seconds in" option
-    // actually skips the intro, per the IFrame API.
-    player.loadVideoById({ videoId: state.currentSong.youtubeId, startSeconds: state.startOffsetSeconds || 0 });
-    if (!preroll.active) {
-      player.playVideo();
-      ensurePlaybackStarted();
-      watchPlaybackStart();
+    const videoId = state.currentSong.youtubeId;
+    const offset = state.startOffsetSeconds || 0;
+    // The new round comes in on the spare — which may already hold exactly this song —
+    // and the previous song is let go on the other player (faded, or stopped).
+    let held = null;
+    if (isReady(spare)) {
+      held = spareSong && spareSong.youtubeId === videoId && !spareSong.failed ? spareSong : null;
+      const outgoing = player;
+      cancelFade(spare);
+      if (ducked) { retire(ducked, 0); ducked = null; }
+      player = spare;
+      spare = outgoing;
+      spareSong = null;
+      showOnly(player);
+      letGoOf(outgoing, state);
+    }
+    if (held) {
+      // Preloaded: nothing to load. Hand over how far it got, so a countdown can say GO
+      // straight away (or, with no countdown, just play).
+      if (held.offset !== offset) player.seekTo(offset, true);
+      if (preroll.active) {
+        preroll.frozen = held.frozen;
+        preroll.ready = held.ready;
+      } else {
+        player.setVolume(100);
+        player.unMute();
+        player.playVideo();
+        ensurePlaybackStarted();
+        watchPlaybackStart();
+        lastReleaseAt = Date.now();
+      }
+    } else {
+      // A held start (see "start of a round" above) loads muted — muted autoplay is
+      // always allowed — and is frozen at its first frame in onStateChange; anything
+      // else loads and plays straight away.
+      cancelFade(player);
+      player.setVolume(100);
+      if (preroll.active) player.mute(); else player.unMute();
+      // Object form — startSeconds is how the "start at N seconds in" option
+      // actually skips the intro, per the IFrame API.
+      player.loadVideoById({ videoId, startSeconds: offset });
+      if (!preroll.active) {
+        player.playVideo();
+        ensurePlaybackStarted();
+        watchPlaybackStart();
+        lastReleaseAt = Date.now();
+      }
     }
   }
 
   if (state.roundStatus === 'idle') {
     loadedRoundKey = null;
     clearTimeout(snippetTimeout);
-    if (typeof player.stopVideo === 'function') player.stopVideo();
+    if (ducked) { retire(ducked, 0); ducked = null; }
+    // Closing a round fades the song out instead of cutting it (with the option on).
+    if (!fades.has(player)) retire(player, fadeOn(state) ? 3000 : 0);
   }
 }
 
@@ -178,10 +312,15 @@ function scheduleSnippetPause(state) {
   clearTimeout(snippetTimeout);
   snippetEnded = false;
   if (!state.snippetSeconds || state.snippetSeconds <= 0) return;
+  // With fading on, the snippet fades out over its last second instead of stopping dead.
+  const fadeMs = fadeOn(state) ? 900 : 0;
   snippetTimeout = setTimeout(() => {
     snippetEnded = true;
-    if (player && typeof player.pauseVideo === 'function') player.pauseVideo();
-  }, state.snippetSeconds * 1000);
+    const p = player;
+    if (!isReady(p)) return;
+    if (fadeMs) fadeVolume(p, 0, fadeMs, () => { p.pauseVideo(); p.setVolume(100); });
+    else p.pauseVideo();
+  }, Math.max(0, state.snippetSeconds * 1000 - fadeMs));
 }
 
 // The YouTube IFrame API is flaky about actually starting playback on the
@@ -278,9 +417,8 @@ const YT_ERROR_MESSAGES = {
   150: 'Embedding disabled by the video owner — pick a different upload',
 };
 
-function createPlayer() {
-  if (player) return;
-  player = new YT.Player('yt-player', {
+function makePlayer(elementId) {
+  const p = new YT.Player(elementId, {
     height: '100%',
     width: '100%',
     playerVars: {
@@ -294,44 +432,60 @@ function createPlayer() {
       playsinline: 1,
     },
     events: {
-      onReady: () => syncVideo(latestState),
-      onStateChange: (e) => {
-        if (preroll.active) {
-          // A held song: freeze it on its first frame (it started muted, so nothing was
-          // heard), put it back on its start point and wait for "GO!". None of this is
-          // reported — to the host it's still just "loading" until the sound is released.
-          if (e.data === 1 && !preroll.frozen) {
-            preroll.frozen = true;
-            player.pauseVideo();
-            player.seekTo((latestState && latestState.startOffsetSeconds) || 0, true);
-          } else if (e.data === 2 && preroll.frozen && !preroll.ready) {
-            preroll.ready = true;
-            clearTimeout(preroll.timer);
-            const cb = preroll.onReady;
-            preroll.onReady = null;
-            if (cb) cb();
-          }
-          return;
-        }
-        if (e.data === 1) {
-          // A load that stalled and only completes after the round was closed would
-          // otherwise start playing into an idle screen.
-          if (loadedRoundKey === null) { player.stopVideo(); return; }
-          setSoundGate(false); // it's playing — whatever blocked it is cleared
-          if (snippetArmed) { snippetArmed = false; scheduleSnippetPause(latestState); }
-        }
-        reportPlayerStatus(YT_STATE_NAMES[e.data] || 'unknown');
+      onReady: () => {
+        p.__ready = true;
+        if (p === player) { showOnly(player); syncVideo(latestState); }
+        maybePreload(latestState);
       },
+      // Events from the spare only matter for its preload; only the round's own player
+      // drives the countdown hold and reports its status to the host.
+      onStateChange: (e) => (p === player ? onRoundPlayerState(e) : onSpareState(p, e)),
       // Fires when the browser itself says it blocked playback (newer API builds);
       // the watchdog above covers builds/browsers that stay silent.
-      onAutoplayBlocked: () => { if (latestState && latestState.roundStatus === 'playing') setSoundGate(true); },
+      onAutoplayBlocked: () => { if (p === player && latestState && latestState.roundStatus === 'playing') setSoundGate(true); },
       onError: (e) => {
+        if (p !== player) { if (p === spare && spareSong) spareSong.failed = true; return; }
         reportPlayerStatus('error', YT_ERROR_MESSAGES[e.data] || `Playback error (code ${e.data})`);
         // A song that can't play must not hold the countdown on "1" for 8 seconds.
         prerollRelease();
       },
     },
   });
+  return p;
+}
+
+function createPlayer() {
+  if (player) return;
+  player = makePlayer('yt-player');
+  if (document.getElementById('yt-player-b')) spare = makePlayer('yt-player-b');
+}
+
+function onRoundPlayerState(e) {
+  if (preroll.active) {
+    // A held song: freeze it on its first frame (it started muted, so nothing was
+    // heard), put it back on its start point and wait for "GO!". None of this is
+    // reported — to the host it's still just "loading" until the sound is released.
+    if (e.data === 1 && !preroll.frozen) {
+      preroll.frozen = true;
+      player.pauseVideo();
+      player.seekTo((latestState && latestState.startOffsetSeconds) || 0, true);
+    } else if (e.data === 2 && preroll.frozen && !preroll.ready) {
+      preroll.ready = true;
+      clearTimeout(preroll.timer);
+      const cb = preroll.onReady;
+      preroll.onReady = null;
+      if (cb) cb();
+    }
+    return;
+  }
+  if (e.data === 1) {
+    // A load that stalled and only completes after the round was closed would
+    // otherwise start playing into an idle screen.
+    if (loadedRoundKey === null) { player.stopVideo(); return; }
+    setSoundGate(false); // it's playing — whatever blocked it is cleared
+    if (snippetArmed) { snippetArmed = false; scheduleSnippetPause(latestState); }
+  }
+  reportPlayerStatus(YT_STATE_NAMES[e.data] || 'unknown');
 }
 
 window.onYouTubeIframeAPIReady = createPlayer;
@@ -648,7 +802,17 @@ function spawnGoFlash(onGo) {
   const finish = () => setTimeout(() => { el.remove(); stageEl.classList.remove('counting'); }, 600);
   const step = () => {
     if (i === steps.length - 1) {
-      whenSongReady(() => { show(); if (onGo) onGo(); finish(); });
+      whenSongReady(() => {
+        if (onGo) onGo();
+        // "GO!" appears the moment the music is actually audible (normally a fraction
+        // of a second after it's let go), so the word and the sound land together.
+        const t0 = Date.now();
+        const tick = () => {
+          if (Date.now() - t0 >= 450 || (isReady(player) && player.getPlayerState() === 1)) { show(); finish(); }
+          else setTimeout(tick, 25);
+        };
+        tick();
+      });
       return;
     }
     show();
@@ -1017,7 +1181,10 @@ socket.on('state', (state) => {
     // The reveal is the payoff — resume full playback even if snippet mode
     // paused it earlier this round. Harmless when already playing.
     clearTimeout(snippetTimeout);
-    if (player && typeof player.playVideo === 'function') player.playVideo();
+    if (isReady(player)) {
+      if (fades.has(player)) { cancelFade(player); player.setVolume(100); } // a snippet fading out — the reveal brings it back
+      player.playVideo();
+    }
     const title = state.currentSong.title || t('unknown', currentLang);
     const artist = state.currentSong.artist || '';
     revealTitleEl.textContent = title;
@@ -1077,4 +1244,5 @@ socket.on('state', (state) => {
   wasPaused = state.paused;
 
   syncVideo(state);
+  maybePreload(state);
 });

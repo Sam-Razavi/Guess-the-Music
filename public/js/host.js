@@ -208,6 +208,26 @@ function syncFiltersFromState(state) {
   difficultyFilter = f.difficulty || 'All';
 }
 
+// Round-option boxes (timer, snippet, start at): reported to the server whenever they
+// change, so auto-advance uses them and the TV preloads the next song at the right
+// start point; and adopted from the server, so every host device shows the same.
+const roundOptionInputs = [timerInput, snippetInput, startOffsetInput];
+roundOptionInputs.forEach(el => el.addEventListener('change', () => {
+  socket.emit('host:setNextRoundOptions', {
+    timerSeconds: Number(timerInput.value) || 0,
+    snippetSeconds: Number(snippetInput.value) || 0,
+    startOffsetSeconds: Number(startOffsetInput.value) || 0,
+  });
+}));
+function syncRoundOptionsFromState(state) {
+  const o = state.nextRoundOptions;
+  if (!o) return;
+  const set = (el, v) => { if (document.activeElement !== el) el.value = v; };
+  set(timerInput, o.timerSeconds);
+  set(snippetInput, o.snippetSeconds);
+  set(startOffsetInput, o.startOffsetSeconds);
+}
+
 function matchesSearch(s) {
   return !searchQuery || s.title.toLowerCase().includes(searchQuery) || (s.artist || '').toLowerCase().includes(searchQuery);
 }
@@ -1389,6 +1409,7 @@ socket.on('state', (state) => {
   latestState = state;
   renderRound(state);
   syncFiltersFromState(state);
+  syncRoundOptionsFromState(state);
   renderFilters(state);
   renderPlaylist(state);
   renderScoreboard(state);
