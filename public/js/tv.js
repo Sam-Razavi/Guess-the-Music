@@ -79,8 +79,60 @@ fetch('/join-info').then(r => r.json()).then(({ url }) => {
 
 // ---- YouTube player ----
 let player = null;
-let loadedYoutubeId = null;
+let loadedRoundKey = null; // which ROUND's song is loaded — see roundKeyOf()
 let latestState = null;
+
+// A round's identity: its song AND when it started. Keying on the song alone meant
+// that starting the same song again (a replay, or re-testing a start offset) looked
+// like "already loaded" and carried on from wherever the player was.
+function roundKeyOf(state) {
+  return state.currentSong ? state.currentSong.youtubeId + '|' + (state.roundStartedAt || 0) : null;
+}
+
+// ---- start of a round: the song is buffered silently during the 3-2-1 countdown
+// and released on "GO!", so the music starts the instant the countdown ends instead
+// of a few seconds later (the load used to begin only when the countdown did, and a
+// slow load meant sound well after "GO!"). If the song isn't ready when the countdown
+// reaches GO, the countdown waits on "1" — up to PREROLL_MAX_WAIT_MS — rather than
+// saying GO to silence. ----
+const PREROLL_MAX_WAIT_MS = 8000;
+const preroll = { active: false, frozen: false, ready: false, onReady: null, timer: null };
+let snippetArmed = false; // snippet mode counts its seconds from when the sound actually starts
+
+function prerollBegin() {
+  clearTimeout(preroll.timer);
+  const stale = preroll.onReady; // an older countdown still waiting on "1" — let it finish its graphic
+  Object.assign(preroll, { active: true, frozen: false, ready: false, onReady: null, timer: null });
+  if (stale) stale();
+}
+
+// Called when the countdown reaches "GO!" (or the round moves on / fails before then).
+// Idempotent: the first caller wins, later ones are no-ops.
+function prerollRelease() {
+  if (!preroll.active) return;
+  clearTimeout(preroll.timer);
+  preroll.active = false;
+  const waiting = preroll.onReady; // a countdown still waiting on "1" — let it finish
+  preroll.onReady = null;
+  if (player && typeof player.unMute === 'function') {
+    player.unMute();
+    if (!(latestState && latestState.paused)) { // while paused the overlay owns playback; resuming plays it
+      player.playVideo();
+      ensurePlaybackStarted();
+      watchPlaybackStart();
+    }
+  }
+  if (waiting) waiting();
+}
+
+// Runs cb once the held song is buffered (immediately if it already is, or if there's
+// nothing being held). Gives up after PREROLL_MAX_WAIT_MS so a song that never loads
+// can't leave the countdown stuck on "1".
+function whenSongReady(cb) {
+  if (!preroll.active || preroll.ready) { cb(); return; }
+  preroll.onReady = cb;
+  preroll.timer = setTimeout(() => { preroll.onReady = null; cb(); }, PREROLL_MAX_WAIT_MS);
+}
 
 // The IFrame API loads asynchronously and can finish after a 'state' event
 // has already arrived (or after a round is already 'playing' when this page
@@ -91,21 +143,27 @@ function syncVideo(state) {
 
   // Not only 'playing': a TV that (re)loads mid-round — kiosk relaunch, PC reboot,
   // a crash-resume — can open straight into 'buzzed' or 'revealed' and must still
-  // pick the song up. In the normal flow loadedYoutubeId already matches, so this
+  // pick the song up. In the normal flow loadedRoundKey already matches, so this
   // is a no-op and the song just keeps playing through a buzz-in and the reveal.
   if (state.currentSong && state.currentSong.youtubeId && ['playing', 'buzzed', 'revealed'].includes(state.roundStatus)
-      && state.currentSong.youtubeId !== loadedYoutubeId) {
-    loadedYoutubeId = state.currentSong.youtubeId;
+      && roundKeyOf(state) !== loadedRoundKey) {
+    loadedRoundKey = roundKeyOf(state);
+    // A held start (see "start of a round" above) loads muted — muted autoplay is
+    // always allowed — and is frozen at its first frame in onStateChange; anything
+    // else loads and plays straight away.
+    if (preroll.active) player.mute(); else player.unMute();
     // Object form — startSeconds is how the "start at N seconds in" option
     // actually skips the intro, per the IFrame API.
     player.loadVideoById({ videoId: state.currentSong.youtubeId, startSeconds: state.startOffsetSeconds || 0 });
-    player.playVideo();
-    ensurePlaybackStarted();
-    watchPlaybackStart();
+    if (!preroll.active) {
+      player.playVideo();
+      ensurePlaybackStarted();
+      watchPlaybackStart();
+    }
   }
 
   if (state.roundStatus === 'idle') {
-    loadedYoutubeId = null;
+    loadedRoundKey = null;
     clearTimeout(snippetTimeout);
     if (typeof player.stopVideo === 'function') player.stopVideo();
   }
@@ -115,10 +173,13 @@ function syncVideo(state) {
 // happens from a short hook instead of the whole track. Piggybacks on the
 // same "new song actually started" detection the 3-2-1-GO flash uses. ----
 let snippetTimeout = null;
+let snippetEnded = false; // this round's snippet already paused the song on purpose
 function scheduleSnippetPause(state) {
   clearTimeout(snippetTimeout);
+  snippetEnded = false;
   if (!state.snippetSeconds || state.snippetSeconds <= 0) return;
   snippetTimeout = setTimeout(() => {
+    snippetEnded = true;
     if (player && typeof player.pauseVideo === 'function') player.pauseVideo();
   }, state.snippetSeconds * 1000);
 }
@@ -130,6 +191,7 @@ function scheduleSnippetPause(state) {
 function ensurePlaybackStarted(attempt = 0) {
   setTimeout(() => {
     if (!player || typeof player.getPlayerState !== 'function') return;
+    if (preroll.active) return; // a held song is paused on purpose until "GO!"
     const PLAYING = 1, BUFFERING = 3;
     const ytState = player.getPlayerState();
     if (ytState === PLAYING || ytState === BUFFERING) return;
@@ -165,7 +227,11 @@ function watchPlaybackStart(startedAt = Date.now()) {
     if (!latestState || latestState.roundStatus !== 'playing' || latestState.paused) return;
     const s = player.getPlayerState();
     if (s === 1) return;                                // PLAYING — all good
-    if (s === -1 || s === 5) { setSoundGate(true); return; } // UNSTARTED / CUED: it never began, i.e. blocked
+    // UNSTARTED / CUED: it never began, i.e. blocked. PAUSED counts too, now that a
+    // song starts muted and is unmuted on "GO!": a browser that blocks sound autoplay
+    // pauses it at that moment (unless the snippet pause did it on purpose).
+    if (s === -1 || s === 5 || (s === 2 && !snippetEnded && !preroll.active)) { setSoundGate(true); return; }
+    if (preroll.active) return; // still held for the countdown — the watchdog restarts on "GO!"
     if (Date.now() - startedAt < WATCHDOG_GIVE_UP_MS) watchPlaybackStart(startedAt); // still buffering — look again
   }, WATCHDOG_MS);
 }
@@ -230,13 +296,40 @@ function createPlayer() {
     events: {
       onReady: () => syncVideo(latestState),
       onStateChange: (e) => {
-        if (e.data === 1) setSoundGate(false); // it's playing — whatever blocked it is cleared
+        if (preroll.active) {
+          // A held song: freeze it on its first frame (it started muted, so nothing was
+          // heard), put it back on its start point and wait for "GO!". None of this is
+          // reported — to the host it's still just "loading" until the sound is released.
+          if (e.data === 1 && !preroll.frozen) {
+            preroll.frozen = true;
+            player.pauseVideo();
+            player.seekTo((latestState && latestState.startOffsetSeconds) || 0, true);
+          } else if (e.data === 2 && preroll.frozen && !preroll.ready) {
+            preroll.ready = true;
+            clearTimeout(preroll.timer);
+            const cb = preroll.onReady;
+            preroll.onReady = null;
+            if (cb) cb();
+          }
+          return;
+        }
+        if (e.data === 1) {
+          // A load that stalled and only completes after the round was closed would
+          // otherwise start playing into an idle screen.
+          if (loadedRoundKey === null) { player.stopVideo(); return; }
+          setSoundGate(false); // it's playing — whatever blocked it is cleared
+          if (snippetArmed) { snippetArmed = false; scheduleSnippetPause(latestState); }
+        }
         reportPlayerStatus(YT_STATE_NAMES[e.data] || 'unknown');
       },
       // Fires when the browser itself says it blocked playback (newer API builds);
       // the watchdog above covers builds/browsers that stay silent.
       onAutoplayBlocked: () => { if (latestState && latestState.roundStatus === 'playing') setSoundGate(true); },
-      onError: (e) => reportPlayerStatus('error', YT_ERROR_MESSAGES[e.data] || `Playback error (code ${e.data})`),
+      onError: (e) => {
+        reportPlayerStatus('error', YT_ERROR_MESSAGES[e.data] || `Playback error (code ${e.data})`);
+        // A song that can't play must not hold the countdown on "1" for 8 seconds.
+        prerollRelease();
+      },
     },
   });
 }
@@ -541,7 +634,9 @@ socket.on('steal', (data) => {
 });
 
 // ---- 3-2-1-GO the moment a new song starts (extraAnimations) ----
-function spawnGoFlash() {
+// onGo runs the instant "GO!" appears — that's what releases the held song, so the
+// music starts with the word. "GO!" itself waits (on "1") until the song is buffered.
+function spawnGoFlash(onGo) {
   if (reduceMotion) return;
   const el = document.createElement('div');
   el.className = 'go-flash';
@@ -549,14 +644,16 @@ function spawnGoFlash() {
   stageEl.classList.add('counting');
   const steps = ['3', '2', '1', 'GO!'];
   let i = 0;
+  const show = () => { el.innerHTML = `<span class="go-ring"></span><span class="go-num">${steps[i]}</span>`; };
+  const finish = () => setTimeout(() => { el.remove(); stageEl.classList.remove('counting'); }, 600);
   const step = () => {
-    el.innerHTML = `<span class="go-ring"></span><span class="go-num">${steps[i]}</span>`;
-    i++;
-    if (i < steps.length) {
-      setTimeout(step, 600);
-    } else {
-      setTimeout(() => { el.remove(); stageEl.classList.remove('counting'); }, 600);
+    if (i === steps.length - 1) {
+      whenSongReady(() => { show(); if (onGo) onGo(); finish(); });
+      return;
     }
+    show();
+    i++;
+    setTimeout(step, 600);
   };
   step();
 }
@@ -850,7 +947,7 @@ function renderSessionStats(state) {
 }
 
 let resultsShown = false;
-let lastPlayingSongId = null;
+let lastPlayingKey = null;
 let wasPaused = false;
 
 socket.on('state', (state) => {
@@ -891,18 +988,30 @@ socket.on('state', (state) => {
   }
 
   // "3...2...1...GO" the moment a NEW song actually starts playing —
-  // tracked separately from syncVideo's own loadedYoutubeId so this fires
+  // tracked separately from syncVideo's own loadedRoundKey so this fires
   // exactly once per round start regardless of video-loading timing.
   // 'buzzed' is deliberately excluded from the reset below: a
   // host:resetBuzzers bounces roundStatus buzzed -> playing on the SAME
   // song, and that must not look like a new song starting.
-  if (state.roundStatus === 'playing' && state.currentSong && state.currentSong.youtubeId !== lastPlayingSongId) {
-    lastPlayingSongId = state.currentSong.youtubeId;
-    if (fxOn(state)) spawnGoFlash();
-    scheduleSnippetPause(state);
+  const roundKey = roundKeyOf(state);
+  if (state.roundStatus === 'playing' && roundKey && roundKey !== lastPlayingKey) {
+    lastPlayingKey = roundKey;
+    clearTimeout(snippetTimeout);
+    snippetEnded = false;
+    snippetArmed = state.snippetSeconds > 0; // counted from when the sound actually starts — see onStateChange
+    if (fxOn(state) && !reduceMotion) {
+      // The song loads silently now and is let go on "GO!". The guard stops an older,
+      // slower countdown from releasing a newer round's song.
+      prerollBegin();
+      spawnGoFlash(() => { if (lastPlayingKey === roundKey) prerollRelease(); });
+    } else {
+      prerollRelease(); // nothing to wait for: plain start, as soon as it loads
+    }
   } else if (state.roundStatus !== 'playing' && state.roundStatus !== 'buzzed') {
-    lastPlayingSongId = null; // replaying the same song later should flash again
+    lastPlayingKey = null; // replaying the same song later should flash again
   }
+  // The round moved on (a buzz-in, the reveal, closed) before "GO!": never leave the song silenced.
+  if (preroll.active && state.roundStatus !== 'playing') prerollRelease();
 
   if (state.roundStatus === 'revealed' && state.currentSong) {
     // The reveal is the payoff — resume full playback even if snippet mode
@@ -961,7 +1070,7 @@ socket.on('state', (state) => {
   if (player && typeof player.pauseVideo === 'function' && typeof player.playVideo === 'function') {
     if (state.paused) {
       player.pauseVideo();
-    } else if (wasPaused && state.roundStatus === 'playing') {
+    } else if (wasPaused && state.roundStatus === 'playing' && !preroll.active) {
       player.playVideo(); // only resume actual playback if a round was live when paused
     }
   }

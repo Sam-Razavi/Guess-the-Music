@@ -212,6 +212,8 @@ powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Guess
 
 To exit kiosk mode, `Alt+F4` the Chrome window (or kill it from Task Manager).
 
+> **TV goes black after a few minutes?** Windows turns the display off after a period with no keyboard/mouse input (the default is 5 minutes), and during a game nobody touches the PC — the phones are the controllers. The page keeps running (and the music keeps playing); only the picture is gone. On the TV PC, set it to never: `powercfg /change monitor-timeout-ac 0` (and `standby-timeout-ac 0` so the PC itself never sleeps).
+
 > **Songs stuck on "Loading…" on the TV?** That's almost always Chrome blocking autoplay because the TV page is open in an *ordinary* Chrome window instead of the kiosk launcher above (only the launcher passes `--autoplay-policy=no-user-gesture-required`). The TV now shows a "Click anywhere to start the music" screen when it happens — one click fixes it until the page is reloaded — but the lasting fix is to close the ordinary window and re-open the TV with the `launch-kiosk.ps1` command above.
 
 ### YouTube playlist import (optional)

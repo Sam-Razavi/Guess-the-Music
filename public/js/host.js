@@ -649,9 +649,22 @@ function stepToAdjacentSong(delta) {
   if (!visible.length) return;
   const currentId = latestState.currentSong ? latestState.currentSong.id : null;
   const at = visible.findIndex(s => s.id === currentId);
-  // Nothing playing (or the playing song isn't in the filtered list): Next
-  // starts at the top of the filtered list, Previous at the bottom.
-  const to = at === -1 ? (delta > 0 ? 0 : visible.length - 1) : (at + delta + visible.length) % visible.length;
+  if (delta > 0) {
+    // Next never hands back a song that has already been played this session — it
+    // goes to the next UNPLAYED one after the current position (wrapping round).
+    // Nothing playing (or the playing song isn't in this filtered list): from the top.
+    for (let i = 1; i <= visible.length; i++) {
+      const cand = visible[((at === -1 ? -1 : at) + i) % visible.length];
+      if (!cand.played) { startRoundWithCurrentOptions(cand.id); return; }
+    }
+    const label = nextSongBtn.textContent;
+    nextSongBtn.textContent = 'No unplayed songs here';
+    setTimeout(() => { nextSongBtn.textContent = label; }, 2500);
+    return;
+  }
+  // Previous is a deliberate step back, so it can land on a played song — that is
+  // the host choosing to replay it. Nothing playing: start at the bottom of the list.
+  const to = at === -1 ? visible.length - 1 : (at - 1 + visible.length) % visible.length;
   startRoundWithCurrentOptions(visible[to].id);
 }
 prevSongBtn.addEventListener('click', () => stepToAdjacentSong(-1));

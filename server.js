@@ -420,7 +420,11 @@ function scheduleAutoAdvance(seconds, nextRoundTimerSeconds) {
     // it, same as those manual actions would.
     if (state.roundStatus === 'revealed' && !state.paused) {
       const next = pickNextSong();
-      if (next) startRound(next.id, nextRoundTimerSeconds);
+      // The next song starts the way the one just revealed did: same round timer,
+      // same snippet length, same "start at N seconds" — those last two used to be
+      // dropped here, so with auto-advance on every song after the first started
+      // from the beginning no matter what offset the host had set.
+      if (next) startRound(next.id, nextRoundTimerSeconds, state.snippetSeconds, undefined, state.startOffsetSeconds);
     }
     broadcast();
   }, seconds * 1000);
@@ -445,6 +449,11 @@ function startRound(id, timerSeconds, snippetSeconds, wagerPlayerId, startOffset
   if (idx === -1) return false;
   const song = state.playlist[idx];
   state.currentIndex = idx;
+  // A song counts as used the moment it starts — not only once it's revealed — so
+  // Play next, Random, auto-advance and the Next button never hand the same song
+  // out twice in a session, even if a round was closed without a reveal. Playing
+  // it again is still possible, but only by picking that row yourself (Replay).
+  if (!song.played) { song.played = true; savePlaylist(); }
   state.buzzOrder = [];
   state.roundHadMiss = false;
   state.hintRevealedIndices = [];
@@ -759,6 +768,10 @@ function payloadFor(role) {
     badges: computeBadges(),
     snippetSeconds: state.settings.snippetMode ? state.snippetSeconds : 0,
     startOffsetSeconds: state.settings.startOffset ? state.startOffsetSeconds : 0,
+    // Identifies this round, not just this song: lets the TV tell "the same song
+    // started again" from "the song already loaded", so a replay reloads and
+    // honors its start offset instead of carrying on from wherever it was.
+    roundStartedAt: state.roundStartedAt,
     wager: state.wager
       ? { playerId: state.wager.playerId, playerName: (state.players[state.wager.playerId] || {}).name || '', amount: state.wager.amount }
       : null,
