@@ -229,7 +229,8 @@ function syncRoundOptionsFromState(state) {
 }
 
 function matchesSearch(s) {
-  return !searchQuery || s.title.toLowerCase().includes(searchQuery) || (s.artist || '').toLowerCase().includes(searchQuery);
+  return !searchQuery || s.title.toLowerCase().includes(searchQuery) || (s.artist || '').toLowerCase().includes(searchQuery)
+    || (s.work || '').toLowerCase().includes(searchQuery);
 }
 
 playlistSearchInput.addEventListener('input', () => {
@@ -777,7 +778,8 @@ function renderRound(state) {
 
   if (state.currentSong) {
     currentSongInfo.innerHTML = `<strong>${escapeHtml(state.currentSong.title)}</strong>` +
-      (state.currentSong.artist ? ` — ${escapeHtml(state.currentSong.artist)}` : '');
+      (state.currentSong.artist ? ` — ${escapeHtml(state.currentSong.artist)}` : '') +
+      (state.currentSong.work ? ` <span class="muted">· 🎬 ${escapeHtml(state.currentSong.work)}</span>` : '');
     currentSongInfo.classList.remove('muted');
   } else {
     currentSongInfo.textContent = 'No round started — pick a song from the playlist below.';
@@ -986,7 +988,7 @@ function renderPlaylist(state) {
   let songs = state.playlist.filter(s => songMatchesFilters(s));
   if (searchQuery) {
     songs = songs.filter(s =>
-      s.title.toLowerCase().includes(searchQuery) || (s.artist || '').toLowerCase().includes(searchQuery));
+      s.title.toLowerCase().includes(searchQuery) || (s.artist || '').toLowerCase().includes(searchQuery) || (s.work || '').toLowerCase().includes(searchQuery));
   }
   const totalMatches = songs.length;
   songs = songs.slice(0, renderLimit);
@@ -1016,7 +1018,7 @@ function renderPlaylist(state) {
       <span class="grip" title="Drag to reorder">⠿</span>
       <div class="info">
         <div class="t">${song.id === state.mysterySongId ? '<span class="mystery-badge" title="This game\'s Mystery Round song — modifier stays secret until it plays">🎭</span> ' : ''}${wagerRoundOn && song.wagerEligible ? '<span title="Daily Double eligible">💰</span> ' : ''}${escapeHtml(song.title)}</div>
-        <div class="a">${escapeHtml(song.artist || '')}</div>
+        <div class="a">${escapeHtml(song.artist || '')}${song.work ? ` <span class="work">· 🎬 ${escapeHtml(song.work)}</span>` : ''}</div>
         <div class="tags">
           ${song.category ? `<span class="cat">${escapeHtml(song.category)}</span>` : ''}
           ${song.decade ? `<span class="cat decade-tag">${escapeHtml(song.decade)}</span>` : ''}

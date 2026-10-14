@@ -711,6 +711,11 @@ function sanitizeSongTags({ year, decade, difficulty } = {}) {
   return out;
 }
 
+// The film or series a soundtrack song comes from (shown on the TV's reveal). Optional.
+function cleanWork(work) {
+  return typeof work === 'string' ? work.replace(/\s+/g, ' ').trim().slice(0, 100) : '';
+}
+
 function makeSong(youtubeId, title, artist, category, tags) {
   return {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + Math.random().toString(36).slice(2, 5),
@@ -719,6 +724,7 @@ function makeSong(youtubeId, title, artist, category, tags) {
     artist: (artist || '').trim(),
     category: (category || '').trim(),
     ...sanitizeSongTags(tags),
+    ...(cleanWork(tags && tags.work) ? { work: cleanWork(tags.work) } : {}), // film / series a soundtrack is from — shown on the reveal
     played: false,
     points: 1,                    // how many points a correct buzz on this song is worth — see host:setSongPoints
     wagerEligible: false,         // host-flagged "Daily Double" song — see host:setWagerEligible
@@ -886,6 +892,7 @@ function payloadFor(role) {
             youtubeId: song.youtubeId,
             title: revealed ? song.title : null,
             artist: revealed ? song.artist : null,
+            work: revealed ? (song.work || null) : null,
             hint: showHint ? buildHintMask(song.title, state.hintRevealedIndices) : null,
           }
         : null,
@@ -1461,7 +1468,7 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  socket.on('host:addSong', async ({ youtubeId, title, artist, category, year, decade, difficulty }) => {
+  socket.on('host:addSong', async ({ youtubeId, title, artist, category, year, decade, difficulty, work }) => {
     if (!youtubeId || typeof youtubeId !== 'string') return;
     const id = youtubeId.trim();
     if (state.playlist.some(s => s.youtubeId === id)) {
@@ -1493,7 +1500,7 @@ io.on('connection', (socket) => {
       }
     }
 
-    const song = makeSong(id, title, artist, category, { year, decade, difficulty });
+    const song = makeSong(id, title, artist, category, { year, decade, difficulty, work });
     state.playlist.push(song);
     savePlaylist();
     broadcast();
@@ -1520,9 +1527,9 @@ io.on('connection', (socket) => {
     const existingIds = new Set(state.playlist.map(s => s.youtubeId));
     for (const entry of songs) {
       if (!entry || typeof entry.youtubeId !== 'string') continue;
-      const { youtubeId, title, artist, category, year, decade, difficulty } = entry;
+      const { youtubeId, title, artist, category, year, decade, difficulty, work } = entry;
       if (!youtubeId.trim() || existingIds.has(youtubeId.trim())) continue;
-      const song = makeSong(youtubeId, title, artist, category, { year, decade, difficulty });
+      const song = makeSong(youtubeId, title, artist, category, { year, decade, difficulty, work });
       state.playlist.push(song);
       existingIds.add(song.youtubeId);
     }
@@ -1538,6 +1545,16 @@ io.on('connection', (socket) => {
       clearRoundTimer();
     }
     delete state.knownBroken[id];
+    savePlaylist();
+    broadcast();
+  });
+
+  // Corrects a song's title and/or the film/series it's from (an empty work removes it).
+  socket.on('host:setSongInfo', ({ id, title, work } = {}) => {
+    const song = state.playlist.find(s => s.id === id);
+    if (!song) return;
+    if (typeof title === 'string' && title.trim()) song.title = title.replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (typeof work === 'string') { const w = cleanWork(work); if (w) song.work = w; else delete song.work; }
     savePlaylist();
     broadcast();
   });

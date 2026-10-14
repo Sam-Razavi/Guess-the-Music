@@ -566,6 +566,8 @@ html[dir="rtl"] .lt-label { letter-spacing: 0; }
 }
 #caption-artist { font-size: 1.2rem; font-weight: 600; color: #cfc6ec; animation-delay: 0.8s; }
 #caption-artist:empty { display: none; }
+#caption-work { font-size: 1.05rem; font-weight: 700; color: #ffc24b; animation-delay: 0.9s; }
+#caption-work:empty { display: none; }
 @keyframes lt-in {
   from { clip-path: inset(0 100% 0 0); transform: translateX(-1rem); }
   to { clip-path: inset(0 0 0 0); transform: none; }

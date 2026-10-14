@@ -31,6 +31,7 @@ const autoAdvanceHintEl = document.getElementById('auto-advance-hint');
 const revealCaptionEl = document.getElementById('reveal-caption');
 const captionTitleEl = document.getElementById('caption-title');
 const captionArtistEl = document.getElementById('caption-artist');
+const captionWorkEl = document.getElementById('caption-work');
 const captionLabelEl = document.querySelector('#reveal-caption .lt-label');
 const mysteryBannerEl = document.getElementById('mystery-banner');
 const wagerBannerEl = document.getElementById('wager-banner');
@@ -257,7 +258,10 @@ function syncVideo(state) {
       player = spare;
       spare = outgoing;
       spareSong = null;
-      showOnly(player);
+      // Don't switch the visible slot yet: the video box is still fading out from the
+      // previous reveal, and the new player is frozen on the NEXT song's first frame —
+      // showing it now would give the answer away. showPanel('revealed') switches it.
+      if (state.roundStatus === 'revealed') showOnly(player);
       letGoOf(outgoing, state);
     }
     if (held) {
@@ -434,7 +438,10 @@ function makePlayer(elementId) {
     events: {
       onReady: () => {
         p.__ready = true;
-        if (p === player) { showOnly(player); syncVideo(latestState); }
+        if (p === player) {
+          if (latestState && latestState.roundStatus === 'revealed') showOnly(player);
+          syncVideo(latestState);
+        }
         maybePreload(latestState);
       },
       // Events from the spare only matter for its preload; only the round's own player
@@ -505,6 +512,7 @@ function showPanel(name) {
   Object.entries(panels).forEach(([key, el]) => { el.hidden = key !== name; });
   overlay.classList.toggle('hide', name === 'revealed');
   stageEl.dataset.status = name;
+  if (name === 'revealed') showOnly(player);
 }
 
 // ---- sound (one shared AudioContext — browsers cap how many can exist) ----
@@ -1192,6 +1200,8 @@ socket.on('state', (state) => {
     captionTitleEl.textContent = title;
     captionTitleEl.classList.toggle('shimmer', fxOn(state));
     captionArtistEl.textContent = artist;
+    // Soundtracks: which film or series it's from (only sent once the song is revealed).
+    captionWorkEl.textContent = state.currentSong.work ? t('fromWork', currentLang).replace('{work}', state.currentSong.work) : '';
     revealCaptionEl.hidden = false;
     // After a ✅ Correct the lower-third names who got it, instead of the plain
     // "The song was" label.

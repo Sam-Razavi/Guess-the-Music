@@ -338,6 +338,7 @@
 .playlist-row .info .t { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mystery-badge { display: inline-block; }
 .playlist-row .info .a { color: var(--text-muted); font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.playlist-row .info .a .work { color: var(--text); opacity: 0.85; }
 .playlist-row .info .cat {
   display: inline-block;
   color: var(--violet);
