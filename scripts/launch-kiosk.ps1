@@ -40,4 +40,12 @@ if (-not $serverUp) {
     "--disable-session-crashed-bubble" `
     "--disable-features=TranslateUI" `
     "--overscroll-history-navigation=0" `
-    "--noerrdialogs"
+    "--noerrdialogs" `
+    "--disable-backgrounding-occluded-windows" `
+    "--disable-renderer-backgrounding" `
+    "--disable-background-timer-throttling"
+# The last three: this PC has one screen (the TV), so any other window opened on
+# top fully covers the kiosk. Chrome then treats the TV page as hidden and slows
+# its timers down to as little as once a minute, so songs never start (the
+# countdown and the YouTube start-up logic both run on timers). These flags keep
+# the TV page running at full speed even when it's covered.
