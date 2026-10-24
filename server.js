@@ -66,6 +66,7 @@ const DEFAULT_SETTINGS = {
   roundLimitValue: 0,    // rounds played at which the game ends early (0 = off) — see checkGameLimit()
   easterEggMahtab: false,
   easterEggMina: false,
+  easterEggReza: false,
   fadeBetweenSongs: true,
 };
 
@@ -765,12 +766,22 @@ function minaSuffix(name) {
   return n.replace(/[يى]/g, 'ی').replace(/ك/g, 'ک') === 'مینا' ? 'جان' : null;
 }
 
+// ---------- Easter egg: Reza ----------
+// Same pattern as Mina: "Reza" -> "Reza Mashhadi", "رضا" -> "رضا مشهدی".
+function rezaSuffix(name) {
+  if (!name) return null;
+  const n = name.trim();
+  if (n.toLowerCase() === 'reza') return 'Mashhadi';
+  return n.replace(/[يى]/g, 'ی').replace(/ك/g, 'ک') === 'رضا' ? 'مشهدی' : null;
+}
+
 function displayName(name) {
   if (state.settings.easterEggMahtab && isMahtabName(name)) {
     return `${name} ${state.language === 'fa' ? 'شوهری' : 'Shohari'}`;
   }
-  const mina = state.settings.easterEggMina ? minaSuffix(name) : null;
-  return mina ? `${name.trim()} ${mina}` : name;
+  const suffix = (state.settings.easterEggMina ? minaSuffix(name) : null)
+    || (state.settings.easterEggReza ? rezaSuffix(name) : null);
+  return suffix ? `${name.trim()} ${suffix}` : name;
 }
 
 function mahtabTease() {
