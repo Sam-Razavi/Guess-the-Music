@@ -6,6 +6,43 @@ It runs from a laptop on your WiFi — nothing to install on the Android TV itse
 
 > 🎉 **A fun hobby project.** This is a for-fun side project built for game nights with friends and family — not a polished commercial product. It works well for us, and you're welcome to use it, fork it, or poke around, but expect a few rough edges.
 
+## Game Night: a hub of party games
+
+Guess the Music is one game in a hub. The TV opens on a game menu; players vote on their phones for what to play next, and the host taps **Launch** — the TV and every phone switch over together (no new link, nobody re-joins). Scores stay per game; each game's winners land on a trophy shelf, and every finished game hands out party points (3 / 2 / 1) towards an overall **Champion of the night**. Can't decide? **🎲 Surprise me** spins a spotlight across the menu (games with more votes come up more often). Everything except the host page follows the EN / فارسی toggle.
+
+![Game Night menu on the TV](docs/screenshots/hub/01-hub-menu.png)
+
+| Game | How it plays |
+|---|---|
+| 🎵 **Guess the Music** · حدس آهنگ | The original — see the tour below. |
+| ✍️ **Esm-Famil** · اسم فامیل | A letter is drawn; everyone fills Name, Last name, City, Country, Food… on their phone. First to fill every box calls **STOP!** and the rest get a few seconds. Answers are reviewed one category at a time — players 👎 answers they don't buy, the host has the last word. 20 if you're the only one with an answer, 10 unique, 5 shared. Each round has a ⭐ golden category worth double, and calling STOP earns +5 — but only if all your answers hold up. Players can take turns picking the letter. Persian or English alphabet. |
+| 🌹 **Gol ya Pooch** · گل یا پوچ | Two teams. The hiding captain secretly puts the flower in a teammate's fist from their phone (only that teammate's phone knows — press-and-hold to peek). The other captain opens hands: *Pooch!* or *Gol!* — with a drumroll on the TV. First-try Gol = +2. A 30-second shot clock keeps the hiding honest, three in a row sets a team "on fire", and the game ends with awards (sharpest eye, best poker face, clean sweeper). |
+| 🎭 **Pantomime** · پانتومیم | Teams take turns; the actor's phone shows the word with ✅ / ⏭. The other teams see the word too (in the classic game they pick it); the TV shows only the category and the number of words. Persian word bank: Iranian films and series, proverbs, Nowruz traditions… The actor chooses between an easy word (1 point) and a hard one (2), and before the game everyone can write secret words that turn up as a *rival* team's hard card. Best actor gets named at the end. Optional 🔞 **18+** category for a grown-up crowd (off by default; Persian and English lists, with easy and hard cards). |
+| 👑 **Who's Most Likely?** · کی از همه بیشتر؟ | A question goes up, everyone secretly votes for a player, the votes stack up on the TV. Voting with the crowd = +1; the "winners" collect titles. Mixed in: *Would you rather* (the bigger side scores) and *Never have I ever* (no points, just confessions). Players can write their own questions. |
+| 🕶️ **Mafia** · مافیا | The app narrates. Secret roles on phones (Godfather, Mafia, Doctor, Detective, optional Sniper, Citizens). At night *everyone* taps someone — citizens pick a "suspect" — so nobody can tell who's who from who's tapping. By day the town votes someone onto trial: they get a defense, then a secret guilty / innocent vote and last words. Optional Bulletproof (survives one shot) and Jester (wins if voted out). The host page is a narrator dashboard with one "next step" button. |
+| 🕵️ **Spy** · جاسوس | Everyone sees the same secret word except the spy. Ask each other questions, then vote; a caught spy can still win by picking the word from the board on the TV. The TV sets a shuffled asking order, and a bold spy can call the word early: right = +3, wrong = everyone else scores. |
+
+<p>
+  <img src="docs/screenshots/hub/03-esmfamil-writing.png" width="49%" alt="Esm-Famil: the letter and everyone's progress on the TV" />
+  <img src="docs/screenshots/hub/06-golpooch-suspense.png" width="49%" alt="Gol ya Pooch: opening a hand" />
+</p>
+<p>
+  <img src="docs/screenshots/hub/11-mafia-night.png" width="49%" alt="Mafia: night falls on the city" />
+  <img src="docs/screenshots/hub/10-mostlikely-reveal.png" width="49%" alt="Who's Most Likely: the votes are in" />
+</p>
+<p>
+  <img src="docs/screenshots/hub/14-mafia-trial.png" width="49%" alt="Mafia: the accused is on trial, guilty or innocent?" />
+  <img src="docs/screenshots/hub/15-mostlikely-rather.png" width="49%" alt="Would you rather: the room splits" />
+</p>
+<p>
+  <img src="docs/screenshots/hub/04-esmfamil-phone.png" width="24%" alt="Esm-Famil answer sheet on a phone" />
+  <img src="docs/screenshots/hub/07-golpooch-peek.png" width="24%" alt="Gol ya Pooch: press and hold to peek" />
+  <img src="docs/screenshots/hub/09-pantomime-actor.png" width="24%" alt="Pantomime: the actor's phone" />
+  <img src="docs/screenshots/hub/12-mafia-role.png" width="24%" alt="Mafia role card" />
+</p>
+
+Same links as before: the TV kiosk still opens `/tv.html`, players still scan the same QR code — the music pages hand over to the hub pages (`/hub/tv.html` etc.) whenever another game is on, and back again. On the music host page, **🎮 All games** returns to the menu (disabled while a round is live). Which game is on is remembered in `hub.json`; a game in progress restarts from its lobby if the server restarts.
+
 ## A tour of the game
 
 Everything below is the real app, captured from a demo game.
