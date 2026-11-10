@@ -166,10 +166,11 @@ module.exports = function createHub({ io, state, displayName, broadcastAll, musi
   // Registers the hub's and every game's socket events. Names start with
   // host:/player:, so server.js's guard already enforces the sender's role.
   function attach(socket, info) {
-    socket.on('host:hub:select', ({ game } = {}) => select(game, socket));
+    socket.on('host:hub:select', (d) => select(d && d.game, socket));
     socket.on('host:hub:clearTrophies', () => { hub.trophies = []; hub.night = { points: {}, names: {} }; save(); broadcast(); });
     socket.on('host:hub:surprise', () => surprise());
-    socket.on('player:hub:vote', ({ game } = {}) => {
+    socket.on('player:hub:vote', (d) => {
+      const game = d && d.game;
       const { playerId } = info();
       if (hub.activeGame !== 'hub' || !playerId || !state.players[playerId]) return;
       if (!ALL_GAMES.includes(game) || votes[playerId] === game) delete votes[playerId];

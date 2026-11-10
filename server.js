@@ -21,13 +21,16 @@ const server = http.createServer(app);
 const io = new Server(server, { perMessageDeflate: { threshold: 4096 } });
 
 const PORT = process.env.PORT || 3000;
-const PLAYLIST_FILE = path.join(__dirname, 'playlist.json');
-const PLAYERS_FILE = path.join(__dirname, 'players.json');
-const SETTINGS_FILE = path.join(__dirname, 'settings.json');
-const STATS_FILE = path.join(__dirname, 'stats.json');
-const PRESETS_FILE = path.join(__dirname, 'presets.json');
-const ROUNDSTATE_FILE = path.join(__dirname, 'roundstate.json');
-const HUB_FILE = path.join(__dirname, 'hub.json');
+// Where the game-night data files live. Defaults to the app folder; the test
+// runner (tests/run.js) points it at a throwaway folder so tests never touch real data.
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : __dirname;
+const PLAYLIST_FILE = path.join(DATA_DIR, 'playlist.json');
+const PLAYERS_FILE = path.join(DATA_DIR, 'players.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+const STATS_FILE = path.join(DATA_DIR, 'stats.json');
+const PRESETS_FILE = path.join(DATA_DIR, 'presets.json');
+const ROUNDSTATE_FILE = path.join(DATA_DIR, 'roundstate.json');
+const HUB_FILE = path.join(DATA_DIR, 'hub.json');
 
 // Optional shared-secret gate for host/player join — see .env.example.
 // Blank (the default) short-circuits the `JOIN_PIN && ...` check below, so
@@ -2149,6 +2152,8 @@ server.listen(PORT, () => {
 
   // Best-effort convenience only — mDNS relies on UDP multicast, which some
   // networks/firewalls block. Never let a failure here affect the game.
+  // NO_MDNS=1 skips it (the test runner does, so a test instance never claims the real name).
+  if (process.env.NO_MDNS) return;
   try {
     const bonjour = new Bonjour();
     bonjour.publish({ name: 'Guess the Music', type: 'http', port: PORT, host: MDNS_HOST });

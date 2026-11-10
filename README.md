@@ -366,6 +366,16 @@ npm install
 pm2 restart guess-the-music
 ```
 
+### Running the tests
+
+```powershell
+npm test                    # every suite (~3 minutes)
+npm test -- hub pin         # only some suites
+npm test -- --no-browser    # skip the ones that drive a real browser
+```
+
+Each suite starts its own copy of the server on port 3999 with an empty, throwaway data folder, so the tests never touch the real playlist or scores, and the live game on port 3000 can keep running. The browser suites need a headless Chromium (`npx playwright install chromium-headless-shell` once).
+
 ### Finding the PC's LAN IP (for the QR code / player join links)
 
 The server prints its own LAN IP on startup (`pm2 logs guess-the-music`), but if you need to check it directly:

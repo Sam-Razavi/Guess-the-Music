@@ -5,7 +5,8 @@
   "description": "Local party game: TV + phone buzzers, real YouTube song rounds",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node tests/run.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
@@ -14,5 +15,9 @@
     "express": "^4.19.2",
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.0",
+    "socket.io-client": "^4.8.4"
   }
 }
