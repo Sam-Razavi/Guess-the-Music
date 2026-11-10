@@ -1129,6 +1129,9 @@ socket.on('state', (state) => {
     if (window.__buildId && window.__buildId !== state.buildId) { location.reload(); return; }
     window.__buildId = state.buildId;
   }
+  // Another game is on (see games/hub.js): this page belongs to the music game,
+  // so hand over to the hub's page for this screen.
+  if (state.activeGame && state.activeGame !== 'music') { location.replace('/hub/tv.html' + location.search); return; }
   latestState = state;
   currentLang = state.language || 'en';
   applyTranslations(currentLang);

@@ -27,6 +27,7 @@ const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 const STATS_FILE = path.join(__dirname, 'stats.json');
 const PRESETS_FILE = path.join(__dirname, 'presets.json');
 const ROUNDSTATE_FILE = path.join(__dirname, 'roundstate.json');
+const HUB_FILE = path.join(__dirname, 'hub.json');
 
 // Optional shared-secret gate for host/player join — see .env.example.
 // Blank (the default) short-circuits the `JOIN_PIN && ...` check below, so
@@ -312,6 +313,11 @@ const state = {
   knownBroken: {},                 // songId -> {message, at} — songs the TV has *actually* hit a real playback error on, see tv:playerStatus. In-memory only (not persisted, doesn't survive a restart) — it's a live diagnostic, not durable data, same reasoning the original playerStatus relay used for staying out of state/broadcast().
   roundsPlayed: savedRound ? (Number(savedRound.roundsPlayed) || 0) : 0, // count of rounds revealed this game — powers the gameLimit setting's round-count end condition, reset by host:resetGame
 };
+
+// The game hub (games/hub.js): which game is on, plus the party games. Created
+// just before the socket handlers; null until then, so an early broadcast()
+// simply skips it.
+let hub = null;
 
 const ACTION_LOG_LIMIT = 50;
 
@@ -816,6 +822,8 @@ function payloadFor(role) {
 
   const base = {
     buildId: BUILD_ID,
+    // The music pages redirect to the hub pages whenever this isn't 'music'.
+    activeGame: hub ? hub.activeGame() : 'music',
     roundStatus: state.roundStatus,
     buzzOrder: state.buzzOrder.map(b => ({ id: b.id, name: displayName(b.name), tease: b.tease || null, verdict: b.verdict || null })),
     // True while a wrong answer has reopened buzzing for a steal — TV and
@@ -924,6 +932,7 @@ function broadcast() {
   io.to('host').emit('state', payloadFor('host'));
   io.to('tv').emit('state', payloadFor('tv'));
   io.to('player').emit('state', payloadFor('player'));
+  if (hub) hub.broadcast();
 }
 
 // ---------- Claude-based auto-categories (optional, like YOUTUBE_API_KEY) ----------
@@ -1008,6 +1017,9 @@ app.get('/join-info', (req, res) => {
     // language instead of always starting in English.
     language: state.language,
     theme: state.theme,
+    // A phone that hasn't joined yet gets no game state, so it learns here which
+    // set of pages (music or hub) to show its join screen on.
+    activeGame: hub ? hub.activeGame() : 'music',
   });
 });
 
@@ -1355,6 +1367,19 @@ app.post('/api/preflight', async (req, res) => {
   res.json({ ready, checks });
 });
 
+// ---------- game hub ----------
+
+hub = require('./games/hub')({
+  io,
+  state,
+  displayName,
+  broadcastAll: () => broadcast(),
+  // Switching game mid-round would leave the round hanging on the TV.
+  musicIsLive: () => ['playing', 'buzzed', 'wagering'].includes(state.roundStatus),
+  buildId: BUILD_ID,
+  file: HUB_FILE,
+});
+
 // ---------- sockets ----------
 
 io.on('connection', (socket) => {
@@ -1383,7 +1408,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('register', ({ role: r, id, name, team, pin } = {}) => {
+  socket.on('register', ({ role: r, id, name, team, pin, view } = {}) => {
     if (r !== 'host' && r !== 'tv' && r !== 'player') return;
     if (r === 'player') {
       // The id becomes a key of state.players and ends up in HTML attributes
@@ -1403,10 +1428,16 @@ io.on('connection', (socket) => {
       return;
     }
     role = r;
-    socket.join(role);
+    // Hub pages ('arcade') get the small hub payload in their own rooms instead
+    // of the music game's 'state' (which is ~1MB for the host with the playlist).
+    const arcade = view === 'arcade';
+    socket.data.role = role;
+    socket.data.view = arcade ? 'arcade' : 'music';
+    socket.join(arcade ? `arcade-${role}` : role);
 
     if (role === 'player') {
       playerId = id;
+      socket.data.playerId = id;
       const cleanTeam = (team || '').trim().slice(0, 24);
       if (!state.players[playerId]) {
         state.players[playerId] = { name: name || 'Player', score: 0, connected: true, socketId: socket.id, team: cleanTeam };
@@ -1418,10 +1449,14 @@ io.on('connection', (socket) => {
       }
       savePlayers();
       broadcast();
+    } else if (arcade) {
+      hub.sendTo(socket);
     } else {
       socket.emit('state', payloadFor(role));
     }
   });
+
+  hub.attach(socket, () => ({ role, playerId }));
 
   socket.on('player:rename', ({ name }) => {
     if (playerId && state.players[playerId] && name && name.trim()) {
@@ -2044,6 +2079,7 @@ io.on('connection', (socket) => {
     // earlier — already-wrong — buzzers remain after a steal: the round then
     // sat on one of THEM as the "current" buzzer, with buzzing closed.)
     if (holdingFloor && state.roundStatus === 'buzzed') reopenBuzzing();
+    hub.onPlayerRemoved(id);
     savePlayers();
     broadcast();
   });
@@ -2093,7 +2129,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    if (role === 'player' && playerId && state.players[playerId]) {
+    // Only if this is still the player's current connection: on a page change
+    // (music <-> hub) or a reload, the new page can register before the old
+    // socket's disconnect arrives — that must not mark them offline.
+    if (role === 'player' && playerId && state.players[playerId] && state.players[playerId].socketId === socket.id) {
       state.players[playerId].connected = false;
       broadcast();
     }

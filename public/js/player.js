@@ -68,7 +68,9 @@ const pinError = document.getElementById('pin-error');
 
 // Only shows the PIN field at all when the server is actually configured
 // with one — otherwise this stays hidden and nothing about joining changes.
-fetch('/join-info').then(r => r.json()).then(({ pinRequired, language, theme }) => {
+fetch('/join-info').then(r => r.json()).then(({ pinRequired, language, theme, activeGame }) => {
+  // Another game is on (games/hub.js): show the hub's join screen, not this one.
+  if (activeGame && activeGame !== 'music') { location.replace('/hub/player.html' + location.search); return; }
   // The join screen is shown before the first game 'state' arrives, so take
   // the language/theme from here — otherwise it is always English.
   if (language) { lastLang = language; applyTranslations(language); }
@@ -293,6 +295,9 @@ socket.on('state', (state) => {
     if (window.__buildId && window.__buildId !== state.buildId) { location.reload(); return; }
     window.__buildId = state.buildId;
   }
+  // Another game is on (see games/hub.js): this page belongs to the music game,
+  // so hand over to the hub's page for this screen.
+  if (state.activeGame && state.activeGame !== 'music') { location.replace('/hub/player.html' + location.search); return; }
   const lang = state.language || 'en';
   lastLang = lang;
   if (currentPin) localStorage.setItem('gtm_pin', currentPin);

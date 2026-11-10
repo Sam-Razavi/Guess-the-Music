@@ -10,4 +10,5 @@ settings.json
 stats.json
 presets.json
 roundstate.json
+hub.json
 playlist.backup*.json

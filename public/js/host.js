@@ -1408,7 +1408,13 @@ socket.on('state', (state) => {
     if (window.__buildId && window.__buildId !== state.buildId) { location.reload(); return; }
     window.__buildId = state.buildId;
   }
+  // Another game is on (see games/hub.js): this page belongs to the music game,
+  // so hand over to the hub's page for this screen.
+  if (state.activeGame && state.activeGame !== 'music') { location.replace('/hub/host.html' + location.search); return; }
   latestState = state;
+  // Back to the game hub — not while a round is live (the server refuses too).
+  const hubBtn = document.getElementById('hub-btn');
+  if (hubBtn) hubBtn.disabled = ['playing', 'buzzed', 'wagering'].includes(state.roundStatus);
   renderRound(state);
   syncFiltersFromState(state);
   syncRoundOptionsFromState(state);
@@ -1425,3 +1431,15 @@ socket.on('state', (state) => {
   renderActionLog(state);
   renderPresets(state);
 });
+
+// ---- game hub ----
+document.getElementById('hub-btn').addEventListener('click', () => socket.emit('host:hub:select', { game: 'hub' }));
+socket.on('hubError', ({ message }) => alertLike(message));
+function alertLike(message) {
+  const el = document.createElement('div');
+  el.className = 'pill';
+  el.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:999;background:var(--surface-solid);color:var(--bad);padding:.7em 1.2em';
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}

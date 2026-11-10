@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Game Night</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Vazirmatn:wght@400;500;700;800;900&family=Lalezar&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/hub/css/hub.css">
+<link rel="stylesheet" href="/hub/css/menu.css">
+<link rel="stylesheet" href="/hub/css/esmfamil.css">
+<link rel="stylesheet" href="/hub/css/golpooch.css">
+<link rel="stylesheet" href="/hub/css/pantomime.css">
+<link rel="stylesheet" href="/hub/css/mostlikely.css">
+<link rel="stylesheet" href="/hub/css/mafia.css">
+<link rel="stylesheet" href="/hub/css/spy.css">
+<link rel="manifest" href="/manifest-player.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<meta name="theme-color" content="#0b0814">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body data-role="player" class="r-player">
+  <div class="join-screen" id="join-screen" hidden>
+    <div class="join-logo"><img src="/logo.svg" alt="" width="96" height="96"></div>
+    <h1 data-t="hub.brand">Game Night</h1>
+    <p data-t="core.whatName">What should we call you?</p>
+    <input type="text" id="join-name" maxlength="24" autocomplete="off" data-t-placeholder="core.yourName" placeholder="Your name">
+    <button class="primary" id="join-submit" data-t="core.join">Let's play</button>
+  </div>
+
+  <div class="pin-gate" id="pin-gate" hidden>
+    <h1 data-t="hub.brand">Game Night</h1>
+    <input type="text" id="pin-input" inputmode="numeric" autocomplete="off" placeholder="PIN">
+    <button class="primary" id="pin-submit" data-t="core.join">Let's play</button>
+    <p class="muted small" id="pin-error"></p>
+  </div>
+
+  <header class="ph-top">
+    <button class="me-chip" id="me-chip" type="button"></button>
+    <div class="game-chip" id="game-chip" hidden></div>
+  </header>
+  <main id="game-root" class="game-root"></main>
+  <p class="awake-note" id="awake-note" hidden></p>
+  <div class="offline-bar" data-t="core.reconnecting">Reconnecting…</div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/avatars.js"></script>
+  <script src="/vendor/NoSleep.min.js"></script>
+  <script src="/js/keepawake.js"></script>
+  <script src="/hub/js/strings.js"></script>
+  <script src="/hub/js/games-meta.js"></script>
+  <script src="/hub/js/core.js"></script>
+  <script src="/hub/js/ui.js"></script>
+  <script src="/hub/js/menu.js"></script>
+  <script src="/hub/js/esmfamil.js"></script>
+  <script src="/hub/js/golpooch.js"></script>
+  <script src="/hub/js/pantomime.js"></script>
+  <script src="/hub/js/mostlikely.js"></script>
+  <script src="/hub/js/mafia.js"></script>
+  <script src="/hub/js/spy.js"></script>
+</body>
+</html>

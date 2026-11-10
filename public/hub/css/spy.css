@@ -1,0 +1,40 @@
+/* Spy (جاسوس) — dossier vibes: a board of possible words, one of them secret. */
+
+.spy-tv { display: flex; min-height: 0; }
+.spy-tv > * { flex: 1; }
+.spy-scene { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.8rem; text-align: center; padding: 0.4rem 2.4rem 1.6rem; min-height: 0; }
+.spy-scene.talk { justify-content: flex-start; }
+.spy-scene h1 { font-family: var(--font-poster); font-weight: 400; font-size: 3.6rem; line-height: 1.05; }
+.spy-scene p { font-size: 1.2rem; font-weight: 600; }
+.spy-head { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.spy-cat { font-size: 1.4rem; font-weight: 800; padding: 0.3rem 1rem; border-radius: 999px; background: linear-gradient(135deg, rgba(13, 148, 136, 0.35), rgba(29, 78, 216, 0.35)); border: 1px solid rgba(94, 234, 212, 0.35); }
+.spy-big { font-size: 7rem; line-height: 1; animation: pop-in 0.7s var(--ease-spring) both, float-y 3s ease-in-out 0.7s infinite; }
+.spy-talk-row { display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: start; gap: 2rem; }
+.spy-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.7rem; width: 100%; max-width: 70rem; }
+.spy-tile { padding: 0.8rem 0.6rem; border-radius: 1rem; font-weight: 800; font-size: 1.25rem; background: var(--surface); border: 1px solid var(--border); animation: card-flip 0.5s var(--ease-out) both; animation-delay: calc(var(--i) * 0.04s); }
+@keyframes card-flip { from { opacity: 0; transform: perspective(40rem) rotateX(-70deg); } to { opacity: 1; transform: none; } }
+.spy-tile.answer { border-color: var(--gold); background: rgba(255, 194, 75, 0.2); box-shadow: 0 0 2rem -0.4rem rgba(255, 194, 75, 0.8); transform: scale(1.05); }
+.spy-tile.guessed:not(.answer) { border-color: var(--bad); background: rgba(244, 63, 94, 0.18); text-decoration: line-through; }
+.spy-word-reveal { font-size: 1.6rem !important; }
+.spy-word-reveal b { color: var(--gold); font-size: 1.15em; }
+.spy-scene.result.spy-won h1 { color: #5eead4; }
+
+/* phone */
+.spy-card .mf-card-face { background: linear-gradient(150deg, #0f766e, #1e3a8a); }
+.spy-card.bad .mf-card-face { background: linear-gradient(150deg, #111827, #7f1d1d); }
+.spy-card .mf-card-face b { font-size: 34px; }
+html[dir="rtl"] .spy-card .mf-card-face b { font-family: "Vazirmatn", sans-serif; font-weight: 900; font-size: 32px; }
+.spy-ph-guess { display: flex; flex-direction: column; gap: 10px; text-align: center; }
+.r-player .spy-board { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.r-player .spy-tile { font-size: 15px; padding: 12px 6px; border-radius: 14px; }
+.r-player button.spy-tile:active { transform: scale(0.96); }
+
+/* ---------- asking order, early guess ---------- */
+.spy-order { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.5rem; width: 100%; font-weight: 700; }
+.spy-order > i { font-style: normal; color: var(--text-muted); }
+html[dir="rtl"] .spy-order > i { display: inline-block; transform: scaleX(-1); }
+.spy-order-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.7rem 0.2rem 0.25rem; border-radius: 999px; background: var(--surface-2); font-size: 0.95rem; }
+html[dir="rtl"] .spy-order-chip { padding: 0.2rem 0.25rem 0.2rem 0.7rem; }
+.spy-order-chip .avatar { font-size: 0.75rem; }
+.spy-early { width: 100%; max-width: 330px; padding: 16px; font-size: 19px; font-weight: 900; border-radius: 18px; border: 0; color: #fff; background: linear-gradient(135deg, #0d9488, #1d4ed8); box-shadow: 0 12px 28px -12px #1d4ed8; }
+.spy-early.armed { background: linear-gradient(135deg, #f59e0b, #dc2626) !important; }

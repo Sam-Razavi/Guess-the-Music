@@ -1,0 +1,121 @@
+/* Gol ya Pooch (گل یا پوچ) — fists, a rose, and a lot of suspense. */
+
+.gp-lobby-teams { display: flex; align-items: stretch; gap: 1rem; margin-top: 1rem; width: 100%; flex-wrap: wrap; }
+.gp-lt { flex: 1; min-width: 12rem; display: flex; flex-direction: column; gap: 0.6rem; padding: 0.9rem; border-radius: 1.2rem; background: color-mix(in srgb, var(--tc) 12%, transparent); border: 1px solid color-mix(in srgb, var(--tc) 45%, transparent); }
+.gp-lt > div { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.gp-lt .who-chip { font-size: 0.9rem; }
+.vs { align-self: center; font-family: var(--font-display); font-weight: 800; font-size: 1.4rem; color: var(--text-muted); }
+
+.gp-tv { display: flex; min-height: 0; }
+.gp-tv > * { flex: 1; }
+.gp-stage { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.8rem; padding: 0.2rem 2rem 1.4rem; min-height: 0; }
+
+.gp-scorebar { display: flex; align-items: center; justify-content: center; gap: 1.4rem; }
+.gp-team-score { position: relative; display: flex; align-items: center; gap: 0.9rem; padding: 0.5rem 0.6rem 0.5rem 0.5rem; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font-size: 1.15rem; transition: box-shadow 0.4s, border-color 0.4s; }
+.gp-team-score.hiding { border-color: var(--tc); box-shadow: 0 0 2rem -0.4rem var(--tc); }
+.gp-pts { font-family: var(--font-display); font-weight: 800; font-size: 2.2rem; min-width: 2.4rem; text-align: center; }
+.gp-has { position: absolute; top: -1rem; inset-inline-end: -0.4rem; font-size: 1.6rem; animation: float-y 2s ease-in-out infinite; }
+.gp-target { font-weight: 800; color: var(--text-muted); font-size: 0.95rem; }
+
+.gp-caption { text-align: center; min-height: 4.4rem; }
+.gp-caption h2 { font-size: 2.1rem; animation: rise-in 0.45s var(--ease-out) both; }
+.gp-caption p { font-size: 1.1rem; font-weight: 600; margin-top: 0.3rem; }
+.gp-suspense { animation: suspense 0.6s ease-in-out infinite alternate !important; }
+@keyframes suspense { from { transform: scale(1); } to { transform: scale(1.06); } }
+
+.gp-hands-area { position: relative; flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.gp-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.4rem 1.8rem; }
+.gp-person { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; animation: rise-in 0.6s var(--ease-out) both; }
+.gp-person-name { display: flex; align-items: center; gap: 0.45rem; font-weight: 800; font-size: 1.1rem; }
+.gp-hands { display: flex; gap: 0.6rem; direction: ltr; } /* left hand on the left in both languages */
+.gp-hand {
+  position: relative; width: 8rem; height: 8.6rem; border-radius: 1.7rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.2rem;
+  background: linear-gradient(170deg, var(--surface-2), var(--surface)); border: 1px solid var(--border-strong); color: var(--text);
+  transition: transform 0.35s var(--ease-spring), box-shadow 0.35s, opacity 0.4s, border-color 0.3s; padding: 0;
+}
+.h-ico { font-size: 4.4rem; line-height: 1; filter: drop-shadow(0 0.4rem 0.5rem rgba(0, 0, 0, 0.35)); }
+.hand-L .h-ico { transform: scaleX(-1); }
+.h-label { font-size: 0.8rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+html[dir="rtl"] .h-label { letter-spacing: 0; }
+.gp-hand.closed .h-ico { animation: fist-bob 2.4s ease-in-out infinite; }
+.gp-hand.hand-R.closed .h-ico { animation-delay: -1.2s; }
+@keyframes fist-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -0.25rem; } }
+.gp-hand.open-empty { opacity: 0.5; transform: scale(0.92); }
+.gp-hand.open-empty .h-ico { filter: grayscale(1) brightness(1.3); }
+.h-puff { position: absolute; top: 0.4rem; inset-inline-end: 0.5rem; font-size: 1.6rem; animation: puff 1.2s ease-out both; }
+@keyframes puff { 0% { opacity: 0; transform: translateY(0.5rem) scale(0.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-1.6rem) scale(1.4); } }
+.gp-hand.open-gol { border-color: #fb7185; box-shadow: 0 0 0 0.25rem rgba(251, 113, 133, 0.45), 0 0 3.5rem rgba(244, 63, 94, 0.7); transform: scale(1.12); z-index: 2; }
+.h-rose { position: absolute; top: 0.6rem; font-size: 3.2rem; animation: bloom 0.9s var(--ease-spring) both; filter: drop-shadow(0 0 1rem rgba(244, 63, 94, 0.9)); }
+@keyframes bloom { 0% { transform: scale(0) rotate(-90deg); } 70% { transform: scale(1.3) rotate(10deg); } 100% { transform: scale(1) rotate(0); } }
+.gp-hand.pending { border-color: var(--gold); animation: shake 0.45s ease-in-out infinite; box-shadow: 0 0 0 0.3rem rgba(255, 194, 75, 0.5), 0 0 3rem rgba(255, 194, 75, 0.5); z-index: 3; }
+.h-call { position: absolute; bottom: -1.1rem; padding: 0.15rem 0.7rem; border-radius: 999px; font-weight: 900; font-size: 1rem; background: var(--gold); color: #3b2300; white-space: nowrap; animation: pop-in 0.35s var(--ease-spring) both; }
+.gp-hand.call-gol .h-call { background: linear-gradient(135deg, #fb7185, #e11d48); color: #fff; }
+.h-sugg { position: absolute; top: -0.9rem; display: flex; }
+.sugg-av { font-size: 0.75rem; margin-inline-end: -0.35rem; border: 2px solid var(--surface-solid); animation: pop-in 0.3s var(--ease-spring) both; }
+.gp-floating-rose { position: absolute; font-size: 3rem; pointer-events: none; animation: rose-wander 3.2s ease-in-out infinite; filter: drop-shadow(0 0 1rem rgba(244, 63, 94, 0.8)); }
+@keyframes rose-wander { 0% { transform: translate(-14rem, -4rem) rotate(-15deg); opacity: 0; } 15% { opacity: 1; } 50% { transform: translate(0, -6rem) rotate(10deg); } 85% { opacity: 1; } 100% { transform: translate(14rem, -4rem) rotate(-10deg); opacity: 0; } }
+
+.gp-result { position: absolute; left: 0; right: 0; bottom: 1.2rem; display: flex; justify-content: center; z-index: 4; }
+.gp-res-card { display: flex; align-items: center; gap: 1rem; padding: 0.9rem 2rem 0.9rem 1.2rem; border-radius: 999px; color: #fff; background: linear-gradient(135deg, var(--tc), var(--tc2)); box-shadow: 0 1.4rem 3rem -1rem var(--tc); animation: pop-in 0.6s var(--ease-spring) both; }
+.gp-res-ico { font-size: 2.8rem; animation: wiggle 0.7s ease-in-out 2; }
+.gp-res-text { font-size: 1.8rem; font-weight: 800; }
+
+.gp-final .gp-final-rose { margin-top: 1.4rem; font-size: 8rem; line-height: 1; animation: bloom 1.1s var(--ease-spring) both, float-y 3s ease-in-out 1.1s infinite; filter: drop-shadow(0 0 2.5rem rgba(244, 63, 94, 0.8)); }
+.gp-final-score { font-family: var(--font-display); font-weight: 800; font-size: 3rem; color: var(--tc); direction: ltr; }
+.gp-final-members { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8rem; }
+
+/* ---------- phone ---------- */
+.gp-ph { display: flex; flex-direction: column; gap: 10px; }
+.gp-ph-score { display: flex; justify-content: center; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 800; font-size: 22px; direction: ltr; }
+.gp-ph-score span { padding: 4px 14px; border-radius: 999px; background: color-mix(in srgb, var(--tc) 18%, transparent); }
+.gp-ph-score span.mine { box-shadow: 0 0 0 2px var(--tc); }
+.gp-ph-score i { font-style: normal; color: var(--text-muted); }
+.gp-ph-body { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding-top: 8px; }
+.gp-ph-body h2 { font-size: 23px; }
+.r-player .gp-grid { gap: 12px 16px; }
+.r-player .gp-hand { width: 78px; height: 86px; border-radius: 20px; }
+.r-player .h-ico { font-size: 42px; }
+.r-player .h-label { font-size: 10px; }
+.r-player .h-rose { font-size: 34px; }
+.r-player .gp-person-name { font-size: 14px; }
+.r-player .h-call { font-size: 12px; bottom: -12px; }
+.r-player button.gp-hand { cursor: pointer; }
+.r-player button.gp-hand:active { transform: scale(0.94); }
+.gp-hand.selected { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold), 0 0 30px rgba(255, 194, 75, 0.5); transform: translateY(-4px) scale(1.05); }
+.gp-hand.my-sugg { border-color: var(--cyan); box-shadow: 0 0 0 3px var(--cyan); }
+.gp-calls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; opacity: 0.25; pointer-events: none; transition: opacity 0.25s; }
+.gp-calls.show { opacity: 1; pointer-events: auto; }
+.gp-call { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 8px; font-size: 24px; font-family: var(--font-poster); border-radius: 20px; }
+.gp-call small { font-family: var(--font-body); font-size: 12px; font-weight: 700; opacity: 0.85; }
+.gp-call.pooch { background: linear-gradient(135deg, #64748b, #334155); color: #fff; border: 0; }
+.gp-call.gol { background: linear-gradient(135deg, #fb7185, #e11d48); color: #fff; border: 0; box-shadow: 0 10px 26px -10px #e11d48; }
+.gp-peek { position: relative; width: 100%; max-width: 360px; height: 200px; border-radius: 24px; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: none; -webkit-touch-callout: none; }
+.peek-cover, .peek-secret { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-weight: 800; padding: 16px; }
+.peek-cover { background: repeating-linear-gradient(45deg, #1f1733 0 14px, #251c3d 14px 28px); color: var(--text-muted); transition: opacity 0.15s; z-index: 1; }
+.peek-cover span { font-size: 44px; }
+.peek-secret { background: linear-gradient(135deg, #3b0a1d, #1e1030); color: #fff; font-size: 18px; }
+.peek-big { font-size: 64px; line-height: 1; }
+.gp-peek.peeking .peek-cover { opacity: 0; }
+
+/* ---------- host ---------- */
+.gp-h-score { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.gp-h-score b { font-family: var(--font-display); font-size: 26px; margin-inline-start: 6px; }
+.r-host .gp-hand { width: 64px; height: 70px; border-radius: 16px; }
+.r-host .h-ico { font-size: 34px; }
+.r-host .h-label { font-size: 9px; }
+.r-host .h-rose { font-size: 28px; }
+.r-host .gp-grid { justify-content: flex-start; gap: 12px; }
+.r-host .gp-person-name { font-size: 13px; }
+
+/* ---------- shot clock, streak, awards ---------- */
+.gp-clock { display: inline-block; min-width: 2.2rem; margin-inline-start: 0.6rem; padding: 0.05em 0.5em; border-radius: 0.6rem; font-family: var(--font-display); font-weight: 800; background: var(--surface-2); color: var(--gold); }
+.gp-clock.urgent { color: var(--bad); animation: bump 1s ease-in-out infinite; }
+.gp-streak { position: absolute; top: 4.6rem; inset-inline-end: 2rem; z-index: 3; padding: 0.5rem 1.2rem; border-radius: 999px; font-weight: 800; font-size: 1.1rem; color: #fff; background: linear-gradient(135deg, #f97316, #dc2626); box-shadow: 0 0.8rem 2rem -0.6rem #f97316; animation: pop-in 0.6s var(--ease-spring) both; }
+.gp-awards { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; margin-top: 0.8rem; }
+.gp-award { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; min-width: 11rem; padding: 0.9rem 1rem; border-radius: 1.2rem; background: var(--surface); border: 1px solid var(--border); animation: rise-in 0.6s var(--ease-out) both; animation-delay: calc(0.8s + var(--i) * 0.25s); }
+.ga-ico { font-size: 2.2rem; line-height: 1; }
+.gp-award b { font-size: 0.95rem; color: var(--gold); }
+.gp-award .avatar { font-size: 1.4rem; }
+.ga-name { font-weight: 800; }
+.gp-award small { color: var(--text-muted); font-weight: 700; }
+.r-host .gp-award { min-width: 120px; font-size: 13px; }

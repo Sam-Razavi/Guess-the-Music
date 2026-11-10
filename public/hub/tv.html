@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" class="tv-html">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Night — TV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Vazirmatn:wght@400;500;700;800;900&family=Lalezar&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/hub/css/hub.css">
+<link rel="stylesheet" href="/hub/css/menu.css">
+<link rel="stylesheet" href="/hub/css/esmfamil.css">
+<link rel="stylesheet" href="/hub/css/golpooch.css">
+<link rel="stylesheet" href="/hub/css/pantomime.css">
+<link rel="stylesheet" href="/hub/css/mostlikely.css">
+<link rel="stylesheet" href="/hub/css/mafia.css">
+<link rel="stylesheet" href="/hub/css/spy.css">
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<meta name="theme-color" content="#0b0814">
+</head>
+<body data-role="tv" class="r-tv">
+  <div class="aurora" aria-hidden="true">
+    <span class="aurora-blob b1"></span>
+    <span class="aurora-blob b2"></span>
+    <span class="aurora-blob b3"></span>
+  </div>
+
+  <div class="tv-frame">
+    <header class="tv-top">
+      <div class="brand"><img src="/logo.svg" alt="" width="40" height="40"> <span data-t="hub.brand">Game Night</span></div>
+      <div class="game-chip" id="game-chip" hidden></div>
+      <div class="join-chip"><span data-t="core.joinAt">Join at</span> <strong data-join-url dir="ltr"></strong> <span class="join-count" data-player-count></span></div>
+    </header>
+    <main id="game-root" class="game-root"></main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/avatars.js"></script>
+  <script src="/hub/js/strings.js"></script>
+  <script src="/hub/js/games-meta.js"></script>
+  <script src="/hub/js/core.js"></script>
+  <script src="/hub/js/ui.js"></script>
+  <script src="/hub/js/menu.js"></script>
+  <script src="/hub/js/esmfamil.js"></script>
+  <script src="/hub/js/golpooch.js"></script>
+  <script src="/hub/js/pantomime.js"></script>
+  <script src="/hub/js/mostlikely.js"></script>
+  <script src="/hub/js/mafia.js"></script>
+  <script src="/hub/js/spy.js"></script>
+</body>
+</html>
