@@ -3,7 +3,7 @@
 # shortcut created by install-kiosk-startup.ps1) so the TV always comes
 # back up on its own after a reboot.
 
-$url = "http://localhost:3000/tv.html"
+$url = "http://localhost:3000/tv.html?kiosk=1"  # kiosk=1: this screen gets the sound if another TV page is open too
 $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
 $profileDir = Join-Path $env:LOCALAPPDATA "guess-the-music-kiosk-profile"
 

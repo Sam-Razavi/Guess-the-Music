@@ -62,6 +62,8 @@ const translations = {
     awakeFail: "⚠️ Couldn't keep the screen on — set Auto-Lock / Screen timeout to Never in your phone's settings",
 
     wrongStamp: 'Wrong!',
+    tvMutedNote: 'Muted: another TV screen is playing the sound.',
+    tvMutedButton: 'Play the sound here',
     verdictCorrect: '✅ Correct!',
     verdictWrong: '❌ Wrong!',
     stealOpen: 'Wrong answer! Anyone left can steal it!',
@@ -168,6 +170,8 @@ const translations = {
     awakeFail: '⚠️ نشد صفحه را روشن نگه دارم — در تنظیمات گوشی، قفل خودکار / زمان خاموشی صفحه را روی «هرگز» بگذار',
 
     wrongStamp: 'اشتباه!',
+    tvMutedNote: 'بی‌صدا: صدا از یه صفحه‌ی تلویزیون دیگه پخش می‌شه.',
+    tvMutedButton: 'صدا از همین‌جا پخش بشه',
     verdictCorrect: '✅ درسته!',
     verdictWrong: '❌ اشتباه!',
     stealOpen: 'جواب اشتباه بود! بقیه می‌توانند آن را بدزدند!',

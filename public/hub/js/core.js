@@ -36,10 +36,14 @@ window.Hub = (function () {
       if (!myName) { showJoin(); return; }
       socket.emit('register', { role, id: myId, name: myName, pin, view: 'arcade' });
     } else {
-      socket.emit('register', { role, pin, view: 'arcade' });
+      // A TV says which browser tab it is: only one TV screen plays sound (tv-sound.js).
+      const screenInfo = role === 'tv' && window.TvSound ? TvSound.info() : {};
+      socket.emit('register', { role, pin, view: 'arcade', ...screenInfo });
     }
   }
   socket.on('connect', register);
+  if (role === 'tv' && window.TvSound) TvSound.attach(socket, { text: () => ({ note: t('core.tvMuted'), button: t('core.tvMutedBtn') }) });
+  const quiet = () => role === 'tv' && window.TvSound && !TvSound.on(); // another TV screen has the sound
   socket.on('disconnect', () => document.body.classList.add('offline'));
   socket.on('connect', () => document.body.classList.remove('offline'));
 
@@ -114,6 +118,7 @@ window.Hub = (function () {
     document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
     document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.dataset.t); });
     document.querySelectorAll('[data-t-placeholder]').forEach(el => { el.placeholder = t(el.dataset.tPlaceholder); });
+    if (role === 'tv' && window.TvSound) TvSound.refresh();
   }
   // Persian digits on the Farsi screens.
   function num(n) {
@@ -191,6 +196,7 @@ window.Hub = (function () {
   // Phones only allow sound after a tap.
   window.addEventListener('pointerdown', () => audio(), { capture: true, passive: true });
   function tones(notes, type = 'sine', peak = 0.2) {
+    if (quiet()) return;
     const c = audio();
     if (!c || c.state !== 'running') return;
     notes.forEach(([freq, at, len, f2]) => {
@@ -209,6 +215,7 @@ window.Hub = (function () {
     });
   }
   function noise(len = 0.3, peak = 0.15, from = 1800, to = 300) {
+    if (quiet()) return;
     const c = audio();
     if (!c || c.state !== 'running') return;
     const buf = c.createBuffer(1, Math.floor(c.sampleRate * len), c.sampleRate);
@@ -300,7 +307,7 @@ window.Hub = (function () {
     el.style.setProperty('--g2', meta.grad[1]);
     el.innerHTML = `<div class="splash-art">${meta.art.map((a, i) => `<span class="sa sa${i}">${a}</span>`).join('')}</div>
       <div class="splash-title">${esc(t(`game.${id}.name`))}</div>
-      <div class="splash-sub"><bdi>${esc(tOther(`game.${id}.name`))}</bdi></div>`;
+      <div class="splash-sub"><bdi dir="${lang === 'fa' ? 'ltr' : 'rtl'}">${esc(tOther(`game.${id}.name`))}</bdi></div>`;
     addFx(el, 2300);
     if (role === 'tv') sfx.whoosh();
   }
@@ -351,6 +358,12 @@ window.Hub = (function () {
 
     const prev = state;
     state = s;
+    const tvsPill = document.getElementById('tvs-pill');
+    if (tvsPill) {
+      const tv = s.tvScreens;
+      tvsPill.hidden = !(tv && tv.count > 1);
+      if (tv && tv.count > 1) tvsPill.textContent = `📺 ${tv.count} TV screens open: sound plays on ${tv.soundIsKiosk ? 'the kiosk' : 'one'} only`;
+    }
     if ((role === 'host' ? 'en' : s.language) !== lang) setLanguage(s.language);
     document.documentElement.dataset.theme = s.theme;
     document.body.classList.toggle('fx', !!s.fx);

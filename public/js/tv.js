@@ -1,6 +1,25 @@
 const socket = io();
 // See host.js for why this re-registers on every 'connect' rather than once.
-socket.on('connect', () => socket.emit('register', { role: 'tv' }));
+// TvSound (tv-sound.js) says which browser tab this is, so the server can let
+// only one TV screen play sound.
+socket.on('connect', () => socket.emit('register', { role: 'tv', ...TvSound.info() }));
+TvSound.attach(socket, {
+  onChange: () => [player, spare].forEach(p => p && p.__applySound && p.__applySound()),
+  text: () => ({ note: t('tvMutedNote', currentLang), button: t('tvMutedButton', currentLang) }),
+});
+
+// Every mute()/unMute() in this file says what the round wants; on a TV screen
+// that isn't the one with the sound, unMute() just remembers it and stays quiet.
+function guardSound(p) {
+  if (p.__applySound || typeof p.unMute !== 'function') return;
+  const realMute = p.mute.bind(p);
+  const realUnMute = p.unMute.bind(p);
+  p.__wantSound = !p.isMuted();
+  p.mute = () => { p.__wantSound = false; realMute(); };
+  p.unMute = () => { p.__wantSound = true; if (TvSound.on()) realUnMute(); };
+  p.__applySound = () => { if (TvSound.on() && p.__wantSound) realUnMute(); else realMute(); };
+  p.__applySound();
+}
 
 const stageEl = document.getElementById('stage');
 const overlay = document.getElementById('overlay');
@@ -437,6 +456,7 @@ function makePlayer(elementId) {
     },
     events: {
       onReady: () => {
+        guardSound(p);
         p.__ready = true;
         if (p === player) {
           if (latestState && latestState.roundStatus === 'revealed') showOnly(player);
@@ -526,6 +546,7 @@ function getAudioCtx() {
 }
 
 function playTones(notes, type = 'sine', peak = 0.25) {
+  if (!TvSound.on()) return; // another TV screen has the sound
   const ctx = getAudioCtx();
   if (!ctx) return;
   notes.forEach(([freq, at, len]) => {
@@ -1135,6 +1156,7 @@ socket.on('state', (state) => {
   latestState = state;
   currentLang = state.language || 'en';
   applyTranslations(currentLang);
+  TvSound.refresh();
   refreshIdleHintLanguage();
   document.documentElement.dataset.theme = state.theme || 'dark';
   document.body.classList.toggle('fx', fxOn(state));

@@ -8,4 +8,6 @@ window.HUB_GAMES = [
   { id: 'mostlikely', art: ['👑', '👉', '😂'], grad: ['#f472b6', '#fb923c'], players: '3+',   mins: '10' },
   { id: 'mafia',      art: ['🕶️', '🌙', '🔪'], grad: ['#b91c1c', '#312e81'], players: '5+',   mins: '30' },
   { id: 'spy',        art: ['🕵️', '🗺️', '❓'], grad: ['#0d9488', '#1d4ed8'], players: '3+',   mins: '15' },
+  { id: 'draw',       art: ['🎨', '✏️', '🖼️'], grad: ['#f59e0b', '#06b6d4'], players: '3+',   mins: '20' },
+  { id: 'truths',     art: ['🤥', '✌️', '🕵️'], grad: ['#f97316', '#7c3aed'], players: '3+',   mins: '15' },
 ];

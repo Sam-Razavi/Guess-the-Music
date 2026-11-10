@@ -24,9 +24,13 @@ const SUITES = [
   { name: 'expand' },                     // the Phase 34 expansions
   { name: 'edge' },                       // absent players, reconnects, leaving mid-round
   { name: 'adult' },                      // Pantomime's 18+ category
+  { name: 'tvs' },                        // only one TV screen plays sound
+  { name: 'draw' },                       // Draw It!
+  { name: 'truths' },                     // Two Truths & a Lie
   { name: 'music' },                      // the music game still works next to the hub
   { name: 'switch', browser: true },      // music <-> hub page hand-off
   { name: 'ui', browser: true },          // real clicks on host/phone pages
+  { name: 'songs', browser: true },       // editing a song's title / artist / year
   { name: 'pin', browser: true, env: { JOIN_PIN: '4321' } },
 ];
 

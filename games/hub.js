@@ -10,14 +10,14 @@
 
 const fs = require('fs');
 
-const ARCADE_GAMES = ['esmfamil', 'golpooch', 'pantomime', 'mostlikely', 'mafia', 'spy'];
+const ARCADE_GAMES = ['esmfamil', 'golpooch', 'pantomime', 'mostlikely', 'mafia', 'spy', 'draw', 'truths'];
 const ALL_GAMES = ['music', ...ARCADE_GAMES];
 const TROPHY_LIMIT = 24;
 // Party points for the night: a game's 1st / 2nd / 3rd place (ties share a place).
 const PLACE_POINTS = [3, 2, 1];
 const SPIN_MS = 5200;
 
-module.exports = function createHub({ io, state, displayName, broadcastAll, musicIsLive, buildId, file }) {
+module.exports = function createHub({ io, state, displayName, broadcastAll, musicIsLive, buildId, file, tvSummary }) {
   const hub = load();
   const votes = {}; // playerId -> gameId, while the hub menu is up
 
@@ -116,6 +116,8 @@ module.exports = function createHub({ io, state, displayName, broadcastAll, musi
         spin: spin && active === 'hub' ? spin : null,
         musicLive: musicIsLive(),
       },
+      // How many TV screens are open (only one plays sound) — host only.
+      tvScreens: role === 'host' && tvSummary ? tvSummary() : null,
       game: game ? game.payload(role, pid) : null,
     };
   }
@@ -169,6 +171,12 @@ module.exports = function createHub({ io, state, displayName, broadcastAll, musi
     socket.on('host:hub:select', (d) => select(d && d.game, socket));
     socket.on('host:hub:clearTrophies', () => { hub.trophies = []; hub.night = { points: {}, names: {} }; save(); broadcast(); });
     socket.on('host:hub:surprise', () => surprise());
+    // A page that (re)loaded mid-game asks the game for what isn't in the regular
+    // payload (Draw It's drawing so far). Any registered page may ask.
+    socket.on('hub:sync', () => {
+      const g = games[hub.activeGame];
+      if (g && g.sync && socket.data.role) g.sync(socket);
+    });
     socket.on('player:hub:vote', (d) => {
       const game = d && d.game;
       const { playerId } = info();

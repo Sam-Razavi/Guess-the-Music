@@ -1,0 +1,96 @@
+/* Two Truths & a Lie — three index cards, one of them gets stamped. */
+
+.tt-tv { display: flex; min-height: 0; }
+.tt-tv > * { flex: 1; min-width: 0; }
+
+.tt-ready-box { margin-top: 0.4rem; }
+.tt-ready { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+.tt-rchip { position: relative; font-size: 1.3rem; opacity: 0.45; transition: opacity 0.3s, transform 0.4s var(--ease-spring); }
+.tt-rchip.in { opacity: 1; transform: translateY(-0.2rem); }
+.tt-rchip i { position: absolute; bottom: -0.3rem; inset-inline-end: -0.3rem; width: 1.25rem; height: 1.25rem; display: grid; place-items: center;
+  border-radius: 50%; font-style: normal; font-size: 0.75rem; font-weight: 900; background: var(--surface-solid); color: var(--text-muted); border: 1px solid var(--border); }
+.tt-rchip.in i { background: var(--good); color: #03241a; border-color: transparent; }
+
+/* ---- TV: a teller on stage ---- */
+.tt-stage { display: flex; flex-direction: column; gap: 1.2rem; padding: 0.4rem 3rem 1.4rem; min-height: 0; }
+.tt-head { display: flex; align-items: center; gap: 1.4rem; }
+.tt-head h1 { font-family: var(--font-poster); font-weight: 400; font-size: 3rem; line-height: 1.05; }
+.tt-sub { color: var(--text-muted); font-weight: 700; font-size: 1.1rem; margin-top: 0.2rem; }
+.tt-teller { position: relative; flex: none; animation: pop-in 0.6s var(--ease-spring) both; }
+.tt-av { font-size: 3rem; box-shadow: 0 0 0 0.3rem #f97316, 0 0 2.6rem rgba(249, 115, 22, 0.55); }
+.tt-nose { position: absolute; bottom: -0.6rem; inset-inline-end: -1rem; font-size: 2rem; animation: float-y 2s ease-in-out infinite; }
+.tt-clock { margin-inline-start: auto; flex: none; }
+.tt-clock .ring { width: 6.5rem; height: 6.5rem; }
+.tt-ring .ring-bar { stroke: #f97316; }
+.tt-stage.voting .tt-ring .ring-bar { stroke: #a855f7; }
+
+.tt-lines { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.4rem; align-items: center; }
+.tt-line { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 0.8rem; min-height: 17rem; padding: 3.2rem 1.6rem 3rem; border-radius: 1.4rem;
+  background: #fffaf0; color: #2b1d0e; box-shadow: 0 1.4rem 3rem -1.2rem rgba(0, 0, 0, 0.55);
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 2.15rem, rgba(59, 130, 246, 0.18) 2.15rem, rgba(59, 130, 246, 0.18) 2.25rem);
+  animation: tt-deal 0.6s var(--ease-spring) both; animation-delay: calc(var(--i) * 0.15s); }
+@keyframes tt-deal { from { opacity: 0; transform: translateY(2.5rem) rotate(calc((var(--i) - 1) * 4deg)); } to { opacity: 1; transform: none; } }
+.tt-line .tt-num { position: absolute; top: 0.9rem; inset-inline-start: 1.1rem; font-family: var(--font-display); font-size: 2.2rem; line-height: 1; color: #f97316; }
+.tt-line p { font-size: 2.05rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; text-align: center; color: #2b1d0e; }
+html[dir="rtl"] .tt-line p { font-family: "Vazirmatn", sans-serif; font-weight: 800; }
+.tt-stage.voting .tt-line { box-shadow: 0 0 0 0.25rem rgba(168, 85, 247, 0.45), 0 1.4rem 3rem -1.2rem rgba(0, 0, 0, 0.55); }
+
+.tt-lines.reveal .tt-line { animation: none; transition: transform 0.6s var(--ease-spring), opacity 0.6s; }
+.tt-lines.reveal .tt-line.truth { opacity: 0.6; transform: scale(0.94); transition-delay: 0.9s; }
+.tt-lines.reveal .tt-line.lie { transform: scale(1.04) rotate(-1deg); box-shadow: 0 0 0 0.35rem var(--bad), 0 0 3rem rgba(244, 63, 94, 0.5); transition-delay: 0.9s; }
+.tt-verdict { position: absolute; top: 0.9rem; inset-inline-end: 1.1rem; padding: 0.2em 0.8em; border-radius: 0.5rem; font-weight: 900; font-size: 1.1rem; letter-spacing: 0.04em;
+  animation: pop-in 0.5s var(--ease-spring) 1s both; }
+.tt-line.truth .tt-verdict { background: rgba(34, 197, 94, 0.18); color: #15803d; }
+.tt-line.lie .tt-verdict { background: var(--bad); color: #fff; font-size: 1.4rem; transform: rotate(-4deg); }
+.tt-voters { position: absolute; bottom: 0.8rem; inset-inline: 1rem; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.3rem; }
+.tt-voter { font-size: 0.9rem; animation: drop-in 0.5s var(--ease-spring) both; animation-delay: calc(1.4s + var(--j) * 0.12s); }
+.tt-headline { text-align: center; font-family: var(--font-poster); font-size: 2.4rem; color: var(--gold); animation: pop-in 0.7s var(--ease-spring) 1.6s both; }
+.tt-next { text-align: center; color: var(--text-muted); font-weight: 700; margin-top: -0.6rem; }
+.tt-votes { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.6rem; min-height: 2.6rem; }
+
+.tt-final h1 { margin-bottom: 1.6rem; }
+.tt-final .podium { margin-top: 0.4rem; }
+.tt-awards { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; }
+.tt-award { display: inline-flex; align-items: baseline; gap: 0.45rem; padding: 0.45rem 1rem; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-weight: 700; }
+.tt-award small { color: var(--text-muted); }
+
+/* ---- phone ---- */
+.tt-ph { padding-top: 12px; }
+.tt-write { width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); text-align: start; }
+.tt-write h3 { font-size: 16px; }
+.tt-wline { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px; border-radius: 14px; border: 2px solid transparent; transition: border-color 0.2s, background 0.2s; }
+.tt-wline.lie { border-color: var(--bad); background: rgba(244, 63, 94, 0.08); }
+.tt-wline textarea { width: 100%; min-width: 0; resize: none; font: inherit; font-size: 16px; line-height: 1.35; padding: 8px 10px; border-radius: 10px;
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+.tt-num { font-weight: 900; color: #f97316; font-size: 20px; }
+.tt-liebtn { display: flex; flex-direction: column; align-items: center; gap: 0; padding: 6px 8px; border-radius: 12px; font-size: 20px; line-height: 1; opacity: 0.55; }
+.tt-liebtn small { font-size: 10px; font-weight: 800; margin-top: 3px; }
+.tt-liebtn[aria-pressed="true"] { opacity: 1; background: var(--bad); color: #fff; border-color: transparent; }
+.tt-wbtns { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
+.tt-wbtns .primary { flex: 1; }
+.tt-wbtns .small-btn { align-self: center; }
+.tt-idea { font-weight: 700; color: var(--gold); min-height: 0; }
+.tt-idea:empty, .tt-err:empty { display: none; }
+.tt-err { color: var(--bad); font-weight: 800; }
+.tt-saved { width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 18px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.35); text-align: start; }
+.tt-ok { font-weight: 800; }
+.tt-mylines { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; text-align: start; }
+.tt-mylines li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); font-weight: 600; }
+.tt-mylines li.lie { background: rgba(244, 63, 94, 0.14); box-shadow: inset 0 0 0 2px var(--bad); }
+.tt-mylines li em { margin-inline-start: auto; font-style: normal; }
+.tt-mylines li span[dir] { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tt-me, .tt-listen, .tt-vote { display: flex; flex-direction: column; gap: 12px; }
+.tt-me h2, .tt-listen h2 { font-size: 20px; }
+.tt-late { margin-top: 6px; }
+.tt-late summary { cursor: pointer; font-weight: 800; color: var(--gold); padding: 6px 0; }
+.tt-picks { display: flex; flex-direction: column; gap: 10px; }
+.tt-pick { display: flex; gap: 12px; align-items: flex-start; text-align: start; padding: 16px; border-radius: 16px; font-size: 17px; font-weight: 700; line-height: 1.35; }
+.tt-pick span[dir] { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tt-pick.on { background: linear-gradient(135deg, rgba(244, 63, 94, 0.25), rgba(168, 85, 247, 0.25)); border-color: var(--bad); box-shadow: 0 0 0 2px var(--bad); }
+.tt-thelie { display: flex; gap: 10px; padding: 12px 14px; border-radius: 14px; background: rgba(244, 63, 94, 0.12); box-shadow: inset 0 0 0 2px var(--bad); text-align: start; font-weight: 700; max-width: 100%; }
+.tt-thelie span[dir] { overflow-wrap: anywhere; }
+.tt-ph-final { padding-bottom: 14px; }
+.tt-awards.ph { flex-direction: column; align-items: stretch; }
+.tt-awards.ph .tt-award { font-size: 14px; justify-content: center; }
+.tt-host-lines { margin: 8px 0; padding-inline-start: 1.4em; display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+.tt-host-lines li.lie { color: var(--bad); font-weight: 800; }

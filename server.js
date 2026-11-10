@@ -321,6 +321,7 @@ const state = {
 // just before the socket handlers; null until then, so an early broadcast()
 // simply skips it.
 let hub = null;
+let tvScreens = null; // games/tv-screens.js, created next to the hub below
 
 const ACTION_LOG_LIMIT = 50;
 
@@ -872,6 +873,7 @@ function payloadFor(role) {
       currentIndex: state.currentIndex,
       playOrder: state.playOrder,
       playFilter: state.playFilter,
+      tvScreens: tvScreens ? tvScreens.summary() : null,
       nextRoundOptions: state.nextRoundOptions,
       // "Double points" reuses the points-per-song pipeline exactly — just
       // overriding the runtime value shown/awarded for this one round. The
@@ -1370,6 +1372,10 @@ app.post('/api/preflight', async (req, res) => {
   res.json({ ready, checks });
 });
 
+// ---------- TV screens: only one plays sound (see games/tv-screens.js) ----------
+
+tvScreens = require('./games/tv-screens')({ io, onChange: () => broadcast() });
+
 // ---------- game hub ----------
 
 hub = require('./games/hub')({
@@ -1381,6 +1387,7 @@ hub = require('./games/hub')({
   musicIsLive: () => ['playing', 'buzzed', 'wagering'].includes(state.roundStatus),
   buildId: BUILD_ID,
   file: HUB_FILE,
+  tvSummary: () => tvScreens.summary(),
 });
 
 // ---------- sockets ----------
@@ -1402,7 +1409,7 @@ io.on('connection', (socket) => {
     // friends without ever registering, sidestepping the PIN entirely.
     if (event.startsWith('host:') && role !== 'host') return;
     if (event.startsWith('player:') && role !== 'player') return;
-    if (event === 'tv:playerStatus' && role !== 'tv') return;
+    if (event.startsWith('tv:') && role !== 'tv') return;
     try {
       const result = handler(...args);
       if (result && typeof result.catch === 'function') result.catch(e => console.error(`[socket ${event}]`, e));
@@ -1411,7 +1418,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('register', ({ role: r, id, name, team, pin, view } = {}) => {
+  socket.on('register', ({ role: r, id, name, team, pin, view, screen, kiosk, fullscreen, visible } = {}) => {
     if (r !== 'host' && r !== 'tv' && r !== 'player') return;
     if (r === 'player') {
       // The id becomes a key of state.players and ends up in HTML attributes
@@ -1452,12 +1459,17 @@ io.on('connection', (socket) => {
       }
       savePlayers();
       broadcast();
-    } else if (arcade) {
-      hub.sendTo(socket);
     } else {
-      socket.emit('state', payloadFor(role));
+      // Before the first state/arcade payload, so a second TV is muted before it
+      // ever starts a song.
+      if (role === 'tv') tvScreens.add(socket, { screen, kiosk, fullscreen, visible });
+      if (arcade) hub.sendTo(socket);
+      else socket.emit('state', payloadFor(role));
     }
   });
+
+  socket.on('tv:screen', (info) => tvScreens.update(socket, info));
+  socket.on('tv:claimSound', () => tvScreens.claim(socket));
 
   hub.attach(socket, () => ({ role, playerId }));
 
@@ -1598,11 +1610,20 @@ io.on('connection', (socket) => {
     broadcast();
   });
 
-  // Corrects a song's title and/or the film/series it's from (an empty work removes it).
-  socket.on('host:setSongInfo', ({ id, title, work } = {}) => {
+  // Corrects a song's details — the host page's ✎ editor on a playlist row. Each
+  // field is optional: a blank title is ignored, a blank artist or work clears it,
+  // and year '' or null clears the year and decade (a valid year sets the decade).
+  socket.on('host:setSongInfo', (info) => {
+    const { id, title, artist, year, work } = info || {};
     const song = state.playlist.find(s => s.id === id);
     if (!song) return;
     if (typeof title === 'string' && title.trim()) song.title = title.replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (typeof artist === 'string') song.artist = artist.replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (year === null || year === '') { song.year = null; song.decade = ''; }
+    else if (year !== undefined) {
+      const tags = sanitizeSongTags({ year });
+      if (tags.year) { song.year = tags.year; song.decade = tags.decade; }
+    }
     if (typeof work === 'string') { const w = cleanWork(work); if (w) song.work = w; else delete song.work; }
     savePlaylist();
     broadcast();
@@ -2043,6 +2064,9 @@ io.on('connection', (socket) => {
   // recorded and fed into /api/check-playlist's broken-video scan too,
   // catching exactly the case the Data-API-only check can miss.
   socket.on('tv:playerStatus', (payload) => {
+    // A muted second TV screen plays the same song silently; only the screen
+    // with the sound reports (otherwise the host would see two statuses).
+    if (!tvScreens.isSoundSocket(socket)) return;
     io.to('host').emit('playerStatus', payload);
     if (!payload || !payload.songId) return;
     if (payload.status === 'error') {
@@ -2132,6 +2156,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    if (role === 'tv') tvScreens.remove(socket);
     // Only if this is still the player's current connection: on a page change
     // (music <-> hub) or a reload, the new page can register before the old
     // socket's disconnect arrives — that must not mark them offline.

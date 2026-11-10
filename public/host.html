@@ -48,6 +48,7 @@
         <button class="pill" id="mc-mode-toggle" title="Simplified view for a guest MC — hides playlist/settings, keeps just the round controls and scoreboard. Stays local to this device.">🎤 MC Mode</button>
         <div class="pill" id="conn-pill">connecting…</div>
         <div class="pill" id="awake-pill" hidden></div>
+        <div class="pill gold" id="tvs-pill" hidden title="Only one TV screen plays the sound: the kiosk first, otherwise the one opened first. If you didn't mean to open another TV page (an old tv.html tab in your everyday Chrome, say), close it. On a muted TV screen, 'Play the sound here' moves the sound to it."></div>
       </div>
     </header>
 
@@ -327,6 +328,26 @@
         </div>
       </section>
     </div>
+  </div>
+
+  <!-- ✎ on a playlist row: fix a song's title, artist, year or film. Lives outside
+       the playlist, which is rebuilt on every state broadcast. -->
+  <div class="song-edit-backdrop" id="song-edit" hidden>
+    <form class="card song-edit" id="song-edit-form" autocomplete="off">
+      <h2>✎ Edit song</h2>
+      <label>Title <input id="se-title" type="text" maxlength="120" required></label>
+      <label>Artist <input id="se-artist" type="text" maxlength="120"></label>
+      <div class="se-row">
+        <label>Year <input id="se-year" type="number" min="1900" max="2100" step="1" placeholder="e.g. 1978"></label>
+        <span class="muted small" id="se-decade"></span>
+      </div>
+      <label>From the film / series <span class="muted small">(optional — shown on the reveal)</span> <input id="se-work" type="text" maxlength="100"></label>
+      <p class="muted small" id="se-video"></p>
+      <div class="se-btns">
+        <button type="button" id="se-cancel">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>

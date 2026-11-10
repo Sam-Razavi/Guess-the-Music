@@ -25,7 +25,7 @@ window.UI = (function () {
       <section class="lobby-main">
         ${art(id, 'big')}
         <h1 class="lobby-title">${esc(t(`game.${id}.name`))}</h1>
-        <p class="lobby-alt"><bdi>${esc(Hub.tOther(`game.${id}.name`))}</bdi></p>
+        <p class="lobby-alt"><bdi dir="${Hub.lang === 'fa' ? 'ltr' : 'rtl'}">${esc(Hub.tOther(`game.${id}.name`))}</bdi></p>
         <ol class="how">${steps}</ol>
         ${extra || ''}
       </section>

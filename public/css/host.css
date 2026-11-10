@@ -301,6 +301,20 @@
 .playlist-row .info .cat.diff-medium { color: var(--gold); background: rgba(255, 194, 75, 0.14); }
 .playlist-row .info .cat.diff-hard { color: var(--bad); background: rgba(244, 63, 94, 0.14); }
 .playlist-row .info .cat.diff-none { color: var(--text-muted); background: transparent; border: 1px dashed var(--border-strong); }
+.playlist-row .info .cat.decade-tag { cursor: pointer; }
+.playlist-row .info .cat.decade-tag.missing { color: var(--text-muted); background: transparent; border: 1px dashed var(--border-strong); }
+.playlist-row .edit-btn { padding-inline: 0.7em; }
+
+/* ✎ song editor (a small dialog over the page) */
+.song-edit-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(5, 3, 15, 0.6); backdrop-filter: blur(4px); }
+.song-edit-backdrop[hidden] { display: none; }
+.song-edit { width: min(460px, 100%); display: flex; flex-direction: column; gap: 0.8rem; animation: rise-in 0.3s var(--ease-out) both; }
+.song-edit label { display: flex; flex-direction: column; gap: 0.3rem; font-weight: 700; font-size: 0.9rem; }
+.song-edit input { width: 100%; }
+.song-edit .se-row { display: flex; align-items: flex-end; gap: 0.8rem; }
+.song-edit .se-row label { flex: 0 0 9rem; }
+.song-edit .se-row .muted { padding-bottom: 0.7rem; }
+.song-edit .se-btns { display: flex; justify-content: flex-end; gap: 0.6rem; }
 
 .playlist {
   display: flex;

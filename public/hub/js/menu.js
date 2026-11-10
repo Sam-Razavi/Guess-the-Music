@@ -87,7 +87,7 @@
           <div class="hc-art">${g.art.map((a, j) => `<span class="hca hca${j}">${a}</span>`).join('')}</div>
           <div class="hc-body">
             <h2 class="hc-name">${esc(t(`game.${g.id}.name`))}</h2>
-            <p class="hc-alt"><bdi>${esc(tOther(`game.${g.id}.name`))}</bdi></p>
+            <p class="hc-alt"><bdi dir="${Hub.lang === 'fa' ? 'ltr' : 'rtl'}">${esc(tOther(`game.${g.id}.name`))}</bdi></p>
             <p class="hc-tag">${esc(t(`game.${g.id}.tag`))}</p>
             <div class="hc-meta"><span>👥 ${num(g.players)}</span><span>⏱ ${num(g.mins)}′</span></div>
           </div>

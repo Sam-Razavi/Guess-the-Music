@@ -259,8 +259,17 @@ socket.on('addSongWarning', ({ message }) => {
   addError.textContent = message;
   addError.classList.add('warn');
 });
+// More than one TV page open (see games/tv-screens.js): only one plays sound.
+function tvScreensText(t) {
+  if (!t || t.count < 2) return '';
+  return `📺 ${t.count} TV screens open: sound plays on ${t.soundIsKiosk ? 'the kiosk' : 'one'} only`;
+}
 // A successful add clears the "Checking…" note once the new row arrives.
-socket.on('state', () => {
+socket.on('state', (st) => {
+  const tvsPill = document.getElementById('tvs-pill');
+  const tvsText = tvScreensText(st && st.tvScreens);
+  tvsPill.hidden = !tvsText;
+  tvsPill.textContent = tvsText;
   if (addError.textContent === 'Checking the video…' && !addError.classList.contains('warn')) addError.textContent = '';
 });
 
@@ -709,8 +718,13 @@ document.getElementById('show-results-btn').addEventListener('click', () => sock
 
 // ---------- keyboard shortcuts (desktop hosting) ----------
 document.addEventListener('keydown', (e) => {
-  const tag = document.activeElement.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA') return; // don't hijack typing in search/add-song fields
+  const el = document.activeElement;
+  const tag = el.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return; // don't hijack typing in search/add-song fields
+  // Space/Enter on a focused button or chip is that button's own key, not "reveal";
+  // nor while the song editor is open, or when something already handled the key.
+  if (e.defaultPrevented || tag === 'BUTTON' || (el.getAttribute && el.getAttribute('role') === 'button')) return;
+  if (!document.getElementById('song-edit').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === ' ') {
     e.preventDefault(); // avoid scrolling the page
     document.getElementById('reveal-btn').click();
@@ -1021,7 +1035,7 @@ function renderPlaylist(state) {
         <div class="a">${escapeHtml(song.artist || '')}${song.work ? ` <span class="work">· 🎬 ${escapeHtml(song.work)}</span>` : ''}</div>
         <div class="tags">
           ${song.category ? `<span class="cat">${escapeHtml(song.category)}</span>` : ''}
-          ${song.decade ? `<span class="cat decade-tag">${escapeHtml(song.decade)}</span>` : ''}
+          ${song.decade ? `<span class="cat decade-tag" role="button" tabindex="0" data-edit="${song.id}" title="${song.year ? song.year + ' — c' : 'C'}lick to edit">${escapeHtml(song.decade)}</span>` : `<span class="cat decade-tag missing" role="button" tabindex="0" data-edit="${song.id}" title="No year yet — click to add one">＋ year</span>`}
           <span class="cat diff-tag diff-${song.difficulty || 'none'}" role="button" tabindex="0" data-difficulty-cycle="${song.id}" title="Click to change difficulty">${song.difficulty ? DIFFICULTY_LABELS[song.difficulty] : '＋ difficulty'}</span>
         </div>
       </div>
@@ -1029,6 +1043,7 @@ function renderPlaylist(state) {
         ${pointValuesOn ? `<input type="number" class="points-input" min="1" step="1" value="${song.points || 1}" data-points="${song.id}" title="Points this song is worth">` : ''}
         ${wagerRoundOn ? `<button class="wager-toggle ${song.wagerEligible ? 'active' : ''}" data-wager-toggle="${song.id}" title="Mark as Daily Double eligible">💰</button>` : ''}
         ${playOrWagerControl}
+        <button class="edit-btn" data-edit="${song.id}" title="Edit title, artist, year, film">✎</button>
         <button class="danger" data-remove="${song.id}">✕</button>
       </div>
     </div>
@@ -1048,6 +1063,10 @@ function renderPlaylist(state) {
     };
     el.addEventListener('click', cycle);
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycle(); } });
+  });
+  playlistList.querySelectorAll('[data-edit]').forEach(el => {
+    el.addEventListener('click', () => openSongEditor(el.dataset.edit));
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSongEditor(el.dataset.edit); } });
   });
   playlistList.querySelectorAll('[data-wager-start]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1073,6 +1092,55 @@ function renderPlaylist(state) {
     });
   });
 }
+
+// ---- ✎ song editor ----
+// A dialog outside the playlist (which is rebuilt on every broadcast), so typing
+// isn't interrupted. Saves through host:setSongInfo; the new values come back in
+// the next state broadcast like any other change.
+const songEdit = document.getElementById('song-edit');
+const songEditForm = document.getElementById('song-edit-form');
+const seField = (id) => document.getElementById(id);
+let editingSongId = null;
+function seDecadeHint() {
+  const y = Number(seField('se-year').value);
+  seField('se-decade').textContent = y >= 1900 && y <= 2100 ? `→ ${Math.floor(y / 10) * 10}s` : seField('se-year').value ? 'Year must be 1900–2100' : 'No year: no decade filter';
+}
+function openSongEditor(id) {
+  const song = latestState && latestState.playlist.find(s => s.id === id);
+  if (!song) return;
+  editingSongId = id;
+  seField('se-title').value = song.title || '';
+  seField('se-artist').value = song.artist || '';
+  seField('se-year').value = song.year || '';
+  seField('se-work').value = song.work || '';
+  seField('se-video').textContent = `YouTube: ${song.youtubeId}${song.decade && !song.year ? ` · decade ${song.decade} (no exact year)` : ''}`;
+  seDecadeHint();
+  songEdit.hidden = false;
+  seField('se-title').focus();
+}
+function closeSongEditor() { songEdit.hidden = true; editingSongId = null; }
+seField('se-year').addEventListener('input', seDecadeHint);
+seField('se-cancel').addEventListener('click', closeSongEditor);
+songEdit.addEventListener('click', (e) => { if (e.target === songEdit) closeSongEditor(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !songEdit.hidden) closeSongEditor(); });
+songEditForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!editingSongId) return;
+  const song = latestState && latestState.playlist.find(s => s.id === editingSongId);
+  const yearText = seField('se-year').value.trim();
+  const year = Number(yearText);
+  if (yearText && !(year >= 1900 && year <= 2100)) { seField('se-year').focus(); return; }
+  // Leave the year alone if the song only has a decade and the box was left empty.
+  const yearOut = yearText ? year : (song && !song.year && song.decade ? undefined : '');
+  socket.emit('host:setSongInfo', {
+    id: editingSongId,
+    title: seField('se-title').value,
+    artist: seField('se-artist').value,
+    ...(yearOut === undefined ? {} : { year: yearOut }),
+    work: seField('se-work').value,
+  });
+  closeSongEditor();
+});
 
 // ---- drag-to-reorder (mouse + touch, via SortableJS) ----
 // Initialized once: renderPlaylist() only replaces playlistList's children

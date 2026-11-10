@@ -40,7 +40,7 @@ async function until(fn, ms = 8000) { const e = Date.now() + ms; while (Date.now
   await mh.click('#hub-btn');
   ok(await until(() => tv.url().endsWith('/hub/tv.html')), '"All games" brings the TV back to the hub');
   ok(await until(() => mh.url().endsWith('/hub/host.html')), '... and the host page too');
-  ok(await until(async () => (await tv.locator('.hub-card').count()) === 8), 'hub menu rendered (7 games + trophy shelf)');
+  ok(await until(async () => (await tv.locator('.hub-card').count()) === 10), 'hub menu rendered (9 games + trophy shelf)');
   console.log('page errors:', errors.length ? errors : 'none');
   ok(!errors.length, 'no page errors');
   console.log(`\n${pass} passed, ${fail} failed`);
