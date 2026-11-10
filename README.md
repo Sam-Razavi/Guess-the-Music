@@ -21,6 +21,8 @@ Guess the Music is one game in a hub. The TV opens on a game menu; players vote 
 | 👑 **Who's Most Likely?** · کی از همه بیشتر؟ | A question goes up, everyone secretly votes for a player, the votes stack up on the TV. Voting with the crowd = +1; the "winners" collect titles. Mixed in: *Would you rather* (the bigger side scores) and *Never have I ever* (no points, just confessions). Players can write their own questions. |
 | 🕶️ **Mafia** · مافیا | The app narrates. Secret roles on phones (Godfather, Mafia, Doctor, Detective, optional Sniper, Citizens). At night *everyone* taps someone — citizens pick a "suspect" — so nobody can tell who's who from who's tapping. By day the town votes someone onto trial: they get a defense, then a secret guilty / innocent vote and last words. Optional Bulletproof (survives one shot) and Jester (wins if voted out). The host page is a narrator dashboard with one "next step" button. |
 | 🕵️ **Spy** · جاسوس | Everyone sees the same secret word except the spy. Ask each other questions, then vote; a caught spy can still win by picking the word from the board on the TV. The TV sets a shuffled asking order, and a bold spy can call the word early: right = +3, wrong = everyone else scores. |
+| 🎨 **Draw It!** · نقاشی‌بازی | One player draws a secret word on their phone with a finger; the drawing appears stroke by stroke on the TV while everyone else types guesses. First right guess 3 points, second 2, then 1, and the artist gets 1 for every right guess. The artist picks from two easy words or one hard one (double points). Wrong guesses scroll by on the TV (near misses only get a private "so close!"), letter hints appear at half time, the reveal replays the drawing as a time-lapse, and the game ends with a gallery of the night's drawings, a best artist and a sharpest eye. Persian and English word banks; formal and spoken Persian spellings both count. |
+| 🤥 **Two Truths & a Lie** · دو راست، یه دروغ | Everyone writes three things about themselves on their phone and marks the made-up one (there's an idea button). One teller at a time: the three lines go up on the TV as index cards, everyone grills the teller out loud, then votes in secret. Catch the lie: +1. Fool someone: +1 for each, and +1 more for fooling everyone. Awards for the best liar and the lie detector. |
 
 <p>
   <img src="docs/screenshots/hub/03-esmfamil-writing.png" width="49%" alt="Esm-Famil: the letter and everyone's progress on the TV" />
@@ -33,6 +35,14 @@ Guess the Music is one game in a hub. The TV opens on a game menu; players vote 
 <p>
   <img src="docs/screenshots/hub/14-mafia-trial.png" width="49%" alt="Mafia: the accused is on trial, guilty or innocent?" />
   <img src="docs/screenshots/hub/15-mostlikely-rather.png" width="49%" alt="Would you rather: the room splits" />
+</p>
+<p>
+  <img src="docs/screenshots/hub/16-draw-tv.png" width="49%" alt="Draw It!: the drawing live on the TV, guesses on the right" />
+  <img src="docs/screenshots/hub/17-truths-reveal.png" width="49%" alt="Two Truths and a Lie: the lie is stamped" />
+</p>
+<p>
+  <img src="docs/screenshots/hub/18-draw-artist.png" width="24%" alt="Draw It!: the artist's phone" />
+  <img src="docs/screenshots/hub/19-truths-write.png" width="24%" alt="Two Truths and a Lie: writing your three lines" />
 </p>
 <p>
   <img src="docs/screenshots/hub/04-esmfamil-phone.png" width="24%" alt="Esm-Famil answer sheet on a phone" />
@@ -167,7 +177,7 @@ Genres come from one fixed list (19 international ones plus Persian Pop, Persian
 
 A big playlist only renders the first 100 matching songs at a time (**Show more** loads the next page), so it stays fast with thousands of songs.
 
-New songs added through the host page can carry a year (which sets the decade) and a difficulty; imported songs can be tagged the same way. The decade and difficulty values are best-effort estimates, so expect to nudge a few.
+New songs added through the host page can carry a year (which sets the decade) and a difficulty; imported songs can be tagged the same way. The decade and difficulty values are best-effort estimates, so expect to nudge a few: the **✎** button on a playlist row edits a song's title, artist, year and film / series, and a song with no year shows a **＋ year** chip that opens the same editor.
 
 Tip: pick videos that don't show the song title on screen (plain "official audio" uploads work great), since the video only stays hidden behind a spinning-record animation *while the round is live* — once you hit **Reveal**, the real video appears.
 
@@ -250,6 +260,8 @@ powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Guess
 To exit kiosk mode, `Alt+F4` the Chrome window (or kill it from Task Manager).
 
 > **TV goes black after a few minutes?** Windows turns the display off after a period with no keyboard/mouse input (the default is 5 minutes), and during a game nobody touches the PC — the phones are the controllers. The page keeps running (and the music keeps playing); only the picture is gone. On the TV PC, set it to never: `powercfg /change monitor-timeout-ac 0` (and `standby-timeout-ac 0` so the PC itself never sleeps).
+
+> **Two TV pages open?** Only one of them plays sound. If the TV page is also open somewhere else (a forgotten `tv.html` tab in your everyday Chrome, say), that copy stays muted and says so in a corner, and the host page shows "📺 2 TV screens open". The kiosk window gets the sound first (the launcher opens `tv.html?kiosk=1`); otherwise the screen that fills the display, then a visible one, then the one opened first. **Play the sound here** on a muted screen moves the sound to it.
 
 > **Songs stuck on "Loading…" on the TV?** That's almost always Chrome blocking autoplay because the TV page is open in an *ordinary* Chrome window instead of the kiosk launcher above (only the launcher passes `--autoplay-policy=no-user-gesture-required`). The TV now shows a "Click anywhere to start the music" screen when it happens — one click fixes it until the page is reloaded — but the lasting fix is to close the ordinary window and re-open the TV with the `launch-kiosk.ps1` command above.
 
