@@ -201,5 +201,14 @@ html[dir="rtl"] .ef-field input { padding: 12px 14px 12px 40px; }
 .ef-letter-grid button { aspect-ratio: 1; padding: 0; font-size: 26px; font-family: "Lalezar", "Vazirmatn", sans-serif; background: #fffdf6; color: #1e3a8a; border: 0; box-shadow: 0 3px 0 #e8e1cc; border-radius: 12px; }
 .ef-letter-grid.en button { font-family: var(--font-display); font-weight: 800; font-size: 22px; }
 .ef-letter-grid button:disabled { opacity: 0.25; }
+/* host: Persian/English letters + the host's own letter grid */
+.ef-h-alpha { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2px 0 12px; }
+.ef-h-alpha .seg button { font-size: 15px; padding: 0.45em 1em; }
+.ef-h-alpha bdi { font-weight: 700; margin-inline-end: 0.5em; }
+.ef-h-letters { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); max-width: 680px; margin: 4px 0 10px; }
+.ef-h-letters button { font-size: 24px; }
+.ef-h-letters.en button { font-size: 20px; }
+.ef-h-letters button { transition: transform 0.12s, box-shadow 0.12s; }
+@media (hover: hover) { html .ef-h-letters button:not(:disabled):hover { background-color: #fff; transform: translateY(-2px); box-shadow: 0 5px 0 #e8e1cc, 0 0 0 3px var(--gold); } }
 .ef-field.golden input { border-color: rgba(245, 158, 11, 0.7); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
 .gain.bonus { color: #fbbf24; }

@@ -29,6 +29,9 @@ const STOP_BONUS = 5;
 module.exports = function esmfamil(ctx) {
   const timers = makeTimers();
   let g;
+  // Until the host picks an alphabet, a freshly opened game uses the screen
+  // language's letters; once they've picked one it stays for the night.
+  let alphabetPicked = false;
 
   function reset() {
     timers.clearAll();
@@ -43,7 +46,7 @@ module.exports = function esmfamil(ctx) {
         hardLetters: false,
         golden: true,        // one random category a round counts double
         stopBonus: true,     // +5 for calling STOP, only if all your answers hold up
-        letterMode: 'random', // 'random' | 'player' (a player picks the letter on their phone)
+        letterMode: 'random', // 'random' | 'host' (the host taps it) | 'player' (a player picks on their phone)
       },
       golden: null,
       picker: null,
@@ -311,11 +314,11 @@ module.exports = function esmfamil(ctx) {
       if (patch.seconds !== undefined) s.seconds = clampInt(patch.seconds, 30, 600, s.seconds);
       if (patch.stopGrace !== undefined) s.stopGrace = clampInt(patch.stopGrace, 0, 60, s.stopGrace);
       if (patch.rounds !== undefined) s.rounds = clampInt(patch.rounds, 1, 30, s.rounds);
-      if (patch.alphabet === 'fa' || patch.alphabet === 'en') s.alphabet = patch.alphabet;
+      if (patch.alphabet === 'fa' || patch.alphabet === 'en') { s.alphabet = patch.alphabet; alphabetPicked = true; }
       if (typeof patch.hardLetters === 'boolean') s.hardLetters = patch.hardLetters;
       if (typeof patch.golden === 'boolean') s.golden = patch.golden;
       if (typeof patch.stopBonus === 'boolean') s.stopBonus = patch.stopBonus;
-      if (patch.letterMode === 'random' || patch.letterMode === 'player') s.letterMode = patch.letterMode;
+      if (['random', 'host', 'player'].includes(patch.letterMode)) s.letterMode = patch.letterMode;
       ctx.broadcast();
     },
     'host:esmfamil:start': (who, { letter }) => {
@@ -406,7 +409,7 @@ module.exports = function esmfamil(ctx) {
 
   return {
     id: 'esmfamil',
-    reset: () => { const keep = g && g.settings; reset(); if (keep) g.settings = keep; g.settings.alphabet = ctx.lang(); },
+    reset: () => { const keep = g && g.settings; reset(); if (keep) g.settings = keep; if (!alphabetPicked) g.settings.alphabet = ctx.lang(); },
     leave: () => timers.clearAll(),
     payload,
     handlers,

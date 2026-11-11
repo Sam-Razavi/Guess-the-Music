@@ -12,6 +12,10 @@
     fa: 'ا ب پ ت ث ج چ ح خ د ذ ر ز ژ س ش ص ض ط ظ ع غ ف ق ک گ ل م ن و ه ی'.split(' '),
     en: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
   };
+  const HARD = { fa: 'ث ذ ژ ض ط ظ'.split(' '), en: 'K Q U V X Y Z'.split(' ') };
+  // Only the letters this game draws from (hard ones only if they're switched on).
+  const choosableLetters = (g) => (LETTERS[g.settings.alphabet] || LETTERS.fa)
+    .filter(l => g.settings.hardLetters || !(HARD[g.settings.alphabet] || []).includes(l));
   const catLabel = (c) => t(`ef.cat.${c}`);
   const catChip = (c, golden) => `<span class="ef-cat ${c === golden ? 'golden' : ''}"><span>${CAT_EMOJI[c]}</span>${esc(catLabel(c))}${c === golden ? ` <b class="x2"><bdi dir="ltr">×${num(2)}</bdi></b>` : ''}</span>`;
 
@@ -244,9 +248,7 @@
       if (st === 'lobby') { Hub.screen(el, 'lobby' + Hub.lang, UI.phoneLobby('esmfamil')); return; }
       if (st === 'picking') {
         const me = g.picker && g.picker.id === Hub.myId;
-        // Only the letters this game draws from (hard ones only if they're switched on).
-        const HARD = { fa: 'ث ذ ژ ض ط ظ'.split(' '), en: 'K Q U V X Y Z'.split(' ') };
-        const letters = (LETTERS[g.settings.alphabet] || LETTERS.fa).filter(l => g.settings.hardLetters || !(HARD[g.settings.alphabet] || []).includes(l));
+        const letters = choosableLetters(g);
         Hub.screen(el, 'pick' + g.round + me + Hub.lang, me
           ? `<div class="ef-ph-pick"><h2>🎯 ${esc(t('ef.youChoose'))}</h2><p class="muted">${esc(t('ef.youChooseSub'))} <span class="pill" data-ends="${g.pickEndsAt}"></span></p>
               <div class="ef-letter-grid ${g.settings.alphabet}">${letters.map(l => `<button data-letter="${esc(l)}" ${g.usedLetters.includes(l) ? 'disabled' : ''}>${esc(l)}</button>`).join('')}</div></div>`
@@ -364,7 +366,6 @@
         if (j) Hub.emit('host:esmfamil:judge', JSON.parse(j.dataset.judge));
       });
       root.addEventListener('change', (e) => {
-        if (e.target.id === 'ef-alpha') Hub.emit('host:esmfamil:settings', { alphabet: e.target.value });
         if (e.target.id === 'ef-letter-mode') Hub.emit('host:esmfamil:settings', { letterMode: e.target.value });
       });
     },
@@ -373,16 +374,28 @@
       const el = document.getElementById('ef-host');
       const st = g.status;
       const startLabel = st === 'scores' ? (g.round >= g.settings.rounds ? 'Show final results 🏆' : `Next round (${g.round + 1}/${g.settings.rounds}) ▶`) : st === 'final' ? 'Play again ▶' : 'Start round 1 ▶';
+      const nextRound = st === 'scores' ? g.round + 1 : 1;
+      const moreRounds = st !== 'scores' || g.round < g.settings.rounds;
+      // Persian or English letters: up front, because it decides the whole game.
+      const alphaPick = `<div class="ef-h-alpha"><b>Letters</b><div class="seg">${[['fa', 'ا ب پ', 'Persian'], ['en', 'A B C', 'English']]
+        .map(([k, sample, label]) => `<button class="${g.settings.alphabet === k ? 'active' : ''}" data-emit="host:esmfamil:settings" data-args='{"alphabet":"${k}"}'><bdi>${sample}</bdi> ${label}</button>`).join('')}</div></div>`;
+      // "Me" mode: the host taps the letter that starts the next round (used ones greyed out).
+      const letterGrid = () => `<p class="muted small">Tap the letter for round ${nextRound}:</p>
+          <div class="ef-letter-grid ef-h-letters ${g.settings.alphabet}">${choosableLetters(g).map(l => `<button data-emit="host:esmfamil:start" data-args="${esc(JSON.stringify({ letter: l }))}" ${st !== 'final' && g.usedLetters.includes(l) ? 'disabled' : ''}>${esc(l)}</button>`).join('')}</div>
+          <div class="h-btns"><button data-emit="host:esmfamil:start">🎲 Random letter</button></div>`;
+      const startControls = g.settings.letterMode === 'host' && moreRounds
+        ? letterGrid()
+        : `<button class="primary big-btn" data-emit="host:esmfamil:start">${startLabel}</button>`;
       const settingsCard = `<section class="h-card">
           <h2>Settings</h2>
           <div class="h-fields">
             ${UI.hostField('Seconds to write', UI.numberInput('seconds', g.settings.seconds, 30, 600, 10))}
             ${UI.hostField('After STOP, others get (sec)', UI.numberInput('stopGrace', g.settings.stopGrace, 0, 60))}
             ${UI.hostField('Rounds', UI.numberInput('rounds', g.settings.rounds, 1, 30))}
-            ${UI.hostField('Alphabet', `<select id="ef-alpha"><option value="fa" ${g.settings.alphabet === 'fa' ? 'selected' : ''}>Persian (ا ب پ …)</option><option value="en" ${g.settings.alphabet === 'en' ? 'selected' : ''}>English (A B C …)</option></select>`)}
           </div>
-          ${UI.hostField('Who picks the letter', `<select id="ef-letter-mode"><option value="random" ${g.settings.letterMode === 'random' ? 'selected' : ''}>Random draw</option><option value="player" ${g.settings.letterMode === 'player' ? 'selected' : ''}>A player (takes turns, 20 sec)</option></select>`)}
-          ${UI.toggle('hardLetters', g.settings.hardLetters, 'Include hard letters', 'ث ذ ژ ض ط ظ / K Q U V X Y Z')}
+          ${UI.hostField('Who picks the letter', `<select id="ef-letter-mode">${[['random', 'Random draw'], ['host', 'Me (tap it on this screen)'], ['player', 'A player (takes turns, 20 sec)']]
+            .map(([k, label]) => `<option value="${k}" ${g.settings.letterMode === k ? 'selected' : ''}>${label}</option>`).join('')}</select>`)}
+          ${UI.toggle('hardLetters', g.settings.hardLetters, 'Include hard letters', (HARD[g.settings.alphabet] || HARD.fa).join(' '))}
           ${UI.toggle('golden', g.settings.golden, '⭐ Golden category', 'One random category each round is worth double')}
           ${UI.toggle('stopBonus', g.settings.stopBonus, '⚡ STOP bonus', '+5 for calling STOP — only if all your answers are accepted')}
           <h3>Categories <span class="muted small">(${g.settings.categories.length} — tap to add/remove)</span></h3>
@@ -393,7 +406,8 @@
           <section class="h-card span2 h-hero">
             <h2>${st === 'final' ? '🏆 Game over' : '✍️ Esm-Famil'}</h2>
             <p class="muted small">Everyone fills in the categories on their phone. Scoring: 20 if you're the only one with an answer, 10 for a unique answer, 5 if someone else wrote the same thing.</p>
-            <button class="primary big-btn" data-emit="host:esmfamil:start">${startLabel}</button>
+            ${alphaPick}
+            ${startControls}
             ${st === 'final' ? '<button data-emit="host:esmfamil:newGame">Reset scores</button>' : ''}
             <div class="roster">${UI.hostRoster(s.players)}</div>
           </section>
@@ -435,10 +449,11 @@
             <div class="h-live-head"><div class="ef-paper ef-letter-sm ${g.settings.alphabet}">${esc(g.letter)}</div>
               <div><h2>${st === 'review' ? `Checking: ${CAT_EMOJI[curCat]} ${esc(HUB_STRINGS.en[`ef.cat.${curCat}`])} (${g.reviewIndex + 1}/${cats.length})` : `Round ${g.round} scored`}</h2>
               <p class="muted small">${st === 'review' ? 'Players can 👎 answers on their phones: rejected once half of the other players object (and at least 2). Your ✓/✗ overrides everything.' : 'Spotted a bad call? Tap ✓/✗ — the round re-scores instantly.'}</p></div></div>
+            ${st === 'scores' && moreRounds ? `${alphaPick}${g.settings.letterMode === 'host' ? letterGrid() : ''}` : ''}
             <div class="h-btns">
               ${st === 'review' ? `<button data-emit="host:esmfamil:reviewNav" data-args='{"dir":-1}' ${g.reviewIndex === 0 ? 'disabled' : ''}>◀ Previous</button>
               <button class="primary" data-emit="host:esmfamil:reviewNav" data-args='{"dir":1}'>${g.reviewIndex === cats.length - 1 ? 'Score the round ✓' : 'Next category ▶'}</button>`
-              : `<button class="primary big-btn" data-emit="host:esmfamil:start">${startLabel}</button>`}
+              : g.settings.letterMode === 'host' && moreRounds ? '' : `<button class="primary big-btn" data-emit="host:esmfamil:start">${startLabel}</button>`}
               <button class="danger" data-emit="host:esmfamil:end" data-confirm="Tap again to end the game">End game</button>
             </div>
           </section>
