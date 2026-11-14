@@ -142,9 +142,9 @@ npm start
 You'll see something like:
 
 ```
-TV (Android TV browser):  http://192.168.1.42:3000/tv.html
-Host control (your phone/laptop): http://192.168.1.42:3000/host.html
-Players join:              http://192.168.1.42:3000/player.html
+TV (Android TV browser):  http://192.168.1.42:4000/tv.html
+Host control (your phone/laptop): http://192.168.1.42:4000/host.html
+Players join:              http://192.168.1.42:4000/player.html
 ```
 
 Keep this terminal running for the whole game night — closing it stops the game (and clears scores; the playlist itself is saved to `playlist.json` and survives restarts).
@@ -216,7 +216,7 @@ This is how the game is deployed on the always-on PC that's HDMI'd into the TV. 
 | Re-open the TV kiosk screen (e.g. you closed it) | `powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Guess-the-Music\scripts\launch-kiosk.ps1` |
 | Add songs / run the game | Open `host.html` on your phone — see [Set it up](#2-set-it-up) above |
 
-`npm start` will fail with `EADDRINUSE` if you try it here — that's expected, it just means pm2 already has the server running on port 3000. You don't need it.
+`npm start` will fail with `EADDRINUSE` if you try it here — that's expected, it just means pm2 already has the server running on port 4000. You don't need it.
 
 ### Server: pm2
 
@@ -242,7 +242,7 @@ pm2 logs guess-the-music   # tail the server's console output
 
 ### TV screen: Chrome kiosk mode
 
-`scripts/launch-kiosk.ps1` waits for the server to answer on `http://localhost:3000/tv.html` (so it doesn't race the server on boot) and then opens it in Chrome with `--kiosk` and `--autoplay-policy=no-user-gesture-required` (so YouTube audio plays without a manual unlock tap), using a separate Chrome profile so it doesn't touch your normal browsing session.
+`scripts/launch-kiosk.ps1` waits for the server to answer on `http://localhost:4000/tv.html` (so it doesn't race the server on boot) and then opens it in Chrome with `--kiosk` and `--autoplay-policy=no-user-gesture-required` (so YouTube audio plays without a manual unlock tap), using a separate Chrome profile so it doesn't touch your normal browsing session.
 
 To register it to launch automatically at logon (creates a shortcut in the Startup folder):
 
@@ -386,7 +386,7 @@ npm test -- hub pin         # only some suites
 npm test -- --no-browser    # skip the ones that drive a real browser
 ```
 
-Each suite starts its own copy of the server on port 3999 with an empty, throwaway data folder, so the tests never touch the real playlist or scores, and the live game on port 3000 can keep running. The browser suites need a headless Chromium (`npx playwright install chromium-headless-shell` once).
+Each suite starts its own copy of the server on port 3999 with an empty, throwaway data folder, so the tests never touch the real playlist or scores, and the live game on port 4000 can keep running. The browser suites need a headless Chromium (`npx playwright install chromium-headless-shell` once).
 
 ### Finding the PC's LAN IP (for the QR code / player join links)
 

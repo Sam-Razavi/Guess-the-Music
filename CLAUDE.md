@@ -307,6 +307,8 @@ Fix (after Phase 35): Esm-Famil letters — the host chooses them:
 - The host's tiles need their own hover colour: style.css's generic `button:hover` background turned the cream tile dark, which looked like a used letter.
 - Tests: 8 more in `expand.test.js` (398 checks in 13 suites).
 
+Fix (after Phase 35): the game moved from port 3000 to **4000** — the homelab dashboard (Caddy, Windows service `HomelabDashboard`, C:\homelab) took 3000, so the game died with EADDRINUSE and pm2's list came up empty. Changed: `server.js` default (`PORT` env still overrides), `launch-kiosk.ps1`, the Cloudflare-tunnel script default, README, tests/run.js comment. Node's firewall rule is any-port, so no firewall change. A port change is a new browser origin: phones lose their saved player id/PIN/localStorage once and re-join; home-screen icons and bookmarks need `:4000`.
+
 Next ideas, not yet started:
 
 - More languages — i18n.js's translations object is keyed by language code, so adding a third is mostly copying the 'en'/'fa' block and adding a toggle button in host.html.

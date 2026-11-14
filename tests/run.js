@@ -7,7 +7,7 @@
 //   npm test -- --no-browser     skip the suites that drive a real browser
 //   npm test -- -v               print every check, not just failures
 //
-// Needs port 3999 free (the live game uses 3000, so it can keep running).
+// Needs port 3999 free (the live game uses 4000, so it can keep running).
 const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');

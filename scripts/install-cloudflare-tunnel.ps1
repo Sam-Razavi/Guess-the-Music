@@ -29,7 +29,7 @@
 param(
     [string]$Hostname = "",
     [string]$TunnelName = "guess-the-music",
-    [int]$Port = 3000
+    [int]$Port = 4000
 )
 
 $configDir = Join-Path $env:USERPROFILE ".cloudflared"

@@ -20,7 +20,7 @@ const server = http.createServer(app);
 // ~5-10x; small messages (everything the TV/players get) stay uncompressed.
 const io = new Server(server, { perMessageDeflate: { threshold: 4096 } });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 // Where the game-night data files live. Defaults to the app folder; the test
 // runner (tests/run.js) points it at a throwaway folder so tests never touch real data.
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : __dirname;
