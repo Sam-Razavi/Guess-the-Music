@@ -8,6 +8,7 @@
   function board(g, opts = {}) {
     return `<div class="spy-board">${g.board.map((w, i) => `<${opts.tappable ? 'button' : 'div'} class="spy-tile ${g.word === w ? 'answer' : ''} ${g.guess === w ? 'guessed' : ''}" ${opts.tappable ? `data-guess="${esc(w)}"` : ''} style="--i:${i}" dir="auto">${esc(w)}</${opts.tappable ? 'button' : 'div'}>`).join('')}</div>`;
   }
+  const hiddenBoard = (key) => `<div class="spy-board-hidden"><span>🙈</span><p>${esc(t(key))}</p></div>`;
   function outcomeText(g) {
     const spies = g.players.filter(p => p.spy).map(p => p.name).join(Hub.lang === 'fa' ? ' و ' : ' & ');
     if (g.outcome === 'escaped') return t('spy.escaped', { name: spies });
@@ -26,7 +27,7 @@
       const st = g.status;
       if (st === 'lobby') {
         Hub.screen(el, 'lobby' + Hub.lang + JSON.stringify(g.settings), () => UI.tvLobby('spy', `<div class="ef-lobby-cats">${g.settings.categories.map(c => `<span class="ef-cat"><span>${CAT_EMOJI[c]}</span>${esc(catLabel(c))}</span>`).join('')}</div>
-          <p class="lobby-meta">${esc(t('spy.roundsN', { n: num(g.settings.rounds) }))} ${Hub.SEP} ⏱ ${num(g.settings.minutes)}′</p>`));
+          <p class="lobby-meta">${esc(t('spy.roundsN', { n: num(g.settings.rounds) }))} ${Hub.SEP} ⏱ ${num(g.settings.minutes)}′${g.settings.showBoard === false ? ` ${Hub.SEP} 🙈 ${esc(t('spy.boardOff'))}` : ''}</p>`));
         UI.renderWho(el.querySelector('[data-who]'), s.players);
         return;
       }
@@ -39,13 +40,13 @@
         return;
       }
       if (st === 'talk') {
-        if (Hub.screen(el, 'talk' + g.round + Hub.lang, `<div class="spy-scene talk">
+        if (Hub.screen(el, 'talk' + g.round + Hub.lang + g.boardHidden, `<div class="spy-scene talk">
           ${head}
           <div class="spy-talk-row"><div><h1>${esc(t('spy.askAway'))}</h1><p>🎤 ${esc(t('spy.firstAsker', { name: g.firstAsker ? g.firstAsker.name : '' }))}</p></div>
           <span class="mf-clock" data-ends="${g.endsAt}" data-format="clock"></span></div>
           <div class="spy-order"><span class="muted">${esc(t('spy.order'))}</span>${g.order.map((p, i) => `${i ? '<i>→</i>' : ''}<span class="spy-order-chip">${avatar(p.name)}<bdi>${esc(p.name)}</bdi></span>`).join('')}<i>↺</i></div>
-          ${board(g)}
-          <p class="muted">${esc(t('spy.boardHint'))}</p></div>`)) Hub.sfx.sparkle();
+          ${g.boardHidden ? hiddenBoard('spy.boardHiddenTv') : `${board(g)}
+          <p class="muted">${esc(t('spy.boardHint'))}</p>`}</div>`)) Hub.sfx.sparkle();
         return;
       }
       if (st === 'vote') {
@@ -57,10 +58,10 @@
         return;
       }
       if (st === 'guess') {
-        if (Hub.screen(el, 'guess' + g.round + Hub.lang, `<div class="spy-scene">
+        if (Hub.screen(el, 'guess' + g.round + Hub.lang + g.boardHidden, `<div class="spy-scene">
           ${head}<h1>🕵️ ${esc(t(g.early ? 'spy.earlyCall' : 'spy.wasSpy', { name: g.accused ? g.accused.name : '' }))}</h1>
           <p>${esc(t(g.early ? 'spy.earlySub' : 'spy.lastChance'))} <span class="pill" data-ends="${g.endsAt}"></span></p>
-          ${board(g)}</div>`)) { Hub.stamp(t(g.early ? 'spy.bold' : 'spy.gotcha'), 'gold'); Hub.sfx.alarm(); }
+          ${g.boardHidden ? hiddenBoard('spy.pickingOnPhone') : board(g)}</div>`)) { Hub.stamp(t(g.early ? 'spy.bold' : 'spy.gotcha'), 'gold'); Hub.sfx.alarm(); }
         return;
       }
       if (st === 'result') {
@@ -162,6 +163,7 @@
       UI.bindSettings(root, 'host:spy:settings');
       root.addEventListener('click', (e) => {
         if (e.target.closest('#spy-peek')) { peek = !peek; host.update(Hub.state); }
+        if (e.target.closest('#spy-board-btn')) Hub.emit('host:spy:board', { show: Hub.state.game.settings.showBoard === false });
         const c = e.target.closest('[data-spycat]');
         if (c) {
           const cats = Hub.state.game.settings.categories.slice();
@@ -186,6 +188,7 @@
             ${UI.hostField('Minutes of questions', UI.numberInput('minutes', g.settings.minutes, 1, 15))}
             ${UI.hostField('Spies (0 = automatic: 2 with 8+ players)', UI.numberInput('spies', g.settings.spies, 0, 3))}
           </div>
+          ${UI.toggle('showBoard', g.settings.showBoard !== false, 'Show the word list on the TV', 'The 16 possible words, shown during the questions. Off makes it harder for the spy: only a caught spy sees them, on their phone, to guess. You can switch it during a round too.')}
           <h3>Categories</h3><div class="cat-picker">${g.categoriesAll.map(c => `<button class="cat-pick ${g.settings.categories.includes(c) ? 'on' : ''}" data-spycat="${c}">${CAT_EMOJI[c]} ${esc(HUB_STRINGS.en[`spy.cat.${c}`])} <span class="fa-name">${esc(HUB_STRINGS.fa[`spy.cat.${c}`])}</span></button>`).join('')}</div></section>`);
         UI.syncSettings(el, g.settings);
         return;
@@ -196,6 +199,7 @@
         <h2>${esc({ cards: 'Players are checking their cards', talk: 'Questions round', vote: 'Voting', guess: 'The spy is guessing the word', result: 'Round over' }[st])} ${g.endsAt ? `<span class="h-timer" data-ends="${g.endsAt}" data-format="clock"></span>` : ''}</h2>
         <p class="h-status">${st === 'cards' ? `${g.seenCount} of ${g.players.length} have looked` : st === 'vote' ? `${g.votes.length} of ${g.players.length} voted` : st === 'result' ? esc(outcomeText(g)) : ''}</p>
         <div class="h-btns">${next ? `<button class="primary big-btn" data-emit="${next[0]}">${next[1]}</button>` : ''}
+          <button id="spy-board-btn">${g.settings.showBoard === false ? '📋 Show word list on TV' : '🙈 Hide word list on TV'}</button>
           <button id="spy-peek">${peek ? '🙈 Hide' : '👁 Peek (only if you\'re not playing)'}</button>
           <button class="danger" data-emit="host:spy:end" data-confirm="Tap again to end">End game</button></div>
         ${peek ? `<p class="h-secret">Word: <b dir="auto">${esc(g.secretWord || '')}</b> · Spy: ${esc((g.spies || []).map(x => x.name).join(', '))}</p>` : ''}

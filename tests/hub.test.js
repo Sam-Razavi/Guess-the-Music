@@ -356,6 +356,37 @@ const G = (s) => s.last && s.last.game;
   ok(G(tv).outcome === 'guessed' && G(tv).word === secret, 'spy guesses the word → spy wins the round');
   ok(G(tv).standings.find(r => r.id === spies[0]).points === 2, 'spy +2');
 
+  console.log('\n# Spy: word list hidden on the TV');
+  host.emit('host:spy:newGame');
+  await until(() => G(tv).status === 'lobby');
+  host.emit('host:spy:settings', { rounds: 1, minutes: 1, showBoard: false });
+  await until(() => G(tv).settings.showBoard === false);
+  host.emit('host:spy:start');
+  await until(() => G(tv).status === 'cards');
+  const spy2 = G(host).spies[0].id, spy2S = byId[spy2], agent2 = ALL.find(s => s !== spy2S);
+  ok(G(tv).board.length === 0 && G(tv).boardHidden === true, 'hidden: the TV gets no word list');
+  ok(G(agent2).board.length === 0 && G(spy2S).board.length === 0, 'hidden: no phone gets the list during the round');
+  ok(G(host).board.length === 16, 'the host still sees the list');
+  agent2.emit('host:spy:board', { show: true });
+  await sleep(200);
+  ok(G(tv).board.length === 0, 'a player cannot switch the list on');
+  ALL.forEach(s => s.emit('player:spy:seen'));
+  await until(() => G(tv).status === 'talk', 3000);
+  host.emit('host:spy:board', { show: true });
+  ok(await until(() => G(tv).board.length === 16 && !G(tv).boardHidden), 'the host can show it mid-round');
+  host.emit('host:spy:board', { show: false });
+  ok(await until(() => G(tv).board.length === 0 && G(tv).boardHidden), '...and hide it again');
+  host.emit('host:spy:vote');
+  await until(() => G(tv).status === 'vote');
+  ALL.forEach(s => s.emit('player:spy:vote', { target: s === spy2S ? agent2.last.me.id : spy2 }));
+  await until(() => G(tv).status === 'guess', 3000);
+  ok(G(spy2S).board.length === 16 && G(tv).board.length === 0 && G(agent2).board.length === 0, 'caught spy gets the list on their phone to guess; TV and others still don\'t');
+  const secret2 = G(host).secretWord;
+  spy2S.emit('player:spy:guess', { word: G(spy2S).board.find(w => w !== secret2) });
+  await until(() => G(tv).status === 'result');
+  ok(G(tv).outcome === 'caught' && G(tv).board.length === 16 && !G(tv).boardHidden, 'round over: the list is shown with the answer');
+  host.emit('host:spy:settings', { showBoard: true });
+
   // ---------------- leaving + music ----------------
   console.log('\n# Back to music');
   host.emit('host:hub:select', { game: 'music' });

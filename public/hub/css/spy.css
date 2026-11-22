@@ -12,6 +12,10 @@
 .spy-talk-row { display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: start; gap: 2rem; }
 .spy-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.7rem; width: 100%; max-width: 70rem; }
 .spy-tile { padding: 0.8rem 0.6rem; border-radius: 1rem; font-weight: 800; font-size: 1.25rem; background: var(--surface); border: 1px solid var(--border); animation: card-flip 0.5s var(--ease-out) both; animation-delay: calc(var(--i) * 0.04s); }
+.spy-board-hidden { display: flex; align-items: center; justify-content: center; gap: 1.4rem; width: 100%; max-width: 70rem; padding: 2.4rem 2rem;
+  border-radius: 1.4rem; border: 2px dashed var(--border-strong); background: var(--surface); animation: pop-in 0.6s var(--ease-spring) both; }
+.spy-board-hidden span { font-size: 4.5rem; line-height: 1; }
+.spy-board-hidden p { margin: 0; font-size: 1.9rem; font-weight: 800; }
 @keyframes card-flip { from { opacity: 0; transform: perspective(40rem) rotateX(-70deg); } to { opacity: 1; transform: none; } }
 .spy-tile.answer { border-color: var(--gold); background: rgba(255, 194, 75, 0.2); box-shadow: 0 0 2rem -0.4rem rgba(255, 194, 75, 0.8); transform: scale(1.05); }
 .spy-tile.guessed:not(.answer) { border-color: var(--bad); background: rgba(244, 63, 94, 0.18); text-decoration: line-through; }

@@ -31,7 +31,9 @@ module.exports = function spy(ctx) {
     timers.clearAll();
     g = {
       status: 'lobby',     // lobby | cards | talk | vote | guess | result | final
-      settings: g ? g.settings : { rounds: 5, minutes: 4, spies: 0, categories: CATEGORIES.slice() },
+      // showBoard: the 16 possible words on the TV during the round. Off = harder
+      // for the spy (only the caught spy's phone gets them, to make the guess).
+      settings: g ? g.settings : { rounds: 5, minutes: 4, spies: 0, categories: CATEGORIES.slice(), showBoard: true },
       round: 0,
       lang: ctx.lang(),
       cat: null,
@@ -159,13 +161,16 @@ module.exports = function spy(ctx) {
 
   function payload(role, pid) {
     const over = g.status === 'result' || g.status === 'final';
+    const guessing = g.status === 'guess' && role === 'player' && pid === g.accused;
+    const seeBoard = g.status !== 'lobby' && (role === 'host' || over || guessing || g.settings.showBoard !== false);
     const base = {
       status: g.status,
       settings: g.settings,
       categoriesAll: CATEGORIES,
       round: g.round,
       cat: g.cat,
-      board: g.status === 'lobby' ? [] : g.board,
+      board: seeBoard ? g.board : [],
+      boardHidden: g.status !== 'lobby' && !over && g.settings.showBoard === false,
       players: g.players.filter(ctx.exists).map(p => ({ id: p, name: ctx.name(p), spy: over ? g.spies.includes(p) : undefined })),
       spyCount: g.spies.length,
       early: g.early,
@@ -203,10 +208,17 @@ module.exports = function spy(ctx) {
       if (patch.rounds !== undefined) s.rounds = clampInt(patch.rounds, 1, 20, s.rounds);
       if (patch.minutes !== undefined) s.minutes = clampInt(patch.minutes, 1, 15, s.minutes);
       if (patch.spies !== undefined) s.spies = clampInt(patch.spies, 0, 3, s.spies);
+      if (typeof patch.showBoard === 'boolean') s.showBoard = patch.showBoard;
       if (Array.isArray(patch.categories)) {
         const cats = CATEGORIES.filter(c => patch.categories.includes(c));
         if (cats.length) s.categories = cats;
       }
+      ctx.broadcast();
+    },
+    // Show or hide the board on the TV — any time, also mid-round.
+    'host:spy:board': ({}, { show }) => {
+      if (typeof show !== 'boolean') return;
+      g.settings.showBoard = show;
       ctx.broadcast();
     },
     'host:spy:start': () => {
