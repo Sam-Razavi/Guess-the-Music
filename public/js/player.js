@@ -158,11 +158,86 @@ function playBuzzSound() {
   } catch (e) { /* Web Audio unavailable — silently skip the sound */ }
 }
 
-buzzBtn.addEventListener('click', () => {
+// ---------- Buzzing ----------
+// Fires on pointerdown — the moment the finger touches — not on 'click', which
+// only comes when the finger lifts (a hard press = a late buzz) and which the
+// browser drops if the finger slides a little. 'click' stays as a fallback for
+// keyboards; the two are de-duplicated.
+//
+// Every buzz waits for the server's answer (an ack). No answer within 2.5 s
+// means the connection is dead even if the page thinks it's connected — the
+// phone forces a reconnect and re-sends after it has re-registered. A buzz made
+// while offline is sent the moment the connection is back. Either way the
+// player sees "Reconnecting…" instead of a buzz that silently went nowhere.
+const BUZZ_ACK_MS = 2500;
+const BUZZ_GIVE_UP_MS = 7000;
+let lastPointerAt = 0;
+let pendingBuzz = null; // { at, tries }
+let buzzBusy = false;   // an emit is waiting for its ack
+
+function tapBuzz() {
+  if (buzzBtn.disabled) return;
+  const now = Date.now();
+  if (pendingBuzz && now - pendingBuzz.at < 400) return; // a double-tap is one buzz
   playBuzzSound();
   if (navigator.vibrate) navigator.vibrate(80); // no-op on iOS Safari, which doesn't support it
-  socket.emit('player:buzz');
+  pendingBuzz = { at: now, tries: 0 };
+  buzzBtn.classList.add('sending'); // stays pressed until the server answers
+  flushBuzz();
+}
+function flushBuzz() {
+  if (!pendingBuzz || buzzBusy) return;
+  if (Date.now() - pendingBuzz.at > BUZZ_GIVE_UP_MS) return buzzGaveUp();
+  if (!socket.connected) { showConnection('reconnecting'); return; } // sent from the 'connect' handler
+  pendingBuzz.tries += 1;
+  buzzBusy = true;
+  const sentOn = socket.id;
+  socket.timeout(BUZZ_ACK_MS).emit('player:buzz', {}, (err, res) => {
+    if (socket.id === sentOn) buzzBusy = false;
+    if (!pendingBuzz) return;
+    if (err) {
+      // The connection already changed underneath (dropped and came back):
+      // just send again on the new one.
+      if (socket.id !== sentOn) { flushBuzz(); return; }
+      // No answer on a connection that still looks fine: it's half-dead. Drop
+      // it; the 'connect' handler re-registers and then re-sends this buzz.
+      showConnection('reconnecting');
+      if (socket.io.engine) socket.io.engine.close();
+      return;
+    }
+    if (res && res.reason === 'notJoined' && pendingBuzz.tries < 3) { sendRegister(); setTimeout(flushBuzz, 300); return; }
+    pendingBuzz = null;
+    buzzBtn.classList.remove('sending');
+    showConnection('ok');
+  });
+}
+function buzzGaveUp() {
+  pendingBuzz = null;
+  buzzBusy = false;
+  buzzBtn.classList.remove('sending');
+  statusText.textContent = t('buzzLost', lastLang);
+}
+buzzBtn.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  lastPointerAt = Date.now();
+  tapBuzz();
 });
+// The click that follows a finger-down/up is the same tap; a click on its own
+// (keyboard Enter/Space) is a real buzz.
+buzzBtn.addEventListener('click', () => { if (Date.now() - lastPointerAt > 1500) tapBuzz(); });
+buzzBtn.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press menu on Android
+
+// A small "Reconnecting…" pill while the connection is down.
+const connPill = document.getElementById('conn-pill');
+let connTimer = null;
+function showConnection(s) {
+  clearTimeout(connTimer);
+  if (s === 'ok') { connPill.hidden = true; return; }
+  // A blip shorter than ~0.6 s isn't worth flashing a warning for.
+  connTimer = setTimeout(() => { connPill.textContent = t('reconnecting', lastLang); connPill.hidden = false; }, pendingBuzz ? 0 : 600);
+}
+socket.on('disconnect', () => { buzzBusy = false; showConnection('reconnecting'); });
+socket.on('connect', () => { showConnection('ok'); flushBuzz(); }); // after sendRegister (registered earlier)
 
 // Targeted at this player specifically (server emits it only to whoever's
 // socket just got the wrong-answer reset) — a distinct double-pulse and a
@@ -316,6 +391,12 @@ socket.on('state', (state) => {
   }
 
   const buzzed = state.buzzOrder.some(b => b.id === myId);
+  // Team mode: a teammate's buzz uses up the whole team's turn (the server
+  // rejects the rest of the team) — so don't show them an armed buzzer that
+  // can't work, e.g. after a steal reopens buzzing for the other teams.
+  const teamOfId = (id) => { const p = state.players.find(x => x.id === id); return p ? String(p.team || '').trim() : ''; };
+  const myTeam = state.settings && state.settings.teamMode ? teamOfId(myId) : '';
+  const teamUsed = !!myTeam && !buzzed && state.buzzOrder.some(b => teamOfId(b.id) === myTeam);
   // The *current* buzzer is whoever buzzed most recently, not the first
   // person to buzz this round — those differ after a reset + a second,
   // different buzzer.
@@ -339,7 +420,7 @@ socket.on('state', (state) => {
   // moment buzzing opens up is obvious, not just an instant disabled->enabled
   // flip. Only fires on the actual transition into that state, not every
   // re-render while it's already armed.
-  const armed = state.roundStatus === 'playing' && !buzzed && !state.buzzingLocked;
+  const armed = state.roundStatus === 'playing' && !buzzed && !teamUsed && !state.buzzingLocked;
   if (armed && !wasArmed) buzzBtn.classList.add('armed');
   wasArmed = armed;
 
@@ -361,6 +442,12 @@ socket.on('state', (state) => {
       // My own buzz was judged wrong (steal reopened buzzing for the others): say so.
       const mine = state.buzzOrder.find(b => b.id === myId);
       buzzLabel.textContent = mine && mine.verdict === 'wrong' ? t('verdictWrong', lang) : t('alreadyBuzzed', lang);
+      statusText.textContent = t('someoneElsesTurn', lang);
+    } else if (teamUsed) {
+      buzzBtn.disabled = true;
+      buzzBtn.classList.add('beaten');
+      setScreenState('beaten');
+      buzzLabel.textContent = t('teamHadTurn', lang);
       statusText.textContent = t('someoneElsesTurn', lang);
     } else if (state.buzzingLocked) {
       buzzBtn.disabled = true;

@@ -370,3 +370,33 @@ html[data-theme="light"] .final-score b { color: var(--text); }
 @keyframes final-in { from { opacity: 0; transform: translateY(24px) scale(0.92); } to { opacity: 1; transform: none; } }
 @keyframes medal-drop { from { opacity: 0; transform: translateY(-40px) rotate(-25deg) scale(0.6); } to { opacity: 1; transform: none; } }
 @keyframes float-y { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+/* Tapped: the cap stays down until the server confirms the buzz (usually a few
+   ms), so a quick tap never looks like it "didn't take". */
+.buzz-btn.sending:not(:disabled) .buzz-cap {
+  transform: translateY(1px);
+  box-shadow: 0 0 0 var(--side), 0 10px 30px -12px rgba(255, 90, 80, 0.75), inset 0 -8px 20px rgba(120, 0, 40, 0.4), inset 0 8px 18px rgba(255, 255, 255, 0.4);
+}
+.buzz-btn { touch-action: none; } /* no scroll/zoom gesture can swallow a press on the buzzer */
+
+/* Connection lost: a small pill under the header (a buzz tapped meanwhile is
+   sent as soon as it's back). */
+.conn-pill {
+  position: fixed;
+  top: max(4.2rem, calc(env(safe-area-inset-top) + 3.4rem));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  margin: 0;
+  padding: 0.45em 1em;
+  border-radius: 999px;
+  background: rgba(244, 63, 94, 0.18);
+  border: 1px solid rgba(244, 63, 94, 0.45);
+  color: #fecdd3;
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  animation: conn-pulse 1.4s ease-in-out infinite;
+}
+html[data-theme="light"] .conn-pill { color: var(--bad); }
+@keyframes conn-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }

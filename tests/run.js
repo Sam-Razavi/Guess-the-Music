@@ -28,9 +28,11 @@ const SUITES = [
   { name: 'draw' },                       // Draw It!
   { name: 'truths' },                     // Two Truths & a Lie
   { name: 'music' },                      // the music game still works next to the hub
+  { name: 'buzz' },                       // buzzer acks, buzzing while reconnecting, held events
   { name: 'switch', browser: true },      // music <-> hub page hand-off
   { name: 'ui', browser: true },          // real clicks on host/phone pages
   { name: 'songs', browser: true },       // editing a song's title / artist / year
+  { name: 'buzzui', browser: true },      // the phone's buzzer: finger-down, offline taps, lost answers
   { name: 'pin', browser: true, env: { JOIN_PIN: '4321' } },
 ];
 

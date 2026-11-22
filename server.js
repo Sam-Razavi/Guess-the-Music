@@ -18,7 +18,10 @@ const server = http.createServer(app);
 // perMessageDeflate only above 4KB: a big playlist makes every host-bound
 // state broadcast hundreds of KB of highly repetitive JSON, which compresses
 // ~5-10x; small messages (everything the TV/players get) stay uncompressed.
-const io = new Server(server, { perMessageDeflate: { threshold: 4096 } });
+// pingInterval/pingTimeout: socket.io's defaults (25 s + 20 s) let a phone whose
+// WiFi silently dropped look connected for up to 45 s, its buzzes going nowhere.
+// 8 s + 6 s notices a dead connection within ~14 s, and both ends reconnect.
+const io = new Server(server, { perMessageDeflate: { threshold: 4096 }, pingInterval: 8000, pingTimeout: 6000 });
 
 const PORT = process.env.PORT || 4000;
 // Where the game-night data files live. Defaults to the app folder; the test
@@ -934,9 +937,12 @@ function payloadFor(role) {
 function broadcast() {
   ensureMysterySong();
   saveRoundState();
-  io.to('host').emit('state', payloadFor('host'));
-  io.to('tv').emit('state', payloadFor('tv'));
+  // Phones and the TV first: the host's payload carries the whole playlist
+  // (~800 KB with 3,800 songs), and building/sending it shouldn't delay the
+  // tiny updates the buzzers and the screen are waiting for.
   io.to('player').emit('state', payloadFor('player'));
+  io.to('tv').emit('state', payloadFor('tv'));
+  io.to('host').emit('state', payloadFor('host'));
   if (hub) hub.broadcast();
 }
 
@@ -1401,22 +1407,45 @@ io.on('connection', (socket) => {
   // process mid-game. Every handler below is registered through this guard,
   // so a bad event is logged and dropped instead of taking the server down.
   const rawOn = socket.on.bind(socket);
-  socket.on = (event, handler) => rawOn(event, (...args) => {
-    // Role gate. Every control event is checked against the role this socket
-    // registered as — registering as 'host' is what the join PIN protects, so
-    // without this any connected socket (a player's phone, a stray browser
-    // tab, anything that can reach the server) could emit host:resetGame and
-    // friends without ever registering, sidestepping the PIN entirely.
-    if (event.startsWith('host:') && role !== 'host') return;
-    if (event.startsWith('player:') && role !== 'player') return;
-    if (event.startsWith('tv:') && role !== 'tv') return;
-    try {
-      const result = handler(...args);
-      if (result && typeof result.catch === 'function') result.catch(e => console.error(`[socket ${event}]`, e));
-    } catch (e) {
-      console.error(`[socket ${event}]`, e);
-    }
-  });
+  // Events that arrive before this socket has registered are HELD, not dropped.
+  // socket.io-client sends whatever was emitted while it was offline as soon as
+  // it reconnects — before the page's own 'connect' handler re-registers — so a
+  // buzz tapped while a phone was reconnecting (screen woke up, WiFi blip) came
+  // from a socket with no role yet and the gate below threw it away: the phone
+  // played its buzz sound, the server never counted it. Held events replay once
+  // register succeeds, through the same gate, so nothing skips the role/PIN check.
+  const HOLD_MS = 5000;
+  let held = [];
+  const replayHeld = () => {
+    const now = Date.now();
+    const list = held;
+    held = [];
+    for (const h of list) if (now - h.at <= HOLD_MS) h.run();
+  };
+  socket.on = (event, handler) => {
+    const guarded = (...args) => {
+      const gated = event.startsWith('host:') || event.startsWith('player:') || event.startsWith('tv:');
+      if (gated && role === null) {
+        if (held.length < 20) held.push({ at: Date.now(), run: () => guarded(...args) });
+        return;
+      }
+      // Role gate. Every control event is checked against the role this socket
+      // registered as — registering as 'host' is what the join PIN protects, so
+      // without this any connected socket (a player's phone, a stray browser
+      // tab, anything that can reach the server) could emit host:resetGame and
+      // friends without ever registering, sidestepping the PIN entirely.
+      if (event.startsWith('host:') && role !== 'host') return;
+      if (event.startsWith('player:') && role !== 'player') return;
+      if (event.startsWith('tv:') && role !== 'tv') return;
+      try {
+        const result = handler(...args);
+        if (result && typeof result.catch === 'function') result.catch(e => console.error(`[socket ${event}]`, e));
+      } catch (e) {
+        console.error(`[socket ${event}]`, e);
+      }
+    };
+    return rawOn(event, guarded);
+  };
 
   socket.on('register', ({ role: r, id, name, team, pin, view, screen, kiosk, fullscreen, visible } = {}) => {
     if (r !== 'host' && r !== 'tv' && r !== 'player') return;
@@ -1466,6 +1495,7 @@ io.on('connection', (socket) => {
       if (arcade) hub.sendTo(socket);
       else socket.emit('state', payloadFor(role));
     }
+    replayHeld();
   });
 
   socket.on('tv:screen', (info) => tvScreens.update(socket, info));
@@ -1481,17 +1511,26 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('player:buzz', () => {
-    if (!playerId || state.roundStatus !== 'playing' || state.buzzingLocked || state.paused) return;
+  // The phone passes an ack callback and waits for this answer: no answer in a
+  // couple of seconds means the connection is dead even if it looks alive, and
+  // the phone reconnects and re-sends (see player.js sendBuzz). Old pages send
+  // no callback — they just get no answer.
+  socket.on('player:buzz', (a, b) => {
+    const ack = typeof b === 'function' ? b : typeof a === 'function' ? a : null;
+    const no = (reason) => { if (ack) ack({ ok: false, reason }); };
+    if (!playerId) return no('notJoined');
+    if (state.paused) return no('paused');
+    if (state.roundStatus !== 'playing') return no('notOpen');
+    if (state.buzzingLocked) return no('locked');
     // Wager round: exclusive to whoever placed the wager — nobody else gets
     // to race for the buzzer on a Daily Double.
-    if (state.wager && playerId !== state.wager.playerId) return;
-    if (state.buzzOrder.find(b => b.id === playerId)) return;
+    if (state.wager && playerId !== state.wager.playerId) return no('wager');
+    if (state.buzzOrder.find(b => b.id === playerId)) return no('already');
     // Team mode: a buzz locks out the whole team, not just the one player —
     // teammates share the buzz-in the same way an individual player does.
     if (state.settings.teamMode) {
       const myTeam = teamOf(playerId);
-      if (myTeam && state.buzzOrder.some(b => teamOf(b.id) === myTeam)) return;
+      if (myTeam && state.buzzOrder.some(b => teamOf(b.id) === myTeam)) return no('team');
     }
     // Reaching this point means the round was open ('playing') and this
     // player hadn't buzzed yet — so this is always the buzz that takes
@@ -1526,6 +1565,7 @@ io.on('connection', (socket) => {
       }
     }
 
+    if (ack) ack({ ok: true });
     broadcast();
   });
 
