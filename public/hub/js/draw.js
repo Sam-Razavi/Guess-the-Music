@@ -360,6 +360,8 @@
       root.addEventListener('click', (e) => {
         const ch = e.target.closest('[data-choose]');
         if (ch) { Hub.emit('player:draw:choose', { index: Number(ch.dataset.choose) }); Hub.vibrate(20); return; }
+        const rr = e.target.closest('[data-reroll]');
+        if (rr) { rr.disabled = true; Hub.emit('player:draw:reroll'); Hub.vibrate(15); return; }
         const col = e.target.closest('[data-color]');
         if (col) {
           tool.c = Number(col.dataset.color);
@@ -425,11 +427,12 @@
       }
       if (st === 'choosing') {
         if (artist) {
-          if (Hub.screen(el, 'c' + g.turnId + 'me', `<div class="dr-pick">
+          if (Hub.screen(el, 'c' + g.turnId + 'me' + (g.offer || []).map(w => w.text).join('|') + g.canReroll, `<div class="dr-pick">
               <div class="ph-top-row"><span class="eyebrow">🎨 ${esc(t('dr.yourTurn'))}</span><span class="pill" data-ends="${g.endsAt}"></span></div>
               <h2>${esc(t('dr.pickWord'))}</h2>
               <div class="dr-offers">${(g.offer || []).map((w, i) => `<button class="dr-offer ${w.hard ? 'hard' : 'easy'}" data-choose="${i}" style="--i:${i}">
                 <b dir="auto">${esc(w.text)}</b><small>${w.hard ? `${esc(t('dr.hard'))} ${Hub.SEP} ${esc(t('dr.double'))}` : esc(t('dr.easy'))}</small></button>`).join('')}</div>
+              ${g.canReroll ? `<button class="dr-reroll" data-reroll>🔄 ${esc(t('dr.reroll'))}</button>` : ''}
               <p class="muted small">${esc(t('dr.noLetters'))}</p>
             </div>`)) Hub.vibrate([30, 40, 30]);
         } else {

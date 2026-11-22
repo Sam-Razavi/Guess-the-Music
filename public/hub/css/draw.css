@@ -114,6 +114,9 @@ html[dir="rtl"] .dr-slot { font-family: "Vazirmatn", sans-serif; }
 .dr-offer small { font-size: 13px; font-weight: 800; color: var(--text-muted); }
 .dr-offer.hard { background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(236, 72, 153, 0.22)); border-color: rgba(245, 158, 11, 0.5); }
 .dr-offer.hard small { color: var(--gold); }
+.dr-reroll { align-self: center; margin-top: 12px; padding: 10px 18px; border-radius: 999px; font-size: 15px; font-weight: 800;
+  background: transparent; border: 1px dashed var(--border-strong, rgba(255,255,255,0.3)); color: var(--text-muted); }
+.dr-reroll:disabled { opacity: 0.4; }
 .dr-wait .dr-big-av { font-size: 44px; }
 .dr-hint.small { gap: 4px; min-height: 0; margin-bottom: 8px; }
 .dr-hint.small .dr-slot { width: 20px; height: 26px; font-size: 17px; border-bottom-width: 3px; }

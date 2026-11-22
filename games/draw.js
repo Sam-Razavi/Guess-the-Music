@@ -93,6 +93,7 @@ module.exports = function draw(ctx) {
       turnId: g ? g.turnId : 0, // only ever goes up, so pages can tell turns apart
       drawer: null,
       offer: null,
+      rerolled: false,       // the artist asked for new words this turn
       word: null,
       strokes: [],
       pointCount: 0,
@@ -113,15 +114,22 @@ module.exports = function draw(ctx) {
   reset();
 
   // ---------- words ----------
-  function deal(kind) {
+  // `avoid`: words already on the table (this offer, or the one being swapped
+  // out), so a deck that runs out and is reshuffled mid-offer can't deal one twice.
+  function deal(kind, avoid = []) {
     if (!g.decks[kind].length) {
       const bank = (WORDS[g.lang] || WORDS.en)[kind];
       let fresh = bank.filter(w => !g.seen.has(g.lang + '|' + w));
-      if (fresh.length < 3) { for (const w of bank) g.seen.delete(g.lang + '|' + w); fresh = bank.slice(); }
-      g.decks[kind] = shuffle(fresh);
+      if (fresh.length < 6) { for (const w of bank) g.seen.delete(g.lang + '|' + w); fresh = bank.slice(); }
+      g.decks[kind] = shuffle(fresh.filter(w => !avoid.includes(w)));
     }
     const raw = g.decks[kind].pop();
     return { raw, ...parseWord(raw, kind === 'hard') };
+  }
+  function dealOffer(avoid = []) {
+    const out = [];
+    for (const kind of ['easy', 'easy', 'hard']) out.push(deal(kind, [...avoid, ...out.map(w => w.raw)]));
+    return out;
   }
   const used = (w) => g.seen.add(g.lang + '|' + w.raw);
 
@@ -164,15 +172,26 @@ module.exports = function draw(ctx) {
     g.feed = [];
     g.lastGuess = {};
     g.nextAt = null;
+    g.rerolled = false;
     if (g.settings.choice) {
       g.status = 'choosing';
-      g.offer = [deal('easy'), deal('easy'), deal('hard')];
+      g.offer = dealOffer();
       g.endsAt = ctx.now() + CHOOSE_MS;
       timers.set('choose', CHOOSE_MS, () => choose(Math.floor(Math.random() * 2)));
       ctx.broadcast();
     } else {
       startDrawing(deal(Math.random() < 0.2 ? 'hard' : 'easy'));
     }
+  }
+
+  // The artist doesn't like any of the three: one fresh set per turn, clock restarts.
+  function reroll() {
+    if (g.status !== 'choosing' || !g.offer || g.rerolled) return;
+    g.rerolled = true;
+    g.offer = dealOffer(g.offer.map(w => w.raw));
+    g.endsAt = ctx.now() + CHOOSE_MS;
+    timers.set('choose', CHOOSE_MS, () => choose(Math.floor(Math.random() * 2)));
+    ctx.broadcast();
   }
 
   function choose(index) {
@@ -269,6 +288,7 @@ module.exports = function draw(ctx) {
       pattern: g.status === 'drawing' ? pattern() : [],
       word: showWord && g.word ? g.word.text : null,
       offer: iDraw && g.status === 'choosing' && g.offer ? g.offer.map(w => ({ text: w.text, hard: w.hard })) : null,
+      canReroll: !!(iDraw && g.status === 'choosing' && !g.rerolled),
       strokeCount: g.strokes.length,
       guessed: g.guessed.filter(x => ctx.exists(x.pid)).map(x => ({ id: x.pid, name: ctx.name(x.pid), pts: x.pts })),
       guesserCount: g.drawer ? guessers().length : 0,
@@ -353,6 +373,7 @@ module.exports = function draw(ctx) {
     'host:draw:end': () => { if (g.status !== 'lobby' && g.status !== 'final') finish(); },
     'host:draw:newGame': () => { reset(); ctx.broadcast(); },
     'player:draw:choose': ({ playerId }, { index }) => { if (playerId === g.drawer) choose(index); },
+    'player:draw:reroll': ({ playerId }) => { if (playerId === g.drawer) reroll(); },
     'player:draw:stroke': ({ playerId }, { i, c, w, p }) => {
       if (g.status !== 'drawing' || playerId !== g.drawer) return;
       const pts = cleanPoints(p);

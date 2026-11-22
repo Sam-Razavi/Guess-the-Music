@@ -13,7 +13,7 @@ const WORDS = require(path.join(__dirname, '..', 'games', 'data', 'draw-words'))
   console.log('\n# word bank');
   for (const L of ['fa', 'en']) {
     const all = [...WORDS[L].easy, ...WORDS[L].hard];
-    ok(WORDS[L].easy.length >= 80 && WORDS[L].hard.length >= 60, `${L}: ${WORDS[L].easy.length} easy + ${WORDS[L].hard.length} hard words`);
+    ok(WORDS[L].easy.length >= 250 && WORDS[L].hard.length >= 150, `${L}: ${WORDS[L].easy.length} easy + ${WORDS[L].hard.length} hard words`);
     ok(new Set(all).size === all.length, `${L}: no duplicates`);
     ok(all.every(w => w === w.trim() && !w.includes('//') && !w.startsWith('/') && !w.endsWith('/')), `${L}: clean entries`);
   }
@@ -139,6 +139,31 @@ const WORDS = require(path.join(__dirname, '..', 'games', 'data', 'draw-words'))
     seenWords.add(g().word.raw);
   }
   ok(repeats === 0 && seenWords.size === 25, `no word drawn twice in 25 games (${seenWords.size} words)`);
+
+  console.log('\n# in-process: new words (reroll)');
+  H('host:draw:end'); H('host:draw:start');
+  const rrArtist = g().drawer, before = g().offer.map(w => w.raw);
+  ok(dm.payload('player', rrArtist).canReroll === true && dm.payload('player', guessers()[0]).canReroll === false, 'only the artist is offered new words');
+  H('player:draw:reroll', {}, guessers()[0]);
+  ok(g().offer.map(w => w.raw).join() === before.join(), 'a guesser cannot swap the words');
+  t += 10000;
+  H('player:draw:reroll', {}, rrArtist);
+  const after = g().offer.map(w => w.raw);
+  ok(after.length === 3 && after.every(w => !before.includes(w)) && !g().offer[0].hard && !g().offer[1].hard && g().offer[2].hard, 'new words: three different ones, still two easy + one hard');
+  ok(g().endsAt === t + 15000 && dm.payload('player', rrArtist).canReroll === false, 'the clock restarts and it only works once per turn');
+  H('player:draw:reroll', {}, rrArtist);
+  ok(g().offer.map(w => w.raw).join() === after.join(), 'a second swap is ignored');
+  fire(15000);
+  ok(g().status === 'drawing' && after.includes(g().word.raw), 'timeout after a swap draws one of the new words');
+  // a deck that runs out mid-offer must not deal the same word twice
+  let dupOffers = 0;
+  for (let i = 0; i < 300; i++) {
+    H('host:draw:end'); H('host:draw:start');
+    const o = g().offer.map(w => w.raw);
+    if (new Set(o).size !== 3) dupOffers++;
+    g().decks.easy.length = Math.min(g().decks.easy.length, 1); // force a reshuffle while dealing
+  }
+  ok(dupOffers === 0, 'no offer ever shows the same word twice, even across a deck reshuffle');
   dm.leave();
   global.setTimeout = realSet; global.clearTimeout = realClear;
 
@@ -211,6 +236,7 @@ const WORDS = require(path.join(__dirname, '..', 'games', 'data', 'draw-words'))
 
   console.log('\n# guesses');
   const [g1, g2, g3] = others;
+  const g1Id = g1.last.me.id;
   g1.emit('player:draw:guess', { text: 'definitely-not-it' });
   ok(await until(() => G(tv).feed.some(f => f.text === 'definitely-not-it' && f.name)), 'a wrong guess shows on the TV with the name');
   g1.emit('player:draw:guess', { text: word.toUpperCase() });
@@ -248,7 +274,7 @@ const WORDS = require(path.join(__dirname, '..', 'games', 'data', 'draw-words'))
   const gal = tv.events.find(e => e.ev === 'draw:gallery').d;
   ok(gal.length === 1 && gal[0].word === word && gal[0].strokes.length === 1, 'gallery: the one drawing, with its word');
   // only turn 1 had right guesses: its first guesser is the sharpest eye, unless they were the one removed above
-  ok(G(tv).awards && G(tv).awards.artist && (G(tv).awards.eye || second === g1.last.me.id), 'awards: best artist and sharpest eye');
+  ok(G(tv).awards && G(tv).awards.artist && (G(tv).awards.eye || second === g1Id), 'awards: best artist and sharpest eye');
   host.emit('host:hub:select', { game: 'hub' });
   ok(await until(() => tv.last.activeGame === 'hub' && tv.last.hub.trophies.some(x => x.game === 'draw')), 'the winner goes on the trophy shelf');
 

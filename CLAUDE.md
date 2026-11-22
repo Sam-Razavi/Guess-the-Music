@@ -309,6 +309,13 @@ Fix (after Phase 35): Esm-Famil letters — the host chooses them:
 
 Fix (after Phase 35): the game moved from port 3000 to **4000** — the homelab dashboard (Caddy, Windows service `HomelabDashboard`, C:\homelab) took 3000, so the game died with EADDRINUSE and pm2's list came up empty. Changed: `server.js` default (`PORT` env still overrides), `launch-kiosk.ps1`, the Cloudflare-tunnel script default, README, tests/run.js comment. Node's firewall rule is any-port, so no firewall change. A port change is a new browser origin: phones lose their saved player id/PIN/localStorage once and re-join; home-screen icons and bookmarks need `:4000`.
 
+Fix (after Phase 35): Draw It! — 2.5× the words, a one-time word swap:
+
+- Word bank (`games/data/draw-words.js`) grew from fa 115+75 / en 110+74 to **fa 292+190 / en 285+180** (easy+hard), grouped by theme in comments (animals, food, house, tools, places, characters, Iranian food/traditions, space...). Checked for duplicates by `answerKey` across easy+hard, alternatives included. Avoid words that are 1 letter off another common word (e.g. no "موس" next to "موش").
+- **🔄 New words (once)**: the artist can swap the three offered words once per turn (`player:draw:reroll`, `canReroll` in the artist's payload); the new set is still 2 easy + 1 hard, excludes the old three, and restarts the 15 s choose clock.
+- Fix: when a deck ran out mid-offer and was reshuffled, the same word could be offered twice — `deal(kind, avoid)`/`dealOffer()` now skip words already on the table.
+- Fixed a flaky Draw It test (≈1 run in 3 crashed reading the removed player's id). 405 checks in 13 suites pass.
+
 Next ideas, not yet started:
 
 - More languages — i18n.js's translations object is keyed by language code, so adding a third is mostly copying the 'en'/'fa' block and adding a toggle button in host.html.
