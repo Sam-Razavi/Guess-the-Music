@@ -162,116 +162,131 @@
       <section class="card" id="options-card">
         <h2 id="options-toggle">Game options <span class="chevron">▾</span></h2>
         <div class="options-list">
-          <label class="option-row">
-            <input type="checkbox" data-setting="fadeBetweenSongs">
-            <span><strong>🎚️ Fade out between songs</strong><br><span class="muted small">No sudden silence: when the next song starts, the last one fades out under the 3-2-1 countdown and stops as the new one comes in. Closing a round, and the end of a snippet, fade out too.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="autoRevealOnCorrect">
-            <span><strong>Reveal the song on Correct</strong><br><span class="muted small">Pressing ✅ Correct also reveals the song on the TV and ends the round (auto-advance still applies). Turn off to reveal by hand.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="wrongPenalty">
-            <span><strong>Wrong costs a point</strong><br><span class="muted small">Pressing ❌ Wrong takes 1 point from the player who answered (a Daily Double loses the wager instead). Scores can go below zero. Reset buzzers never costs points.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="stealMechanic">
-            <span><strong>Steal mechanic</strong><br><span class="muted small">The ❌ Wrong button reopens buzzing for everyone who has not had a turn — whoever steals it gets a bonus point. With this off, Wrong just shows on the TV and buzzing stays closed (Reset buzzers still lets others try).</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="extraAnimations">
-            <span><strong>Extra animations</strong><br><span class="muted small">Bonus TV flourishes on top of the standard animations — a drifting color backdrop, a music visualizer ring around the record, the 3-2-1-GO countdown, a "takes the lead" banner and "stole it!" callout, a rotating sunburst on buzz-ins, a shine across the revealed title, a pulsing timer in the last 5 seconds, a glowing winner, and fireworks on the results screen.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="speedBonus">
-            <span><strong>Speed bonus</strong><br><span class="muted small">Extra point for buzzing in within the first 3 seconds of a round.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="pointValues">
-            <span><strong>Point values per song</strong><br><span class="muted small">Set how much each song is worth instead of a flat point — edit the number next to each song in the playlist.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="blindMode">
-            <span><strong>Blind mode</strong><br><span class="muted small">Hide the scoreboard on TV until results, for suspense.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="teamMode">
-            <span><strong>Team mode</strong><br><span class="muted small">Players pick a team name when joining — buzzing locks the whole team, and awarding a point gives it to the whole team.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="sessionStats">
-            <span><strong>Session stats</strong><br><span class="muted small">Fastest buzz, biggest single round — all-time records shown on the results screen.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="karaokeHint">
-            <span><strong>Karaoke hint</strong><br><span class="muted small">Blank-per-letter title hint on TV, revealed one letter at a time by the host (no real lyrics — built from the song title only).</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="autoCategories">
-            <span><strong>Auto-tag new songs</strong><br><span class="muted small">When you add or import a song, ask Claude to fill in its genre, year (decade) and difficulty (needs ANTHROPIC_API_KEY in .env — see README). Only fills what you left blank; never overrides what you typed.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="mysteryRound">
-            <span><strong>Mystery modifier round</strong><br><span class="muted small">One random song each game gets a surprise twist — double points, no hints, or a blind score reveal — kept secret until that round actually starts.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="categoryVoting">
-            <span><strong>Category voting</strong><br><span class="muted small">Let players vote on which category the next song comes from. Start a vote from the new card below while the round is idle.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="pauseGame">
-            <span><strong>Pause game</strong><br><span class="muted small">A Pause button that freezes buzzing and any running timers for a bathroom/food break — resumes exactly where it left off.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="actionLog">
-            <span><strong>Action log</strong><br><span class="muted small">A running list of every point awarded, wrong answer, and player removal — settles "wait, who got that point?" disputes.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="wagerRound">
-            <span><strong>Wager round (Daily Double)</strong><br><span class="muted small">Flag a song as wager-eligible in the playlist, then pick a player to risk some of their own score on it — exclusive buzz, no race.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="snippetMode">
-            <span><strong>Snippet mode</strong><br><span class="muted small">The TV auto-pauses the song after a set number of seconds — guessing happens from a short hook instead of the whole track. Resumes full playback on reveal.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="startOffset">
-            <span><strong>Start offset</strong><br><span class="muted small">Skip a set number of seconds at the start of the video before playing — jump past a long intro straight to the hook.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="achievementBadges">
-            <span><strong>Achievement badges</strong><br><span class="muted small">Fun awards on the results screen — Fastest Buzzer, Most Steals, Sharpshooter, Comeback Kid — computed from this game only.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="setlistPresets">
-            <span><strong>Setlist presets</strong><br><span class="muted small">Save the current playlist + game options as a named preset ("80s night", "Kids party") and load it back later instead of rebuilding it.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="preflightCheck">
-            <span><strong>Pre-flight check</strong><br><span class="muted small">A "ready to go?" button that scans the whole playlist for broken videos and confirms players have joined, before the party starts.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="gameLimit" id="game-limit-toggle">
-            <span><strong>Game limit</strong><br><span class="muted small">End the game early and jump straight to results once a player (or team) reaches a score, or once a number of rounds have been played — whichever comes first.</span></span>
-          </label>
-          <div id="game-limit-inputs" class="timer-row" hidden>
-            <label for="score-limit-input">Score limit (0 = off)</label>
-            <input id="score-limit-input" type="number" min="0" step="1" value="0">
-            <label for="round-limit-input">Round limit (0 = off)</label>
-            <input id="round-limit-input" type="number" min="0" step="1" value="0">
+          <div class="options-group">
+            <h3 class="options-group-title"><span>🎵</span> Round flow</h3>
+            <label class="option-row">
+              <input type="checkbox" data-setting="fadeBetweenSongs">
+              <span><strong>🎚️ Fade out between songs</strong><br><span class="muted small">No sudden silence: when the next song starts, the last one fades out under the 3-2-1 countdown and stops as the new one comes in. Closing a round, and the end of a snippet, fade out too.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="autoRevealOnCorrect">
+              <span><strong>Reveal the song on Correct</strong><br><span class="muted small">Pressing ✅ Correct also reveals the song on the TV and ends the round (auto-advance still applies). Turn off to reveal by hand.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="wrongPenalty">
+              <span><strong>Wrong costs a point</strong><br><span class="muted small">Pressing ❌ Wrong takes 1 point from the player who answered (a Daily Double loses the wager instead). Scores can go below zero. Reset buzzers never costs points.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="stealMechanic">
+              <span><strong>Steal mechanic</strong><br><span class="muted small">The ❌ Wrong button reopens buzzing for everyone who has not had a turn — whoever steals it gets a bonus point. With this off, Wrong just shows on the TV and buzzing stays closed (Reset buzzers still lets others try).</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="snippetMode">
+              <span><strong>Snippet mode</strong><br><span class="muted small">The TV auto-pauses the song after a set number of seconds — guessing happens from a short hook instead of the whole track. Resumes full playback on reveal.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="startOffset">
+              <span><strong>Start offset</strong><br><span class="muted small">Skip a set number of seconds at the start of the video before playing — jump past a long intro straight to the hook.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="pauseGame">
+              <span><strong>Pause game</strong><br><span class="muted small">A Pause button that freezes buzzing and any running timers for a bathroom/food break — resumes exactly where it left off.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="gameLimit" id="game-limit-toggle">
+              <span><strong>Game limit</strong><br><span class="muted small">End the game early and jump straight to results once a player (or team) reaches a score, or once a number of rounds have been played — whichever comes first.</span></span>
+            </label>
+            <div id="game-limit-inputs" class="timer-row" hidden>
+              <label for="score-limit-input">Score limit (0 = off)</label>
+              <input id="score-limit-input" type="number" min="0" step="1" value="0">
+              <label for="round-limit-input">Round limit (0 = off)</label>
+              <input id="round-limit-input" type="number" min="0" step="1" value="0">
+            </div>
           </div>
-          <label class="option-row">
-            <input type="checkbox" data-setting="easterEggMahtab">
-            <span><strong>🎉 Easter egg: Mahtab</strong><br><span class="muted small">Fun-only. Adds a teasing suffix to a player named "Mahtab"/"مهتاب" wherever their name is shown, plus a little tease when they buzz in.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="easterEggMina">
-            <span><strong>💐 Easter egg: Mina</strong><br><span class="muted small">Fun-only. A player named "Mina" is shown as "Mina jan", and "مینا" as "مینا جان", wherever their name appears.</span></span>
-          </label>
-          <label class="option-row">
-            <input type="checkbox" data-setting="easterEggReza">
-            <span><strong>🕌 Easter egg: Reza</strong><br><span class="muted small">Fun-only. A player named "Reza" is shown as "Reza Mashhadi", and "رضا" as "رضا مشهدی", wherever their name appears.</span></span>
-          </label>
+          <div class="options-group">
+            <h3 class="options-group-title"><span>🏆</span> Scoring & twists</h3>
+            <label class="option-row">
+              <input type="checkbox" data-setting="speedBonus">
+              <span><strong>Speed bonus</strong><br><span class="muted small">Extra point for buzzing in within the first 3 seconds of a round.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="pointValues">
+              <span><strong>Point values per song</strong><br><span class="muted small">Set how much each song is worth instead of a flat point — edit the number next to each song in the playlist.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="mysteryRound">
+              <span><strong>Mystery modifier round</strong><br><span class="muted small">One random song each game gets a surprise twist — double points, no hints, or a blind score reveal — kept secret until that round actually starts.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="wagerRound">
+              <span><strong>Wager round (Daily Double)</strong><br><span class="muted small">Flag a song as wager-eligible in the playlist, then pick a player to risk some of their own score on it — exclusive buzz, no race.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="teamMode">
+              <span><strong>Team mode</strong><br><span class="muted small">Players pick a team name when joining — buzzing locks the whole team, and awarding a point gives it to the whole team.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="blindMode">
+              <span><strong>Blind mode</strong><br><span class="muted small">Hide the scoreboard on TV until results, for suspense.</span></span>
+            </label>
+          </div>
+          <div class="options-group">
+            <h3 class="options-group-title"><span>📺</span> On the TV</h3>
+            <label class="option-row">
+              <input type="checkbox" data-setting="extraAnimations">
+              <span><strong>Extra animations</strong><br><span class="muted small">Bonus TV flourishes on top of the standard animations — a drifting color backdrop, a music visualizer ring around the record, the 3-2-1-GO countdown, a "takes the lead" banner and "stole it!" callout, a rotating sunburst on buzz-ins, a shine across the revealed title, a pulsing timer in the last 5 seconds, a glowing winner, and fireworks on the results screen.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="karaokeHint">
+              <span><strong>Karaoke hint</strong><br><span class="muted small">Blank-per-letter title hint on TV, revealed one letter at a time by the host (no real lyrics — built from the song title only).</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="sessionStats">
+              <span><strong>Session stats</strong><br><span class="muted small">Fastest buzz, biggest single round — all-time records shown on the results screen.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="achievementBadges">
+              <span><strong>Achievement badges</strong><br><span class="muted small">Fun awards on the results screen — Fastest Buzzer, Most Steals, Sharpshooter, Comeback Kid — computed from this game only.</span></span>
+            </label>
+          </div>
+          <div class="options-group">
+            <h3 class="options-group-title"><span>🧰</span> Host tools</h3>
+            <label class="option-row">
+              <input type="checkbox" data-setting="categoryVoting">
+              <span><strong>Category voting</strong><br><span class="muted small">Let players vote on which category the next song comes from. Start a vote from the new card below while the round is idle.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="autoCategories">
+              <span><strong>Auto-tag new songs</strong><br><span class="muted small">When you add or import a song, ask Claude to fill in its genre, year (decade) and difficulty (needs ANTHROPIC_API_KEY in .env — see README). Only fills what you left blank; never overrides what you typed.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="actionLog">
+              <span><strong>Action log</strong><br><span class="muted small">A running list of every point awarded, wrong answer, and player removal — settles "wait, who got that point?" disputes.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="setlistPresets">
+              <span><strong>Setlist presets</strong><br><span class="muted small">Save the current playlist + game options as a named preset ("80s night", "Kids party") and load it back later instead of rebuilding it.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="preflightCheck">
+              <span><strong>Pre-flight check</strong><br><span class="muted small">A "ready to go?" button that scans the whole playlist for broken videos and confirms players have joined, before the party starts.</span></span>
+            </label>
+          </div>
+          <div class="options-group">
+            <h3 class="options-group-title"><span>🎉</span> Easter eggs</h3>
+            <label class="option-row">
+              <input type="checkbox" data-setting="easterEggMahtab">
+              <span><strong>🎉 Easter egg: Mahtab</strong><br><span class="muted small">Fun-only. Adds a teasing suffix to a player named "Mahtab"/"مهتاب" wherever their name is shown, plus a little tease when they buzz in.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="easterEggMina">
+              <span><strong>💐 Easter egg: Mina</strong><br><span class="muted small">Fun-only. A player named "Mina" is shown as "Mina jan", and "مینا" as "مینا جان", wherever their name appears.</span></span>
+            </label>
+            <label class="option-row">
+              <input type="checkbox" data-setting="easterEggReza">
+              <span><strong>🕌 Easter egg: Reza</strong><br><span class="muted small">Fun-only. A player named "Reza" is shown as "Reza Mashhadi", and "رضا" as "رضا مشهدی", wherever their name appears.</span></span>
+            </label>
+          </div>
         </div>
       </section>
 

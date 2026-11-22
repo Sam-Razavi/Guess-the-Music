@@ -27,7 +27,7 @@
   // Party points for the night: who's winning the whole evening.
   function nightList(s, limit) {
     const rows = (s.hub.night || []).slice(0, limit);
-    if (!rows.length) return `<p class="muted trophy-empty">${esc(t('hub.noTrophies'))}</p>`;
+    if (!rows.length) return `<div class="tc-empty"><div class="tc-medals" aria-hidden="true"><span>🥈</span><span>🥇</span><span>🥉</span></div><p class="muted">${esc(t('hub.noTrophies'))}</p></div>`;
     return rows.map((r, i) => `<div class="night-row ${i === 0 ? 'lead' : ''}" style="--i:${i}">${i === 0 ? '<span class="night-crown">👑</span>' : `<b class="night-rank">${num(i + 1)}</b>`}${avatar(r.name)}<bdi class="night-name">${esc(r.name)}</bdi><span class="night-pts">${num(r.points)}</span></div>`).join('');
   }
 
@@ -199,9 +199,9 @@
       Hub.screen(grid, 'v1', () => HUB_GAMES.map(g => `
         <div class="launch" data-game="${g.id}" style="--g1:${g.grad[0]};--g2:${g.grad[1]}">
           <span class="l-art">${g.art[0]}</span>
-          <span class="l-text"><b>${esc(HUB_STRINGS.en[`game.${g.id}.name`])} <span class="fa-name">${esc(HUB_STRINGS.fa[`game.${g.id}.name`])}</span></b><small>${esc(HUB_STRINGS.en[`game.${g.id}.tag`])}</small><small class="l-meta">👥 ${g.players} · ⏱ ${g.mins} min</small></span>
+          <span class="l-text"><b>${esc(HUB_STRINGS.en[`game.${g.id}.name`])}</b><span class="fa-name l-fa" dir="rtl">${esc(HUB_STRINGS.fa[`game.${g.id}.name`])}</span><small>${esc(HUB_STRINGS.en[`game.${g.id}.tag`])}</small></span>
           <span class="l-votes"></span>
-          <button class="primary" data-launch="${g.id}">Launch ▶</button>
+          <div class="l-foot"><span class="l-meta">👥 ${g.players}<i></i>⏱ ${g.mins} min</span><button class="primary" data-launch="${g.id}">Launch ▶</button></div>
         </div>`).join(''));
       grid.querySelectorAll('.launch').forEach(el => {
         const n = votesFor(s, el.dataset.game).length;

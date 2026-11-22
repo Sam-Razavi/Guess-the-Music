@@ -747,13 +747,19 @@ html[dir="rtl"] .auto-advance-hint { right: auto; left: calc(16% + 1rem); }
 /* ---------- Results / podium ---------- */
 .stage[data-status="results"] ~ .scoreboard { visibility: hidden; }
 #panel-results { gap: 0.7rem; }
-#panel-results h1 { font-size: 2.6rem; }
+#panel-results h1 { font-size: 3rem; }
 .results { display: flex; flex-direction: column; align-items: center; gap: 1.1rem; width: min(62rem, 90vw); margin-top: 0.4rem; }
-.podium { display: flex; align-items: flex-end; justify-content: center; gap: 1rem; }
-.podium-slot { --h: 6rem; width: 12.5rem; display: flex; flex-direction: column; align-items: center; }
-.podium-slot.place-1 { --h: 9rem; width: 14rem; }
-.podium-slot.place-2 { --h: 6.3rem; }
-.podium-slot.place-3 { --h: 4.4rem; }
+/* The scoreboard is hidden on this screen, so the podium gets the room; the
+   panel still zooms itself down if badges/stats make it too tall. */
+.podium { display: flex; align-items: flex-end; justify-content: center; gap: 1.2rem; padding: 0 2rem; position: relative; }
+.podium::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent); }
+.podium::before { content: ""; position: absolute; left: 10%; right: 10%; bottom: -1.6rem; height: 3rem; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 194, 75, 0.22), transparent); filter: blur(4px); pointer-events: none; }
+.podium-slot { --h: 7.5rem; width: 15rem; display: flex; flex-direction: column; align-items: center; position: relative; z-index: 1; }
+.podium-slot.place-1 { --h: 12rem; width: 17rem; }
+.podium-slot.place-2 { --h: 8.6rem; }
+.podium-slot.place-3 { --h: 6rem; }
 .podium-player {
   display: flex;
   flex-direction: column;
@@ -764,11 +770,11 @@ html[dir="rtl"] .auto-advance-hint { right: auto; left: calc(16% + 1rem); }
   animation: podium-player-in 0.7s var(--ease-spring) both;
   animation-delay: calc(var(--d) + 0.45s);
 }
-.podium-player .avatar { font-size: 1.9rem; }
-.place-1 .podium-player .avatar { font-size: 2.5rem; box-shadow: 0 0 0 0.3rem rgba(255, 194, 75, 0.5), 0 1rem 3rem -0.5rem rgba(255, 194, 75, 0.7); }
-.podium-crown { font-size: 2.2rem; line-height: 1; margin-bottom: -0.2rem; animation: crown-drop 0.8s var(--ease-spring) both; animation-delay: calc(var(--d) + 0.9s); }
-.podium-name { font-weight: 800; font-size: 1.2rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-.podium-score { font-family: var(--font-display); font-weight: 800; font-size: 1.35rem; color: var(--gold); font-variant-numeric: tabular-nums; }
+.podium-player .avatar { font-size: 2.4rem; }
+.place-1 .podium-player .avatar { font-size: 3.2rem; box-shadow: 0 0 0 0.3rem rgba(255, 194, 75, 0.5), 0 1rem 3rem -0.5rem rgba(255, 194, 75, 0.7); }
+.podium-crown { font-size: 2.8rem; line-height: 1; margin-bottom: -0.2rem; animation: crown-drop 0.8s var(--ease-spring) both; animation-delay: calc(var(--d) + 0.9s); }
+.podium-name { font-weight: 800; font-size: 1.5rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.podium-score { font-family: var(--font-display); font-weight: 800; font-size: 1.8rem; color: var(--gold); font-variant-numeric: tabular-nums; }
 .podium-block {
   width: 100%;
   height: var(--h);
@@ -778,10 +784,10 @@ html[dir="rtl"] .auto-advance-hint { right: auto; left: calc(16% + 1rem); }
   border-bottom: none;
   display: flex;
   justify-content: center;
-  padding-top: 0.5rem;
+  padding-top: 0.7rem;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 2.4rem;
+  font-size: 3.2rem;
   color: rgba(255, 255, 255, 0.5);
   transform-origin: 50% 100%;
   animation: block-grow 0.75s var(--ease-out) both;

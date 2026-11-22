@@ -1266,9 +1266,24 @@ function measureOptionsHeight() {
 
 function applyOptionsCollapse() {
   optionsCard.classList.toggle('collapsed', optionsCollapsed);
-  optionsListEl.style.maxHeight = optionsCollapsed ? '0px' : measureOptionsHeight() + 'px';
+  if (optionsCollapsed) {
+    // From 'none' there is nothing to animate from: pin the current height first.
+    if (!optionsListEl.style.maxHeight || optionsListEl.style.maxHeight === 'none') {
+      optionsListEl.style.maxHeight = optionsListEl.scrollHeight + 'px';
+      void optionsListEl.offsetHeight;
+    }
+    optionsListEl.style.maxHeight = '0px';
+  } else {
+    optionsListEl.style.maxHeight = measureOptionsHeight() + 'px';
+  }
 }
 applyOptionsCollapse();
+// A pixel max-height is only needed while it animates. Once open, let the list
+// size itself — a height measured before the web fonts (or a resize) finished
+// reflowing the text used to clip the last group of options.
+const releaseOptionsHeight = () => { if (!optionsCollapsed && optionsListEl.style.maxHeight !== '0px') optionsListEl.style.maxHeight = 'none'; };
+optionsListEl.addEventListener('transitionend', (e) => { if (e.target === optionsListEl && e.propertyName === 'max-height') releaseOptionsHeight(); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setTimeout(releaseOptionsHeight, 500));
 
 optionsToggle.addEventListener('click', () => {
   optionsCollapsed = !optionsCollapsed;

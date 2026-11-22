@@ -18,7 +18,7 @@
   filter: blur(6px); animation: spot-sway 4s ease-in-out infinite alternate; }
 @keyframes spot-sway { from { transform: translateX(-50%) rotate(-4deg); } to { transform: translateX(-50%) rotate(4deg); } }
 .pm-actor-av { font-size: 5rem; box-shadow: 0 0 0 0.35rem var(--tc), 0 0 4rem color-mix(in srgb, var(--tc) 70%, transparent); animation: pop-in 0.7s var(--ease-spring) both; }
-.pm-spot h1 { font-family: var(--font-poster); font-weight: 400; font-size: 4.2rem; animation: rise-in 0.6s var(--ease-out) 0.2s both; }
+.pm-spot h1 { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(4.2rem * var(--poster-scale)); animation: rise-in 0.6s var(--ease-out) 0.2s both; }
 .pm-spot p { font-size: 1.3rem; font-weight: 600; }
 
 /* acting */
@@ -43,7 +43,7 @@
 
 /* turn end */
 .pm-end { display: flex; flex-direction: column; align-items: center; gap: 0.9rem; padding: 0.4rem 2.4rem 1.4rem; }
-.pm-end h1 { font-family: var(--font-poster); font-weight: 400; font-size: 3.4rem; }
+.pm-end h1 { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(3.4rem * var(--poster-scale)); }
 .pm-end-sum { display: flex; align-items: center; gap: 1rem; font-size: 1.4rem; }
 .pm-end-sum b { font-family: var(--font-display); font-size: 3rem; color: var(--good); }
 .pm-turnlist { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; max-width: 70rem; }
@@ -63,7 +63,7 @@
 
 /* ---------- phone ---------- */
 .pm-ph-ready { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding-top: 30px; }
-.pm-ph-ready h1 { font-family: var(--font-poster); font-weight: 400; font-size: 36px; }
+.pm-ph-ready h1 { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(36px * var(--poster-scale)); }
 .pm-go { font-size: 22px; padding: 18px 40px; border-radius: 20px; width: 100%; max-width: 360px; }
 .pm-ph-act { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; }
 .pm-ph-top { display: flex; justify-content: space-between; align-items: center; font-weight: 800; }
@@ -84,7 +84,7 @@ html[dir="rtl"] .pm-word-card b { font-family: "Vazirmatn", sans-serif; font-wei
 .pm-ph-watch { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding-top: 16px; }
 .pm-ph-watch h2 { font-size: 26px; }
 .pm-ph-end { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 16px; text-align: center; }
-.pm-ph-end h1 { font-family: var(--font-poster); font-weight: 400; font-size: 34px; }
+.pm-ph-end h1 { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(34px * var(--poster-scale)); }
 .r-player .pm-tw { font-size: 14px; }
 .r-host .pm-tw { font-size: 13px; }
 

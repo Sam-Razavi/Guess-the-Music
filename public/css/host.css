@@ -472,16 +472,56 @@
 }
 #options-toggle .chevron { transition: transform var(--dur) var(--ease-out); color: var(--text-muted); font-size: 0.9em; }
 #options-card.collapsed #options-toggle .chevron { transform: rotate(-90deg); }
+/* Five groups of switches. On a laptop the card spans the whole width and the
+   groups flow into columns, instead of one tall list beside an empty half. */
+@media (min-width: 860px) {
+  #options-card { grid-column: span 2; }
+}
+/* A grid, not CSS columns: the list has a max-height (for the collapse
+   animation), and columns overflow sideways — out of view — when height is
+   capped. Round flow (the longest group) runs down the left; the other four
+   pair up beside it. */
 .options-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 1.1rem;
+  align-items: start;
   overflow: hidden;
-  max-height: 2000px;
+  max-height: 4000px;
   opacity: 1;
   transition: max-height 0.4s var(--ease-out), opacity 0.25s ease;
 }
 #options-card.collapsed .options-list { max-height: 0; opacity: 0; }
+@media (min-width: 700px) {
+  .options-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1000px) {
+  .options-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .options-group:first-child { grid-row: span 2; }
+}
+.options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0.9rem 0 0;
+  padding: 0.7rem 0.5rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.options-group-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.6rem 0.35rem;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.options-group-title span { font-size: 1rem; letter-spacing: 0; }
 .option-row {
   display: flex;
   gap: 0.8rem;

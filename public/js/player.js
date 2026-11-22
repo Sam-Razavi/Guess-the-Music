@@ -406,7 +406,36 @@ socket.on('state', (state) => {
   } else if (state.roundStatus === 'results') {
     buzzBtn.disabled = true;
     buzzLabel.textContent = t('gameOver', lang);
-    statusText.textContent = t('yourFinalScore', lang).replace('{n}', me ? me.score : 0);
+    statusText.textContent = t('lookAtTv', lang);
     setScreenState('results');
   }
+  renderFinalCard(state, me, lang);
 });
+
+// Game over: the buzzer makes way for a card with your place (competition
+// ranking, so equal scores share a place, like the TV podium).
+const finalCard = document.getElementById('final-card');
+let finalShownFor = null;
+function renderFinalCard(state, me, lang) {
+  const show = state.roundStatus === 'results' && !state.paused && !!me;
+  finalCard.hidden = !show;
+  buzzBtn.hidden = show;
+  if (!show) { finalShownFor = null; return; }
+  const scores = state.players.map(p => Number(p.score) || 0);
+  const mine = Number(me.score) || 0;
+  const place = 1 + scores.filter(x => x > mine).length;
+  const tied = scores.filter(x => x === mine).length > 1;
+  const placeText = place <= 3 ? t('finalPlace' + place, lang) : t('finalPlaceN', lang).replace('{n}', place);
+  document.getElementById('final-place').textContent = tied && place > 1 ? t('finalTied', lang).replace('{place}', placeText) : placeText;
+  document.getElementById('final-medal').textContent = ['🥇', '🥈', '🥉'][place - 1] || '🎉';
+  document.getElementById('final-score').textContent = mine;
+  document.getElementById('final-of').textContent = t('finalOf', lang).replace('{n}', state.players.length);
+  finalCard.dataset.place = Math.min(place, 4);
+  // Replay the entrance only when the game actually ends, not on every update.
+  const key = state.roundsPlayed + ':' + place;
+  if (finalShownFor !== key) {
+    finalShownFor = key;
+    finalCard.classList.remove('enter'); void finalCard.offsetWidth; finalCard.classList.add('enter');
+    if (place === 1 && navigator.vibrate) navigator.vibrate([60, 40, 60, 40, 120]);
+  }
+}

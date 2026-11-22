@@ -6,9 +6,15 @@
   --team-blue: #06b6d4;   --team-blue-2: #0e7490;
   --team-green: #84cc16;  --team-green-2: #4d7c0f;
   --team-gold: #f59e0b;   --team-gold-2: #b45309;
-  --font-poster: "Lalezar", var(--font-display);
+  /* Big "poster" headings. English uses the brand display face (Unbounded,
+     same as the music game and the menu cards) — it is much wider than
+     Lalezar, so every poster size is multiplied by --poster-scale. Persian
+     keeps Lalezar, which is made for it. */
+  --font-poster: var(--font-display);
+  --poster-weight: 800;
+  --poster-scale: 0.78;
 }
-html[dir="rtl"] { --font-poster: "Lalezar", "Vazirmatn", system-ui, sans-serif; }
+html[dir="rtl"] { --font-poster: "Lalezar", "Vazirmatn", system-ui, sans-serif; --poster-weight: 400; --poster-scale: 1; }
 
 /* The TV is laid out in rem, and rem follows the screen size (same trick as
    the music TV page): 16px at 720p, 24px at 1080p. */
@@ -129,6 +135,7 @@ html[dir="rtl"] .ring svg { transform: rotate(-90deg) scaleY(-1); }
 .ring-num { font-family: var(--font-display); font-weight: 800; font-size: 2rem; font-variant-numeric: tabular-nums; }
 .ring.urgent .ring-bar { stroke: var(--bad); }
 .ring.urgent .ring-num { color: var(--bad); animation: bump 1s ease-in-out infinite; }
+.ring-num.long { display: inline-block; transform: scale(0.8); letter-spacing: -0.02em; }
 
 /* ---------- TV lobby (every game) ---------- */
 .tv-lobby {
@@ -137,7 +144,7 @@ html[dir="rtl"] .ring svg { transform: rotate(-90deg) scaleY(-1); }
 }
 .lobby-main { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; animation: rise-in 0.7s var(--ease-out) both; }
 .lobby-main .game-art { margin-bottom: 0.8rem; }
-.lobby-title { font-family: var(--font-poster); font-size: 4.2rem; font-weight: 400; line-height: 1; letter-spacing: -0.01em;
+.lobby-title { font-family: var(--font-poster); font-size: calc(4.2rem * var(--poster-scale)); font-weight: var(--poster-weight); line-height: 1; letter-spacing: -0.01em;
   background: linear-gradient(120deg, #fff 20%, var(--g1) 60%, var(--g2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 html[data-theme="light"] .lobby-title { background: linear-gradient(120deg, var(--g2), var(--g1)); -webkit-background-clip: text; background-clip: text; }
 .lobby-alt { font-size: 1.4rem; font-weight: 700; color: var(--text-muted); margin-top: -0.2rem; }
@@ -164,7 +171,7 @@ html[dir="rtl"] .who-chip { padding: 0.3rem 0.3rem 0.3rem 0.85rem; }
 
 /* ---------- final screens / podium ---------- */
 .final-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; padding: 0.5rem 2rem 1.5rem; text-align: center; }
-.final-screen h1 { font-family: var(--font-poster); font-weight: 400; font-size: 3.4rem; }
+.final-screen h1 { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(3.4rem * var(--poster-scale)); }
 .podium { display: flex; align-items: flex-end; justify-content: center; gap: 1.2rem; margin-top: 1rem; }
 .pod { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; width: 13rem; animation: rise-in 0.8s var(--ease-spring) both; animation-delay: calc(0.4s + var(--d) * 0.45s); }
 .pod-who { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; position: relative; }
@@ -199,7 +206,7 @@ html[dir="rtl"] .who-chip { padding: 0.3rem 0.3rem 0.3rem 0.85rem; }
   animation: stamp-fade 2.6s ease forwards;
 }
 .fx-stamp-word {
-  font-family: var(--font-poster); font-size: 9rem; line-height: 1; color: #fff; padding: 0.15em 0.5em 0.05em; border-radius: 1.5rem;
+  font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(9rem * var(--poster-scale)); line-height: 1; color: #fff; padding: 0.15em 0.5em 0.05em; border-radius: 1.5rem;
   background: linear-gradient(135deg, #34d399, #059669); border: 0.4rem solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 2rem 5rem -1rem rgba(0, 0, 0, 0.6); transform: rotate(-6deg);
   animation: stamp-hit 0.55s var(--ease-spring) both;
@@ -231,7 +238,7 @@ html[dir="rtl"] .who-chip { padding: 0.3rem 0.3rem 0.3rem 0.85rem; }
 .splash-art .sa0 { font-size: 8rem; animation-delay: 0.1s; }
 .splash-art .sa1 { font-size: 3.4rem; top: -1rem; right: -2.5rem; animation-delay: 0.3s; }
 .splash-art .sa2 { font-size: 3rem; bottom: -0.5rem; left: -2.5rem; animation-delay: 0.42s; }
-.splash-title { font-family: var(--font-poster); font-size: 6rem; color: #fff; text-shadow: 0 0.4rem 2rem rgba(0, 0, 0, 0.35); animation: rise-in 0.6s var(--ease-out) 0.25s both; }
+.splash-title { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(6rem * var(--poster-scale)); color: #fff; text-shadow: 0 0.4rem 2rem rgba(0, 0, 0, 0.35); animation: rise-in 0.6s var(--ease-out) 0.25s both; }
 .splash-sub { font-size: 1.8rem; font-weight: 800; color: rgba(255, 255, 255, 0.8); animation: rise-in 0.6s var(--ease-out) 0.4s both; }
 .r-player .splash-art { width: 120px; height: 120px; }
 .r-player .splash-art .sa0 { font-size: 80px; }
@@ -256,7 +263,7 @@ html[dir="rtl"] .me-chip { padding: 5px 5px 5px 14px; }
 .join-screen, .r-player .pin-gate {
   position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center;
 }
-.join-screen h1 { font-family: var(--font-poster); font-weight: 400; font-size: 44px; }
+.join-screen h1 { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(44px * var(--poster-scale)); }
 .join-screen input { width: 100%; max-width: 340px; text-align: center; font-size: 18px; padding: 14px; }
 .join-screen button { width: 100%; max-width: 340px; padding: 15px; font-size: 18px; }
 .join-logo img { animation: spin 6s linear infinite; }
@@ -264,13 +271,13 @@ html[dir="rtl"] .me-chip { padding: 5px 5px 5px 14px; }
 body.offline .offline-bar { transform: none; }
 .awake-note { text-align: center; color: var(--text-muted); font-size: 12px; padding: 0 16px 16px; }
 .ph-lobby { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding-top: 18px; animation: rise-in 0.6s var(--ease-out) both; }
-.ph-lobby h1 { font-family: var(--font-poster); font-weight: 400; font-size: 40px; margin-top: 10px; }
+.ph-lobby h1 { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(40px * var(--poster-scale)); margin-top: 10px; }
 .small-how { text-align: start; margin: 4px 0; width: 100%; }
 .small-how .how-step { font-size: 15px; }
 .small-how .how-num { width: 28px; height: 28px; font-size: 14px; --g1: var(--violet); --g2: var(--pink); }
 .ph-team { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; color: var(--text-muted); margin: 8px 0; }
 .ph-result { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding-top: 24px; animation: rise-in 0.6s var(--ease-out) both; }
-.ph-result h1 { font-family: var(--font-poster); font-weight: 400; font-size: 34px; }
+.ph-result h1 { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(34px * var(--poster-scale)); }
 .ph-result h2 { font-size: 22px; }
 .big-rank { font-size: 76px; line-height: 1; animation: pop-in 0.7s var(--ease-spring) both; }
 .big-score { font-family: var(--font-display); font-weight: 800; font-size: 46px; color: var(--gold); }
@@ -347,3 +354,8 @@ button.armed { background: var(--bad) !important; color: #fff !important; }
   .aurora-blob { animation: none !important; }
   .confetti, .fx-flash, .game-splash { display: none; }
 }
+
+/* Phone "message" screens (waiting, your result, spectating) sit in the middle
+   of the screen instead of hugging the top with an empty half below. Longer
+   screens are unaffected: min-height only adds room. */
+.r-player .ph-result, .r-player .mf-ph-msg { min-height: calc(100dvh - 120px); justify-content: center; padding-top: 0; padding-bottom: 40px; }

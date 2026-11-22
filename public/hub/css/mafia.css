@@ -7,11 +7,13 @@
 .mf-tv { display: flex; min-height: 0; position: relative; }
 .mf-tv > * { flex: 1; }
 .mf-scene { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.8rem; text-align: center; padding: 0.4rem 2.4rem 1.6rem; overflow: hidden; border-radius: 1.6rem; margin: 0 1.2rem 1.2rem; }
-.mf-scene h1 { font-family: var(--font-poster); font-weight: 400; font-size: 4rem; line-height: 1.05; position: relative; z-index: 2; }
+.mf-scene h1 { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(4rem * var(--poster-scale)); line-height: 1.05; position: relative; z-index: 2; }
 .mf-scene p { position: relative; z-index: 2; font-size: 1.25rem; font-weight: 600; color: rgba(255, 255, 255, 0.8); }
 .mf-scene .eyebrow { color: rgba(255, 255, 255, 0.7); position: relative; z-index: 2; }
 
-.mf-stars { position: absolute; inset: 0; pointer-events: none; }
+.mf-stars { position: absolute; inset: 0; pointer-events: none;
+  /* keep the sky clear behind the headline so stars never twinkle between the letters */
+  -webkit-mask-image: radial-gradient(60% 45% at 50% 55%, transparent 35%, #000 85%); mask-image: radial-gradient(60% 45% at 50% 55%, transparent 35%, #000 85%); }
 .mf-stars i { position: absolute; width: calc(3px * var(--s)); height: calc(3px * var(--s)); border-radius: 50%; background: #fff; animation: twinkle 3s ease-in-out var(--d) infinite; }
 @keyframes twinkle { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
 
@@ -117,7 +119,7 @@ html[data-theme="light"] body[data-game="mafia"].r-player { background: linear-g
 .mf-card.open .mf-card-front { transform: rotateY(-180deg); }
 .mf-card.open .mf-card-face { transform: rotateY(0); }
 .mf-card-ico { font-size: 84px; line-height: 1; }
-.mf-card-face b { font-family: var(--font-poster); font-weight: 400; font-size: 38px; }
+.mf-card-face b { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(38px * var(--poster-scale)); }
 .mf-card-face small { font-size: 15px; font-weight: 600; opacity: 0.9; line-height: 1.45; }
 .mf-team { font-size: 14px; font-weight: 700; padding: 8px 12px; border-radius: 14px; background: rgba(0, 0, 0, 0.3); }
 .mf-ph-night, .mf-ph-vote { display: flex; flex-direction: column; gap: 12px; }

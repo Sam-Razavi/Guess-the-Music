@@ -85,7 +85,7 @@ html[dir="rtl"] .h-label { letter-spacing: 0; }
 .gp-hand.my-sugg { border-color: var(--cyan); box-shadow: 0 0 0 3px var(--cyan); }
 .gp-calls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; opacity: 0.25; pointer-events: none; transition: opacity 0.25s; }
 .gp-calls.show { opacity: 1; pointer-events: auto; }
-.gp-call { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 8px; font-size: 24px; font-family: var(--font-poster); border-radius: 20px; }
+.gp-call { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 8px; font-size: calc(24px * var(--poster-scale)); font-family: var(--font-poster); font-weight: var(--poster-weight); border-radius: 20px; }
 .gp-call small { font-family: var(--font-body); font-size: 12px; font-weight: 700; opacity: 0.85; }
 .gp-call.pooch { background: linear-gradient(135deg, #64748b, #334155); color: #fff; border: 0; }
 .gp-call.gol { background: linear-gradient(135deg, #fb7185, #e11d48); color: #fff; border: 0; box-shadow: 0 10px 26px -10px #e11d48; }

@@ -68,6 +68,15 @@
         <p class="muted small" id="vote-player-status"></p>
       </div>
 
+      <!-- end of the game: your place instead of a dead buzzer -->
+      <div id="final-card" class="final-card" hidden>
+        <div class="final-medal" id="final-medal" aria-hidden="true">🏆</div>
+        <p class="eyebrow" data-i18n="gameOverEyebrow">Game over</p>
+        <h2 id="final-place"></h2>
+        <p class="final-score"><b id="final-score">0</b> <span data-i18n="pts">pts</span></p>
+        <p class="muted small" id="final-of"></p>
+      </div>
+
       <button id="buzz-btn" class="buzz-btn" disabled>
         <span class="buzz-ring" aria-hidden="true"></span>
         <span class="buzz-ring buzz-ring-2" aria-hidden="true"></span>

@@ -169,6 +169,15 @@ button.primary {
   border-color: transparent;
   box-shadow: 0 8px 24px -8px rgba(255, 122, 80, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
+/* A see-through brand gradient reads as muddy brown on the dark background —
+   a disabled primary goes neutral instead, so "not yet" looks deliberate. */
+button.primary:disabled {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border-color: var(--border-strong);
+  box-shadow: none;
+  opacity: 0.75;
+}
 button.danger {
   background: rgba(244, 63, 94, 0.14);
   color: var(--bad);

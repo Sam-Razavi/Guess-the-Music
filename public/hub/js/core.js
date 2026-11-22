@@ -169,8 +169,10 @@ window.Hub = (function () {
       const left = ends ? Math.max(0, (ends - now()) / 1000) : 0;
       const secs = Math.ceil(left);
       const numEl = el.classList.contains('ring') ? el.querySelector('.ring-num') : el;
-      const text = el.dataset.format === 'clock' ? clock(secs) : num(secs);
-      if (numEl.textContent !== text) numEl.textContent = text;
+      // A ring shows a minute or more as m:ss ("118" read like a score).
+      const isRing = el.classList.contains('ring');
+      const text = el.dataset.format === 'clock' || (isRing && secs >= 60) ? clock(secs) : num(secs);
+      if (numEl.textContent !== text) { numEl.textContent = text; if (isRing) numEl.classList.toggle('long', text.length > 3); }
       el.classList.toggle('urgent', ends > 0 && secs <= 10 && secs > 0);
       if (el.classList.contains('ring') && total) {
         const bar = el.querySelector('.ring-bar');
