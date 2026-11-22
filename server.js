@@ -1425,6 +1425,10 @@ hub = require('./games/hub')({
   buildId: BUILD_ID,
   file: HUB_FILE,
   tvSummary: () => tvScreens.summary(),
+  isSoundTv: (socket) => tvScreens.isSoundSocket(socket),
+  // Music Bingo hit a song the TV can't play: same list the music host's
+  // broken-video scanner and the bingo pool both read.
+  markBroken: (songId, message) => { state.knownBroken[songId] = { message, at: Date.now() }; },
 });
 
 // ---------- sockets ----------

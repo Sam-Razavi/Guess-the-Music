@@ -10,14 +10,14 @@
 
 const fs = require('fs');
 
-const ARCADE_GAMES = ['esmfamil', 'golpooch', 'pantomime', 'mostlikely', 'mafia', 'spy', 'draw', 'truths'];
+const ARCADE_GAMES = ['bingo', 'esmfamil', 'golpooch', 'pantomime', 'mostlikely', 'mafia', 'spy', 'draw', 'truths'];
 const ALL_GAMES = ['music', ...ARCADE_GAMES];
 const TROPHY_LIMIT = 24;
 // Party points for the night: a game's 1st / 2nd / 3rd place (ties share a place).
 const PLACE_POINTS = [3, 2, 1];
 const SPIN_MS = 5200;
 
-module.exports = function createHub({ io, state, displayName, broadcastAll, musicIsLive, buildId, file, tvSummary }) {
+module.exports = function createHub({ io, state, displayName, broadcastAll, musicIsLive, buildId, file, tvSummary, isSoundTv, markBroken }) {
   const hub = load();
   const votes = {}; // playerId -> gameId, while the hub menu is up
 
@@ -48,6 +48,13 @@ module.exports = function createHub({ io, state, displayName, broadcastAll, musi
     players: () => Object.entries(state.players).map(([id, p]) => ({ id, name: displayName(p.name), connected: !!p.connected })),
     connectedIds: () => Object.entries(state.players).filter(([, p]) => p.connected).map(([id]) => id),
     allIds: () => Object.keys(state.players),
+    // The music game's library (Music Bingo plays from it) and its live list of
+    // songs the TV has failed to play.
+    playlist: () => state.playlist,
+    isBroken: (songId) => !!(state.knownBroken && state.knownBroken[songId]),
+    markBroken: (songId, message) => { if (markBroken) markBroken(songId, message); },
+    // Is this socket the TV screen that plays the sound? (games/tv-screens.js)
+    isSoundTv: (socket) => !!(socket && isSoundTv && isSoundTv(socket)),
     broadcast: () => broadcast(),
     // Coalesces bursts (e.g. everyone typing answers at once) into one update.
     broadcastSoon: () => {
@@ -191,7 +198,7 @@ module.exports = function createHub({ io, state, displayName, broadcastAll, musi
           if (hub.activeGame !== id) return;
           const who = info();
           if (who.role === 'player' && (!who.playerId || !state.players[who.playerId])) return;
-          handler(who, data && typeof data === 'object' ? data : {});
+          handler({ ...who, socket }, data && typeof data === 'object' ? data : {});
         });
       }
     }

@@ -27,6 +27,7 @@ const SUITES = [
   { name: 'tvs' },                        // only one TV screen plays sound
   { name: 'draw' },                       // Draw It!
   { name: 'truths' },                     // Two Truths & a Lie
+  { name: 'bingo' },                      // Music Bingo
   { name: 'music' },                      // the music game still works next to the hub
   { name: 'buzz' },                       // buzzer acks, buzzing while reconnecting, held events
   { name: 'switch', browser: true },      // music <-> hub page hand-off

@@ -1,0 +1,159 @@
+/* Music Bingo (بینگوی موسیقی) — TV, phones, host. Logic: games/bingo.js + hub/js/bingo.js. */
+
+/* ---------- TV ---------- */
+.bg-tv { position: relative; display: flex; min-height: 0; }
+.bg-stage { flex: 1; min-width: 0; min-height: 0; display: flex; position: relative; z-index: 1; }
+.bg-stage > * { flex: 1; min-width: 0; }
+
+/* The two YouTube players. Never visible while a clip is a secret; on the
+   reveal the playing one shows in the frame on the right. Kept on screen (just
+   transparent) because a player needs a real size to play. */
+.bg-videos { position: absolute; z-index: 0; right: 2.4rem; top: 50%; width: 36rem; aspect-ratio: 16 / 9; transform: translateY(-50%);
+  border-radius: 1.4rem; overflow: hidden; opacity: 0; pointer-events: none; transition: opacity 0.6s ease; }
+body[data-bg="reveal"] .bg-videos { opacity: 1; z-index: 2; box-shadow: 0 2rem 4rem -1.5rem rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.bg-slot { position: absolute; inset: 0; opacity: 0; }
+.bg-slot.on { opacity: 1; }
+.bg-slot iframe, .bg-yt { width: 100%; height: 100%; border: 0; }
+
+.bg-gate { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem;
+  background: rgba(8, 6, 16, 0.86); color: #fff; text-align: center; cursor: pointer; }
+.bg-gate span { font-size: 6rem; line-height: 1; animation: bump 1.2s ease-in-out infinite; }
+.bg-gate b { font-family: var(--font-display); font-size: 2.4rem; }
+
+/* lobby */
+.bg-lobby-chips { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.6rem; }
+.bg-chip { display: inline-flex; align-items: center; gap: 0.4em; padding: 0.4em 0.95em; border-radius: 999px; font-weight: 800; font-size: 1.05rem;
+  background: var(--surface-2); border: 1px solid var(--border); }
+.tv-lobby .bg-ladder { flex-direction: row; flex-wrap: wrap; padding: 0.7rem 0.9rem; margin-top: 0.6rem; }
+.tv-lobby .bg-ladder li { opacity: 1; }
+
+/* listening */
+.bg-listen { display: grid; grid-template-columns: minmax(0, 1fr) 23rem; gap: 2rem; padding: 0 2.4rem 1.6rem; min-height: 0; }
+.bg-listen-main { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.9rem; text-align: center; min-height: 0; }
+.bg-disc-wrap { position: relative; width: 19rem; height: 19rem; display: grid; place-items: center; margin: 0.4rem 0; }
+.bg-disc { width: 15.5rem; height: 15.5rem; }
+.bg-ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bg-ring .ring-num { display: none; }
+.bg-ring .ring-bar { stroke: var(--gold); }
+.bg-ring circle { stroke-width: 4; }
+.bg-listen-title { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(4.2rem * var(--poster-scale)); line-height: 1.05; }
+.bg-listen-sub { font-size: 1.4rem; font-weight: 700; color: var(--text-muted); min-height: 1.6em; }
+
+.bg-side { display: flex; flex-direction: column; gap: 1rem; min-height: 0; overflow: hidden; padding-top: 0.6rem; }
+.bg-ladder { list-style: none; margin: 0; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.55rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 1.2rem; }
+.bg-ladder li { display: flex; align-items: center; gap: 0.7rem; opacity: 0.55; font-size: 1.05rem; }
+.bg-ladder li.now { opacity: 1; }
+.bg-ladder li.now b { color: var(--gold); }
+.bg-ladder li.won { opacity: 1; }
+.bg-ladder li small { display: block; color: var(--text-muted); font-size: 0.85rem; font-weight: 700; }
+.bg-ladder-ico { width: 1.6rem; text-align: center; font-size: 1.2rem; }
+
+.bg-closest, .bg-history { padding: 0.9rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 1.2rem; }
+.bg-closest .eyebrow, .bg-history .eyebrow { margin-bottom: 0.4rem; }
+.bg-close-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.3rem 0; font-weight: 800; }
+.bg-close-row .avatar { font-size: 0.85rem; }
+.bg-close-row bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bg-away { margin-inline-start: auto; color: var(--text-muted); font-size: 0.95rem; white-space: nowrap; }
+.bg-close-row.hot .bg-away { color: var(--gold); animation: bump 1s ease-in-out infinite; }
+.bg-hist { font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.15rem 0; color: var(--text); }
+.bg-hist span { color: var(--text-muted); font-weight: 600; }
+
+/* reveal: the song + the video in the frame on the right */
+.bg-reveal { display: grid; grid-template-columns: minmax(0, 1fr) 36rem; gap: 2.4rem; padding: 0 2.4rem 1.6rem; align-items: center; }
+.bg-reveal-text { display: flex; flex-direction: column; gap: 0.6rem; animation: rise-in 0.6s var(--ease-out) both; }
+.bg-song-title { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(5rem * var(--poster-scale)); line-height: 1.05;
+  background: linear-gradient(120deg, #fff 30%, var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+html[data-theme="light"] .bg-song-title { background: linear-gradient(120deg, var(--text) 30%, var(--coral)); -webkit-background-clip: text; background-clip: text; }
+.bg-song-artist { font-size: 2rem; font-weight: 800; color: var(--text); }
+.bg-oncards { font-size: 1.3rem; font-weight: 700; color: var(--text-muted); }
+.bg-next { font-size: 1.15rem; font-weight: 700; color: var(--text-muted); margin-top: 0.6rem; }
+.bg-reveal-video { width: 36rem; aspect-ratio: 16 / 9; }
+
+/* BINGO! */
+.bg-claim { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.8rem; padding: 0 2rem 1.4rem; text-align: center; }
+.bg-claim-prize { font-size: 1.6rem; font-weight: 800; color: var(--gold); }
+.bg-claim-title { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(7.5rem * var(--poster-scale)); line-height: 1;
+  background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: pop-in 0.7s var(--ease-spring) both; filter: drop-shadow(0 0.6rem 2rem rgba(240, 69, 143, 0.45)); }
+.bg-claim-wins { display: flex; justify-content: center; gap: 2.4rem; flex-wrap: wrap; }
+.bg-claim-win { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; animation: rise-in 0.7s var(--ease-out) 0.2s both; }
+.bg-claim-who { display: flex; align-items: center; gap: 0.7rem; font-size: 1.8rem; }
+.bg-claim-av { font-size: 1.4rem; }
+.bg-mini { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 0.35rem; width: 26rem; }
+.bg-claim-wins.many .bg-mini { width: 18rem; }
+.bg-mini span { aspect-ratio: 1; display: grid; place-items: center; padding: 0.3rem; border-radius: 0.6rem; overflow: hidden;
+  background: var(--surface-2); border: 1px solid var(--border); font-size: 0.78rem; font-weight: 700; line-height: 1.1; color: var(--text-muted);
+  word-break: break-word; }
+.bg-mini span.free { background: rgba(255, 194, 75, 0.2); }
+.bg-mini span.hit { background: linear-gradient(145deg, #ffc24b, #f0458f); color: #2a0710; border-color: transparent; animation: hit-pop 0.5s var(--ease-spring) both; }
+.bg-mini span.hit:nth-child(odd) { animation-delay: 0.35s; }
+.bg-mini span.hit:nth-child(even) { animation-delay: 0.5s; }
+@keyframes hit-pop { from { transform: scale(0.6); opacity: 0.3; } to { transform: scale(1); opacity: 1; } }
+
+/* final */
+.bg-awards { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem 0.9rem; margin-top: 1.2rem; }
+.bg-award { display: inline-flex; align-items: center; gap: 0.45em; padding: 0.45em 1em; border-radius: 999px; font-size: 1.05rem;
+  background: var(--surface); border: 1px solid var(--border); }
+.bg-award small { color: var(--text-muted); }
+
+/* ---------- phone ---------- */
+.bg-ph { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+.bg-ph-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bg-ph-bar .pill { font-size: 13px; }
+.bg-ph-line { min-height: 2.5em; margin: 2px 0 0; font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.3; }
+.bg-ph-line.reveal { color: var(--gold); }
+.bg-ph-line.reveal span { color: var(--text-muted); font-weight: 600; }
+.bg-ph-line.claim { color: var(--pink); }
+
+.bg-card { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 6px; }
+.bg-cell { position: relative; aspect-ratio: 1 / 1.05; min-width: 0; padding: 6px 4px; border-radius: 12px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px; text-align: center; overflow: hidden; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border-strong); box-shadow: none;
+  touch-action: manipulation; -webkit-user-select: none; user-select: none;
+  transition: background-color 0.18s ease, transform 0.18s var(--ease-spring), border-color 0.2s ease, color 0.18s ease; }
+.bg-cell b { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.15; font-weight: 800; word-break: break-word; }
+.bg-cell small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-weight: 600; font-size: 0.8em; }
+.bg-card.n3 .bg-cell { font-size: 15px; }
+.bg-card.n4 .bg-cell { font-size: 12.5px; }
+.bg-card.n5 .bg-cell { font-size: 10.5px; border-radius: 10px; padding: 4px 3px; }
+.bg-card.n5 { gap: 5px; }
+.bg-cell.marked { background: linear-gradient(145deg, #ff7a50, #f0458f); border-color: transparent; color: #fff; transform: scale(0.96); }
+.bg-cell.marked small { color: rgba(255, 255, 255, 0.85); }
+.bg-daub { position: absolute; top: 4px; inset-inline-end: 4px; width: 18px; height: 18px; border-radius: 50%; background: #fff; color: #e0306f;
+  font-style: normal; font-size: 12px; font-weight: 900; line-height: 18px; text-align: center; transform: scale(0); transition: transform 0.25s var(--ease-spring); }
+.bg-daub::before { content: "✓"; }
+.bg-cell.marked .bg-daub { transform: scale(1); }
+.bg-card.n5 .bg-daub { width: 14px; height: 14px; line-height: 14px; font-size: 10px; top: 3px; }
+/* A revealed song you haven't marked: glows until you tap it ("help" setting). */
+.bg-cell.hint { border-color: var(--gold); animation: bg-hint 1.3s ease-in-out infinite; }
+@keyframes bg-hint { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 194, 75, 0.0); } 50% { box-shadow: 0 0 0 3px rgba(255, 194, 75, 0.75); } }
+.bg-cell.free { background: linear-gradient(145deg, rgba(255, 194, 75, 0.35), rgba(255, 194, 75, 0.12)); border-color: rgba(255, 194, 75, 0.5); cursor: default; }
+.bg-free { font-size: 1.8em; line-height: 1; }
+html[data-theme="light"] .bg-cell { background: #fff; }
+html[data-theme="light"] .bg-cell.marked { background: linear-gradient(145deg, #ff7a50, #f0458f); }
+
+/* Not ready yet: an outline (tappable — your eyes may be ahead of the marks). Ready: the full brand fill, pulsing. */
+.bg-claim-btn { width: 100%; margin-top: 4px; padding: 16px; border-radius: 18px; font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: 0.04em;
+  background: var(--surface-2); color: #ffb08c; border: 2px solid rgba(255, 122, 80, 0.55);
+  touch-action: manipulation; transition: transform 0.15s var(--ease-out), box-shadow 0.3s ease, background 0.3s ease; }
+.bg-claim-btn.ready { background: var(--grad-brand); color: var(--on-accent); border-color: transparent; animation: bg-ready 1.1s ease-in-out infinite; }
+@keyframes bg-ready { 0%, 100% { transform: scale(1); box-shadow: 0 10px 30px -10px rgba(255, 122, 80, 0.7); } 50% { transform: scale(1.03); box-shadow: 0 14px 40px -6px rgba(240, 69, 143, 0.9); } }
+.bg-claim-btn:disabled { background: var(--surface-2); color: var(--text-muted); border: 1px dashed var(--border-strong); animation: none; opacity: 0.8; }
+.bg-claim-btn.sending { opacity: 0.7; }
+.bg-claim-btn.shake { animation: bg-shake 0.45s ease; }
+@keyframes bg-shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.bg-ph-winners { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.bg-ph-winners p { margin: 0; color: var(--text); font-weight: 700; }
+.bg-ph-note { min-height: 2.6em; margin: 0; text-align: center; font-size: 14px; font-weight: 600; color: var(--text-muted); }
+
+/* ---------- host ---------- */
+.bg-host-count { font-weight: 700; margin: 6px 0 10px; }
+.bg-host-count.bad { color: var(--bad); }
+.h-status.bad { color: var(--bad); }
+#bg-host select { width: 100%; }
+#bg-host .bg-ladder { background: none; border: none; padding: 0; }
+#bg-host .bg-ladder li { font-size: 15px; }
+html[data-theme="light"] .bg-claim-btn:not(.ready):not(:disabled) { color: var(--coral); }
+.bg-ph-winners b { margin-inline-end: 0.35em; }
+.bg-ph-winners bdi { color: var(--gold); }

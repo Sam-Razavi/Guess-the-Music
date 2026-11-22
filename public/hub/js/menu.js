@@ -197,7 +197,7 @@
     update(s) {
       const grid = document.getElementById('launch-grid');
       Hub.screen(grid, 'v1', () => HUB_GAMES.map(g => `
-        <div class="launch" data-game="${g.id}" style="--g1:${g.grad[0]};--g2:${g.grad[1]}">
+        <div class="launch ${['music', 'bingo'].includes(g.id) ? 'featured' : ''}" data-game="${g.id}" style="--g1:${g.grad[0]};--g2:${g.grad[1]}">
           <span class="l-art">${g.art[0]}</span>
           <span class="l-text"><b>${esc(HUB_STRINGS.en[`game.${g.id}.name`])}</b><span class="fa-name l-fa" dir="rtl">${esc(HUB_STRINGS.fa[`game.${g.id}.name`])}</span><small>${esc(HUB_STRINGS.en[`game.${g.id}.tag`])}</small></span>
           <span class="l-votes"></span>

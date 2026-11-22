@@ -5,8 +5,9 @@
 .hub-main { display: flex; flex-direction: column; min-height: 0; gap: 0.8rem; }
 .hub-heading { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(3.1rem * var(--poster-scale)); line-height: 1.05; }
 .hub-heading span { background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.hub-cards { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 0.9rem; }
-/* Nine games + the champions card = a 5 x 2 grid. */
+.hub-cards { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 0.9rem; }
+/* Ten games in a 5 x 2 grid, the champions card down the whole sixth column. */
+.hub-cards > .trophy-card { grid-column: 6; grid-row: 1 / span 2; }
 .hub-card {
   position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden;
   border-radius: 1.4rem; border: 1px solid var(--border);
@@ -27,9 +28,12 @@
 .hca0 { font-size: 3rem; z-index: 1; animation: float-y 3.4s ease-in-out infinite; animation-delay: calc(var(--i) * -0.4s); }
 .hca1 { font-size: 1.7rem; top: 12%; inset-inline-end: 14%; animation: float-y 2.7s ease-in-out infinite; animation-delay: calc(var(--i) * -0.7s); opacity: 0.95; }
 .hca2 { font-size: 1.5rem; bottom: 10%; inset-inline-start: 14%; animation: float-y 3s ease-in-out infinite; animation-delay: calc(var(--i) * -0.3s); opacity: 0.95; }
-.hc-body { padding: 0.6rem 0.8rem 0.25rem; display: flex; flex-direction: column; gap: 0.1rem; min-height: 0; }
+/* overflow hidden + no shrinking: in the narrow 6-column cards a long tagline is
+   cut off cleanly instead of being squeezed under the player count. */
+.hc-body { padding: 0.6rem 0.75rem 0.25rem; display: flex; flex-direction: column; gap: 0.1rem; min-height: 0; overflow: hidden; }
+.hc-body > * { flex-shrink: 0; }
 .hc-name { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(1.55rem * var(--poster-scale)); line-height: 1.05; }
-html:not([dir="rtl"]) .hc-name { font-family: var(--font-display); font-weight: 800; font-size: 1.12rem; letter-spacing: -0.01em; }
+html:not([dir="rtl"]) .hc-name { font-family: var(--font-display); font-weight: 800; font-size: 0.98rem; letter-spacing: -0.02em; }
 .hc-alt { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); }
 .hc-tag { font-size: 0.8rem; color: var(--text); opacity: 0.85; margin-top: 0.2rem; line-height: 1.3;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -84,7 +88,9 @@ html[dir="rtl"] .ph-game { padding: 10px 10px 10px 14px; }
 
 /* ---------- host ---------- */
 /* 300px minimum: three columns on a laptop, so the nine games make a tidy 3×3. */
-.launch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.launch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); grid-auto-flow: dense; gap: 12px; }
+/* The two music games are wide "featured" cards: with them, ten games fill a 3-column grid exactly. */
+@media (min-width: 700px) { .launch.featured { grid-column: span 2; } }
 .launch { display: grid; grid-template-columns: auto 1fr; grid-template-rows: 1fr auto; gap: 10px 14px; padding: 14px; border-radius: 18px; border: 1px solid var(--border);
   background: linear-gradient(120deg, color-mix(in srgb, var(--g1) 18%, transparent), transparent 70%), var(--surface); position: relative;
   transition: transform var(--dur) var(--ease-out), border-color var(--dur-fast) ease, box-shadow var(--dur) var(--ease-out); }
@@ -125,8 +131,8 @@ html[dir="rtl"] .ph-game { padding: 10px 10px 10px 14px; }
 .trophy-card .tc-list { flex: 1; }
 .tc-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.7rem; text-align: center; padding: 0.4rem; }
 .tc-medals { display: flex; align-items: flex-end; gap: 0.35rem; }
-.tc-medals span { font-size: 2.1rem; line-height: 1; filter: drop-shadow(0 0.5rem 0.8rem rgba(0, 0, 0, 0.35)); animation: float-y 3s ease-in-out infinite; }
+.tc-medals span { font-size: 1.5rem; line-height: 1; filter: drop-shadow(0 0.5rem 0.8rem rgba(0, 0, 0, 0.35)); animation: float-y 3s ease-in-out infinite; }
 .tc-medals span:nth-child(1) { animation-delay: -1s; }
-.tc-medals span:nth-child(2) { font-size: 2.9rem; }
+.tc-medals span:nth-child(2) { font-size: 2.1rem; }
 .tc-medals span:nth-child(3) { animation-delay: -2s; }
 .tc-empty p { font-size: 0.82rem; line-height: 1.4; }
