@@ -9,6 +9,26 @@ const ok = (c, m) => { if (c) { pass++; console.log('  ✓', m); } else { fail++
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 async function until(fn, ms = 6000) { const e = Date.now() + ms; while (Date.now() < e) { try { if (fn()) return true; } catch (x) {} await sleep(40); } return false; }
 
+console.log('# content banks');
+{
+  const D = (f) => require(path.join(__dirname, '..', 'games', 'data', f));
+  const norm = (s) => String(Array.isArray(s) ? s.join('|') : s).toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  const bank = (name, list, min) => {
+    const k = list.map(norm);
+    const dup = k.filter((x, i) => k.indexOf(x) !== i);
+    ok(list.length >= min && !dup.length && k.every(Boolean), `${name}: ${list.length} entries, no duplicates ${dup.join(',')}`);
+  };
+  const ml = D('mostlikely-prompts'), pp = D('party-polls'), sp = D('spy-places');
+  for (const L of ['en', 'fa']) {
+    bank(`most likely (${L})`, ml[L], 110);
+    bank(`would you rather (${L})`, pp.rather[L], 50);
+    bank(`never have I ever (${L})`, pp.never[L], 50);
+    bank(`spy places (${L})`, sp[L], 75);
+    bank(`spy cities (${L})`, sp.cities[L], 45);
+    ok(pp.rather[L].every(x => Array.isArray(x) && x.length === 2 && x[0] && x[1]), `would you rather (${L}): every entry is a pair`);
+  }
+}
+
 console.log('# strings');
 const ctx = { window: {} };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'hub', 'js', 'strings.js'), 'utf8'), ctx);
