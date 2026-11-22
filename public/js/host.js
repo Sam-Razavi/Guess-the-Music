@@ -1,5 +1,21 @@
 const socket = io();
 
+// Slow-WiFi mode (game option "Lighter host updates"): the server leaves the
+// playlist out of an update when it didn't change, or sends only the changed
+// songs (playlistPatch). Rebuild state.playlist here, in the FIRST 'state'
+// listener, so every other listener below sees a complete playlist as usual.
+// A full list always replaces the copy (a fresh connection gets one).
+let hostPlaylist = [];
+socket.on('state', (state) => {
+  if (Array.isArray(state.playlist)) {
+    hostPlaylist = state.playlist;
+  } else if (state.playlistPatch && Array.isArray(state.playlistPatch.upsert)) {
+    const byId = new Map(state.playlistPatch.upsert.map(s => [s.id, s]));
+    hostPlaylist = hostPlaylist.map(s => byId.get(s.id) || s); // a new array, so "did it change" checks still work
+  }
+  state.playlist = hostPlaylist;
+});
+
 // Keep the host's phone/laptop screen on too (see keepawake.js) — arms on the first tap.
 const awakePill = document.getElementById('awake-pill');
 KeepAwake.onChange = (s) => {

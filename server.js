@@ -75,6 +75,9 @@ const DEFAULT_SETTINGS = {
   easterEggMina: false,
   easterEggReza: false,
   fadeBetweenSongs: true,
+  // Slow-WiFi mode: the host's updates leave out the playlist unless it changed,
+  // and then carry only the songs that changed — see hostPlaylistDelta().
+  liteHostUpdates: false,
 };
 
 // Mystery Modifier Round: exactly one song per game gets a random surprise
@@ -934,6 +937,34 @@ function payloadFor(role) {
   return base;
 }
 
+// Slow-WiFi mode (settings.liteHostUpdates). The host payload normally carries
+// the whole playlist — ~830 KB with 3,800 songs — on every update, even when the
+// only news is "Sara buzzed". In this mode a broadcast to the host:
+//   - leaves the playlist out when nothing in it changed (playlist: undefined);
+//   - when songs only changed in place (a played flag, points, an edit), sends
+//     just those songs as playlistPatch: { upsert: [...] };
+//   - sends the full list when songs were added, removed or reordered.
+// host.js keeps its own copy and rebuilds state.playlist before anything reads
+// it. A host that (re)connects gets the full payload from 'register', so it
+// never depends on having seen earlier patches. Patches are idempotent
+// (replace by id), so a host that got a fresher full list is unaffected.
+let hostPlaylistSnap = null; // { order: 'id,id,...', json: Map(id -> JSON) } as of the last host broadcast
+function hostPlaylistDelta(payload) {
+  if (!state.settings.liteHostUpdates) { hostPlaylistSnap = null; return payload; }
+  const list = payload.playlist;
+  const json = new Map(list.map(s => [s.id, JSON.stringify(s)]));
+  const order = list.map(s => s.id).join(',');
+  const prev = hostPlaylistSnap;
+  hostPlaylistSnap = { order, json };
+  if (!prev || prev.order !== order) return payload; // first time, or added/removed/reordered: full list
+  const upsert = list.filter(s => prev.json.get(s.id) !== json.get(s.id));
+  const out = { ...payload, playlist: undefined };
+  if (!upsert.length) return out;
+  if (upsert.length > 300) return payload; // a bulk change: the full list is simpler
+  out.playlistPatch = { upsert };
+  return out;
+}
+
 function broadcast() {
   ensureMysterySong();
   saveRoundState();
@@ -942,7 +973,7 @@ function broadcast() {
   // tiny updates the buzzers and the screen are waiting for.
   io.to('player').emit('state', payloadFor('player'));
   io.to('tv').emit('state', payloadFor('tv'));
-  io.to('host').emit('state', payloadFor('host'));
+  io.to('host').emit('state', hostPlaylistDelta(payloadFor('host')));
   if (hub) hub.broadcast();
 }
 

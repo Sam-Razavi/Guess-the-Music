@@ -33,6 +33,7 @@ const SUITES = [
   { name: 'ui', browser: true },          // real clicks on host/phone pages
   { name: 'songs', browser: true },       // editing a song's title / artist / year
   { name: 'buzzui', browser: true },      // the phone's buzzer: finger-down, offline taps, lost answers
+  { name: 'lite', browser: true },        // slow-WiFi mode: host updates without the full playlist
   { name: 'pin', browser: true, env: { JOIN_PIN: '4321' } },
 ];
 
