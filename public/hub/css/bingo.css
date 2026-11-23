@@ -9,8 +9,9 @@
    reveal the playing one shows in the frame on the right. Kept on screen (just
    transparent) because a player needs a real size to play. */
 .bg-videos { position: absolute; z-index: 0; right: 2.4rem; top: 50%; width: 36rem; aspect-ratio: 16 / 9; transform: translateY(-50%);
-  border-radius: 1.4rem; overflow: hidden; opacity: 0; pointer-events: none; transition: opacity 0.6s ease; }
-body[data-bg="reveal"] .bg-videos { opacity: 1; z-index: 2; box-shadow: 0 2rem 4rem -1.5rem rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.12); }
+  border-radius: 1.4rem; overflow: hidden; opacity: 0; visibility: hidden; pointer-events: none; transition: none; }
+body[data-bg="reveal"] .bg-videos { opacity: 1; visibility: visible; z-index: 2; transition: opacity 0.6s ease 0.25s;
+  box-shadow: 0 2rem 4rem -1.5rem rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.12); }
 .bg-slot { position: absolute; inset: 0; opacity: 0; }
 .bg-slot.on { opacity: 1; }
 .bg-slot iframe, .bg-yt { width: 100%; height: 100%; border: 0; }
@@ -61,11 +62,14 @@ body[data-bg="reveal"] .bg-videos { opacity: 1; z-index: 2; box-shadow: 0 2rem 4
 
 /* reveal: the song + the video in the frame on the right */
 .bg-reveal { display: grid; grid-template-columns: minmax(0, 1fr) 36rem; gap: 2.4rem; padding: 0 2.4rem 1.6rem; align-items: center; }
-.bg-reveal-text { display: flex; flex-direction: column; gap: 0.6rem; animation: rise-in 0.6s var(--ease-out) both; }
-.bg-song-title { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(5rem * var(--poster-scale)); line-height: 1.05;
+.bg-reveal-text { display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; animation: rise-in 0.6s var(--ease-out) both; }
+.bg-song-title { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(5rem * var(--poster-scale)); line-height: 1.12;
+  overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; padding-block: 0.05em;
   background: linear-gradient(120deg, #fff 30%, var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 html[data-theme="light"] .bg-song-title { background: linear-gradient(120deg, var(--text) 30%, var(--coral)); -webkit-background-clip: text; background-clip: text; }
-.bg-song-artist { font-size: 2rem; font-weight: 800; color: var(--text); }
+.bg-song-artist { font-size: 2rem; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+.bg-gotit { color: var(--good, #3ddc97); margin-inline-start: 0.4em; }
+.bg-close-row.out { opacity: 0.45; }
 .bg-oncards { font-size: 1.3rem; font-weight: 700; color: var(--text-muted); }
 .bg-next { font-size: 1.15rem; font-weight: 700; color: var(--text-muted); margin-top: 0.6rem; }
 .bg-reveal-video { width: 36rem; aspect-ratio: 16 / 9; }
@@ -73,6 +77,8 @@ html[data-theme="light"] .bg-song-title { background: linear-gradient(120deg, va
 /* BINGO! */
 .bg-claim { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.8rem; padding: 0 2rem 1.4rem; text-align: center; }
 .bg-claim-prize { font-size: 1.6rem; font-weight: 800; color: var(--gold); }
+.bg-claim-title.auto { font-size: calc(5.5rem * var(--poster-scale)); }
+.bg-claim-sub { font-size: 1.4rem; font-weight: 700; color: var(--text-muted); margin-top: -0.2rem; }
 .bg-claim-title { font-family: var(--font-poster); font-weight: var(--poster-weight); font-size: calc(7.5rem * var(--poster-scale)); line-height: 1;
   background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: pop-in 0.7s var(--ease-spring) both; filter: drop-shadow(0 0.6rem 2rem rgba(240, 69, 143, 0.45)); }
@@ -118,20 +124,25 @@ html[data-theme="light"] .bg-song-title { background: linear-gradient(120deg, va
 .bg-card.n4 .bg-cell { font-size: 12.5px; }
 .bg-card.n5 .bg-cell { font-size: 10.5px; border-radius: 10px; padding: 4px 3px; }
 .bg-card.n5 { gap: 5px; }
-.bg-cell.marked { background: linear-gradient(145deg, #ff7a50, #f0458f); border-color: transparent; color: #fff; transform: scale(0.96); }
-.bg-cell.marked small { color: rgba(255, 255, 255, 0.85); }
+.bg-cell.got { background: linear-gradient(145deg, #ff7a50, #f0458f); border-color: transparent; color: #fff; transform: scale(0.96); }
+.bg-cell.got small { color: rgba(255, 255, 255, 0.85); }
+.bg-card.open .bg-cell:not(.got):not(.missed):not(.free) { border-color: rgba(255, 194, 75, 0.55); }
+.bg-cell.picked { background: rgba(255, 194, 75, 0.18); border: 2px solid var(--gold); box-shadow: 0 0 0 3px rgba(255, 194, 75, 0.35); transform: scale(1.03); }
+.bg-cell.picked::after { content: "👂"; position: absolute; top: 2px; inset-inline-end: 3px; font-size: 14px; }
+.bg-cell.missed { opacity: 0.38; filter: grayscale(1); }
+.bg-cell.missed b { text-decoration: line-through; text-decoration-thickness: 2px; }
+.bg-cell.missed::after { content: "✕"; position: absolute; top: 3px; inset-inline-end: 5px; font-size: 12px; font-weight: 900; color: var(--text-muted); }
+.bg-cell.just { animation: bg-just 0.7s var(--ease-spring); }
+@keyframes bg-just { 0% { transform: scale(1.15); } 100% { transform: scale(0.96); } }
 .bg-daub { position: absolute; top: 4px; inset-inline-end: 4px; width: 18px; height: 18px; border-radius: 50%; background: #fff; color: #e0306f;
   font-style: normal; font-size: 12px; font-weight: 900; line-height: 18px; text-align: center; transform: scale(0); transition: transform 0.25s var(--ease-spring); }
 .bg-daub::before { content: "✓"; }
-.bg-cell.marked .bg-daub { transform: scale(1); }
+.bg-cell.got .bg-daub { transform: scale(1); }
 .bg-card.n5 .bg-daub { width: 14px; height: 14px; line-height: 14px; font-size: 10px; top: 3px; }
-/* A revealed song you haven't marked: glows until you tap it ("help" setting). */
-.bg-cell.hint { border-color: var(--gold); animation: bg-hint 1.3s ease-in-out infinite; }
-@keyframes bg-hint { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 194, 75, 0.0); } 50% { box-shadow: 0 0 0 3px rgba(255, 194, 75, 0.75); } }
 .bg-cell.free { background: linear-gradient(145deg, rgba(255, 194, 75, 0.35), rgba(255, 194, 75, 0.12)); border-color: rgba(255, 194, 75, 0.5); cursor: default; }
 .bg-free { font-size: 1.8em; line-height: 1; }
 html[data-theme="light"] .bg-cell { background: #fff; }
-html[data-theme="light"] .bg-cell.marked { background: linear-gradient(145deg, #ff7a50, #f0458f); }
+html[data-theme="light"] .bg-cell.got { background: linear-gradient(145deg, #ff7a50, #f0458f); }
 
 /* Not ready yet: an outline (tappable — your eyes may be ahead of the marks). Ready: the full brand fill, pulsing. */
 .bg-claim-btn { width: 100%; margin-top: 4px; padding: 16px; border-radius: 18px; font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: 0.04em;

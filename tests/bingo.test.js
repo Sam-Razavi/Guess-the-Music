@@ -55,7 +55,7 @@ function makePlaylist() {
   const cellOf = (pid, songId) => g().cards[pid].cells.indexOf(songId);
 
   // settings + pool
-  ok(JSON.stringify(g().settings) === JSON.stringify({ pool: 'mix', level: 'medium', size: 4, clip: 30, prizes: 'all', help: true, auto: true, start: 'into' }), 'default settings');
+  ok(JSON.stringify(g().settings) === JSON.stringify({ pool: 'mix', level: 'medium', size: 4, clip: 30, prizes: 'all', auto: true, start: 'into' }), 'default settings');
   H('host:bingo:settings', { size: 7, clip: 1000, pool: 'nope', prizes: 'x', level: 'easy' });
   ok(g().settings.size === 4 && g().settings.clip === 90 && g().settings.pool === 'mix' && g().settings.level === 'easy', 'settings are validated (size 7 refused, clip clamped to 90)');
   H('host:bingo:settings', { level: 'medium', clip: 30 });
@@ -90,12 +90,39 @@ function makePlaylist() {
   ok(bm.payload('host').secret.title === curTitle, 'the host can peek');
   const aw0 = bm.payload('tv').board.map(b => b.away).join();
 
-  // marking during the clip = sharp ear
-  if (holder) H('player:bingo:mark', { cell: cellOf(holder, cur), on: true }, { playerId: holder });
-  ok(!holder || g().ear[holder] === 1, 'marking the song while its clip plays counts for "sharpest ear"');
+  // picking during the clip: one pick per song, changeable
+  // make sure the song is on Ana's and Ben's cards (random deals may leave it off)
+  for (const pid of ['a', 'b']) { const c = g().cards[pid]; if (!c.cells.includes(cur)) { c.cells = c.cells.slice(); c.cells[5] = cur; } }
+  const ids = Object.keys(g().cards);
+  const pickers = ids.filter(id => g().cards[id].cells.includes(cur));
+  const others = ids.filter(id => !g().cards[id].cells.includes(cur));
+  ok(pickers.length >= 2, `the first song is on ${pickers.length} cards`);
+  const [right, missedIt] = pickers;
+  if (right) {
+    const wrongCell = cellOf(right, cur) === 0 ? 1 : 0;
+    H('player:bingo:mark', { cell: wrongCell, on: true }, { playerId: right });
+    H('player:bingo:mark', { cell: cellOf(right, cur), on: true }, { playerId: right });
+    ok(bm.payload('player', right).me.pick === cellOf(right, cur), 'a second tap moves the pick: one pick per clip');
+  }
+  if (others[0]) H('player:bingo:mark', { cell: 3, on: true }, { playerId: others[0] });
+  ok(bm.payload('player', 'a').me.canPick === true, 'phones are told picking is open');
   ok(bm.payload('tv').board.map(b => b.away).join() === aw0, '"N away" on the TV does not move during the clip (it would give the song away)');
+  ok(!JSON.stringify(bm.payload('player', right || 'a').me.cells).includes('"got"'), 'nothing is daubed during the clip');
   fire(30000);
   ok(g().status === 'reveal' && bm.payload('tv').song.title === curTitle && bm.payload('player', 'a').song.title === curTitle, 'clip over: revealed everywhere');
+  if (right) {
+    const me = bm.payload('player', right).me;
+    ok(me.cells[cellOf(right, cur)].state === 'got' && me.last.result === 'got' && g().ear[right] === 1, 'the right pick is daubed at the reveal (and counts for "sharpest ear")');
+  }
+  if (missedIt) ok(bm.payload('player', missedIt).me.cells[cellOf(missedIt, cur)].state === 'missed' && bm.payload('player', missedIt).me.last.result === 'missed', 'on the card but not picked: missed for the rest of the game');
+  if (others[0]) ok(bm.payload('player', others[0]).me.last.result === 'wrong' && !bm.payload('player', others[0]).me.cells.some(c => c.state === 'got'), 'a wrong pick gets nothing');
+  ok(bm.payload('tv').gotIt === (right ? 1 : 0) && bm.payload('tv').onCards === pickers.length, 'the reveal says how many cards had it and how many got it');
+  ok(bm.payload('player', 'a').me.canPick === false, 'picking is closed after the clip');
+  if (missedIt) {
+    t += 800;
+    H('player:bingo:mark', { cell: cellOf(missedIt, cur), on: true }, { playerId: missedIt });
+    ok(bm.payload('player', missedIt).me.cells[cellOf(missedIt, cur)].state === 'missed', 'tapping the song after the clip (title on the TV) does nothing');
+  }
   ok(bm.payload('player', 'a').history.length === 1, 'history lists revealed songs');
   ok(has(7000), 'auto: next song scheduled after the reveal');
   fire(7000);
@@ -104,7 +131,17 @@ function makePlaylist() {
   // the load timeout starts the clip without a TV
   fire(9000);
   ok(g().status === 'playing' && g().calls.length === 2, 'no word from the TV in 9 s: the clip starts anyway');
-  fire(30000); fire(7000);
+  {
+    const c2 = g().current;
+    const holder2 = Object.keys(g().cards).find(id => g().cards[id].cells.includes(c2));
+    fire(30000);
+    if (holder2) {
+      t += 400; // tapped just before the end, arrived just after
+      H('player:bingo:mark', { cell: cellOf(holder2, c2), on: true }, { playerId: holder2 });
+      ok(bm.payload('player', holder2).me.cells[cellOf(holder2, c2)].state === 'got', 'a pick arriving within 0.7 s of the end still counts');
+    }
+  }
+  fire(7000);
 
   // blocked: wait instead of a silent clip
   H('tv:bingo:status', { songId: g().current, status: 'blocked' }, TV);
@@ -133,33 +170,38 @@ function makePlaylist() {
   ok(g().status === 'loading' && g().skipped.length === 2, 'host skip: the song does not count');
 
   // claims
-  tvPlaying(); fire(30000);
-  // give Ana a line made only of played songs, by hand
-  const played = new Set(g().calls);
-  const card = g().cards.a;
+  tvPlaying();
   const lines = bm._lines(4);
   const row = lines[0];
+  // Ana: three daubed cells in the top row + the 4th is this clip's song
+  const card = g().cards.a;
   card.cells = card.cells.slice();
-  const playedList = [...played];
-  row.forEach((i, k) => { card.cells[i] = playedList[k % playedList.length]; });
-  // false claim first: mark the row but one cell isn't played yet
-  const unplayed = [...g().songs.keys()].find(id => !played.has(id));
-  const saved = card.cells[row[3]];
-  card.cells[row[3]] = unplayed;
-  row.forEach(i => H('player:bingo:mark', { cell: i, on: true }, { playerId: 'a' }));
+  card.got = new Set(); card.missed = new Set();
+  const live = g().current;
+  const spare = [...g().songs.keys()].filter(id => id !== live && !card.cells.includes(id));
+  if (card.cells.includes(live)) card.cells[card.cells.indexOf(live)] = spare.pop();
+  card.cells[row[3]] = live;
+  row.slice(0, 3).forEach(i => card.got.add(i));
+  // false claim first: a wrong pick doesn't complete it
+  H('player:bingo:mark', { cell: 5, on: true }, { playerId: 'a' });
   H('player:bingo:claim', {}, { playerId: 'a' });
-  ok(sent.at(-1).d.ok === false && sent.at(-1).d.reason === 'false' && g().notice.kind === 'false' && g().falses.a === 1, 'a line with an unplayed song: false bingo');
+  ok(sent.at(-1).d.ok === false && sent.at(-1).d.reason === 'false' && g().notice.kind === 'false' && g().falses.a === 1, 'a line that is one song short: false bingo');
   H('player:bingo:claim', {}, { playerId: 'a' });
   ok(sent.at(-1).d.reason === 'sitout', 'and Ana sits out until the next song');
-  card.cells[row[3]] = saved;
-  fire(7000); tvPlaying();
-  // make Ben a valid line too, so he can join the claim
-  const bc = g().cards.b; bc.cells = bc.cells.slice();
-  const playedNow = [...new Set(g().calls)];
-  lines[1].forEach((i, k) => { bc.cells[i] = playedNow[k % playedNow.length]; });
-  lines[1].forEach(i => H('player:bingo:mark', { cell: i, on: true }, { playerId: 'b' }));
+  H('player:bingo:mark', { cell: row[3], on: true }, { playerId: 'a' });
+  ok(bm.payload('player', 'a').me.pick === null && bm.payload('player', 'a').me.canPick === false, '...and can not pick again this song (a refused BINGO is no free answer check)');
+  fire(30000); fire(7000); tvPlaying();
+  // the next song: Ana picks it and it completes her line
+  const live2 = g().current;
+  if (card.cells.includes(live2)) card.cells[card.cells.indexOf(live2)] = spare.pop();
+  card.cells[row[3]] = live2; card.missed.delete(row[3]); card.got.delete(row[3]);
+  H('player:bingo:mark', { cell: row[3], on: true }, { playerId: 'a' });
+  // Ben: a full daubed line of his own, so he can join the claim
+  const bc = g().cards.b;
+  bc.cells = bc.cells.slice();
+  lines[1].forEach(i => { if (bc.cells[i] === live2) bc.cells[i] = spare.pop(); bc.got.add(i); bc.missed.delete(i); });
   H('player:bingo:claim', {}, { playerId: 'a' });
-  ok(sent.at(-1).d.ok === true && g().status === 'claim' && g().claim.prize === 'line', 'next song: the same line now checks out: BINGO');
+  ok(sent.at(-1).d.ok === true && g().status === 'claim' && g().claim.prize === 'line', 'BINGO the moment the last song of the line plays (the right pick counts)');
   ok(bm.payload('tv').claim.winners[0].cells.filter(c => c.hit).length === 4, "the TV gets Ana's card with the 4 winning cells");
   t += 2000;
   H('player:bingo:claim', {}, { playerId: 'b' });
@@ -180,10 +222,11 @@ function makePlaylist() {
     if (g().status === 'loading') tvPlaying();
     else if (g().status === 'playing') fire(30000);
     else if (g().status === 'reveal') fire(7000);
-    else if (g().status === 'claim') fire(7500);
+    else if (g().status === 'claim') fire(g().claim.auto ? 9500 : 7500);
   }
   ok(g().status === 'final', 'the pool runs out: game over');
-  ok(finished.length === 1 && finished[0].groups[0].includes('a') && finished[0].groups[0].includes('b'), 'Ana and Ben go on the trophy shelf');
+  // (the prize still open when the songs ran out went to the closest card, which may be anyone)
+  ok(finished.length === 1 && g().points.a >= 1 && g().points.b >= 1 && finished[0].groups.flat().includes('a'), 'the game result goes to the trophy shelf, Ana and Ben with their line');
   ok(bm.payload('tv').awards.ear !== undefined, 'final screen has awards');
 
   // second game prefers songs not played tonight
@@ -207,13 +250,55 @@ function makePlaylist() {
   H('host:bingo:start', {}, { socket: hostSock });
   ok(g().status === 'lobby' && hostSock.emitted.some(e => e.ev === 'hubError' && /Only/.test(e.d.message)), 'too few songs for a card: stays in the lobby and tells the host why');
   playlist = makePlaylist();
+  // tapping every cell gets you nothing more than one pick
+  bm.leave(); bm = mod(ctx);
+  H('host:bingo:settings', { size: 3, prizes: 'lineFull' });
+  H('host:bingo:start', {}, { socket: hostSock });
+  g().prizeIdx = 1; // the line is already won: playing for the full house
+  tvPlaying();
+  for (let i = 0; i < 9; i++) H('player:bingo:mark', { cell: i, on: true }, { playerId: 'c' });
+  ok(bm.payload('player', 'c').me.pick === 8, 'tapping all 9 cells leaves one pick (the last)');
+  // play it all out with nobody picking: the full house is out of reach for everyone
+  // except Ana, who picks every one of her songs except one
+  let g2 = 0;
+  const skipOne = g().cards.a.cells[4];
+  while (g().status !== 'final' && g().status !== 'claim' && g2++ < 100) {
+    if (g().status === 'loading') tvPlaying();
+    else if (g().status === 'playing') {
+      const at = g().cards.a.cells.indexOf(g().current);
+      if (at >= 0 && g().current !== skipOne) H('player:bingo:mark', { cell: at, on: true }, { playerId: 'a' });
+      fire(30000);
+    } else if (g().status === 'reveal') fire(7000);
+  }
+  ok(g().status === 'claim' && g().claim.auto && g().claim.prize === 'full' && g().claim.pids.join() === 'a', 'songs ran out, no full house: the closest card (Ana, 8 of 9) wins it');
+  ok(bm.payload('tv').claim.auto === true && bm.payload('tv').claim.winners[0].cells.filter(c => c.hit).length === 8, 'the TV shows it as "closest card" with her 8 daubed songs');
+  H('player:bingo:claim', {}, { playerId: 'b' });
+  ok(sent.at(-1).d.ok === false, 'nobody can join an automatic win');
+  fire(9500);
+  ok(g().status === 'final' && g().points.a === 3, 'then the game ends (3 points for the full house)');
+  ok(bm.payload('tv').board.length === 0 && bm.payload('tv').standings[0].id === 'a', 'final standings');
+  // late joiner: songs that haven't played yet, played ones marked missed
+  bm.leave(); bm = mod(ctx);
+  H('host:bingo:settings', { size: 4, prizes: 'all' });
+  H('host:bingo:start', {}, { socket: hostSock });
+  for (let k = 0; k < 5; k++) { tvPlaying(); fire(30000); fire(7000); }
+  players.e = 'Eve'; online.add('e');
+  const pe = bm.payload('player', 'e').me;
+  const doneSet = new Set(g().calls.slice(0, g().revealed));
+  ok(pe && g().cards.e.cells.every(id => !doneSet.has(id)) && !pe.cells.some(c => c.state === 'missed'), 'a late joiner is dealt only songs that have not played yet');
+  delete players.e; online.delete('e'); bm.onPlayerRemoved('e');
+  // the board: a missed cell in every line = out of reach
+  const bcard = g().cards.b;
+  bcard.missed = new Set([0, 1, 2, 3, 4, 8, 12, 5, 10, 15, 6, 9]);
+  ok(bm.payload('tv').board.find(b => b.id === 'b').away === null, 'a card with a missed song in every line shows "out of reach"');
+
   // removing the only winner during the BINGO moment
   bm.leave(); bm = mod(ctx);
   H('host:bingo:start', {}, { socket: hostSock });
   tvPlaying();
   const ec = g().cards.c; ec.cells = ec.cells.slice();
   const p1 = g().calls[0];
-  bm._lines(4)[0].forEach(i => { ec.cells[i] = p1; ec.marks.add(i); });
+  bm._lines(4)[0].forEach(i => { ec.got.add(i); }); void p1;
   H('player:bingo:claim', {}, { playerId: 'c' });
   ok(g().status === 'claim', 'Cy calls BINGO');
   bm.onPlayerRemoved('c');
@@ -250,9 +335,9 @@ function makePlaylist() {
   ok(await until(() => G(tv).status === 'playing'), "the kiosk TV's report starts the clip");
   const me0 = G(P[0]).me;
   P[0].emit('player:bingo:mark', { cell: 2, on: true });
-  ok(await until(() => G(P[0]).me.marks.includes(2)), 'a mark is saved');
+  ok(await until(() => G(P[0]).me.pick === 2), 'a pick is saved');
   P[0].emit('player:bingo:mark', { cell: 2, on: false });
-  ok(await until(() => !G(P[0]).me.marks.includes(2)), 'and can be undone');
+  ok(await until(() => G(P[0]).me.pick === null), 'and can be undone');
   P[0].emit('player:bingo:claim');
   ok(await until(() => P[0].ev.some(x => x.e === 'bingo:result' && x.d.ok === false)), 'an empty-card BINGO is refused with a reason');
   ok(me0.cells.every(c => typeof c.title === 'string' && c.title), 'card cells carry titles');

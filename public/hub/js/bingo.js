@@ -226,8 +226,10 @@
         spare.token = null;
         try { spare.p.mute(); spare.p.loadVideoById({ videoId: g.upNext.youtubeId, startSeconds: g.upNext.start }); } catch (e) {}
       }
-      // Only the playing slot is ever visible (and only on the reveal, by CSS).
-      slots.forEach((x, i) => x.el.classList.toggle('on', i === cur));
+      // Only the revealed song's player is ever visible, and only on the reveal
+      // (by CSS). The slot switches only then: switching when the next call
+      // starts showed the next song's first frame while the frame faded out.
+      if (g.status === 'reveal') slots.forEach((x, i) => x.el.classList.toggle('on', i === cur));
     }
     // The sound moved to another screen: go quiet. (Moving it here is picked up
     // on the next clip; the playing one stays muted rather than jumping in.)
@@ -300,7 +302,8 @@
         const first = !lastClaimKey; // the BINGO itself; later changes are someone joining it
         if (Hub.screen(el, key, `<div class="bg-claim">
             <p class="bg-claim-prize">${PRIZE_ICON[g.claim.prize]} ${esc(prizeName(g.claim.prize))}</p>
-            <h1 class="bg-claim-title" dir="auto">${esc(t('bg.bingoWord'))}</h1>
+            <h1 class="bg-claim-title ${g.claim.auto ? 'auto' : ''}" dir="auto">${esc(g.claim.auto ? t('bg.closestTitle') : t('bg.bingoWord'))}</h1>
+            ${g.claim.auto ? `<p class="bg-claim-sub">${esc(t('bg.closestWins', { prize: prizeName(g.claim.prize) }))}</p>` : ''}
             <div class="bg-claim-wins ${g.claim.winners.length > 1 ? 'many' : ''}">${g.claim.winners.map(w => `<div class="bg-claim-win">
                 <div class="bg-claim-who">${avatar(w.name, 'bg-claim-av')}<b>${esc(w.name)}</b></div>
                 ${miniCard(w.cells, g.size)}</div>`).join('')}</div>
@@ -317,11 +320,12 @@
               <p class="eyebrow">${esc(t('bg.songOf', { n: num(g.callNo), of: num(g.total) }))}</p>
               <h1 class="bg-song-title" dir="auto">${esc(g.song.title)}</h1>
               <p class="bg-song-artist" dir="auto">${esc(g.song.artist)}</p>
-              <p class="bg-oncards">${esc(g.onCards ? t('bg.onCards', { n: num(g.onCards) }) : t('bg.onNoCards'))}</p>
+              <p class="bg-oncards">${esc(g.onCards ? t('bg.onCards', { n: num(g.onCards) }) : t('bg.onNoCards'))}${g.onCards ? ` <span class="bg-gotit">${esc(t('bg.gotIt', { n: num(g.gotIt) }))}</span>` : ''}</p>
               <p class="bg-next" id="bg-next"></p>
             </div>
             <div class="bg-reveal-video"></div>
           </div>`);
+        placeVideo();
         const nx = document.getElementById('bg-next');
         if (nx) nx.textContent = g.paused ? `⏸ ${t('bg.paused')}` : g.nextAt ? t('bg.nextIn', { n: num(Hub.secondsLeft(g.nextAt)) }) : t('bg.waitHost');
         renderSide(g);
@@ -349,39 +353,61 @@
       if (nx && g.status === 'reveal' && g.nextAt && !g.paused) nx.textContent = t('bg.nextIn', { n: num(Hub.secondsLeft(g.nextAt)) });
     },
   };
+  // The video frame lives outside the re-rendered stage (the players must not be
+  // rebuilt); on the reveal it is laid exactly over the empty frame in the
+  // layout — which side that is depends on the language (RTL flips the grid).
+  function placeVideo() {
+    const ph = document.querySelector('.bg-reveal-video');
+    const box = document.querySelector('.bg-videos');
+    const tvEl = document.querySelector('.bg-tv');
+    if (!ph || !box || !tvEl) return;
+    const put = () => {
+      if (!ph.isConnected) return;
+      const r = ph.getBoundingClientRect(), o = tvEl.getBoundingClientRect();
+      if (!r.width) return;
+      Object.assign(box.style, { left: (r.left - o.left) + 'px', top: (r.top - o.top) + 'px', width: r.width + 'px', right: 'auto', transform: 'none' });
+    };
+    put();
+    setTimeout(put, 700); // after the panel's entrance animation
+  }
+  window.addEventListener('resize', () => { if (document.body.dataset.bg === 'reveal') placeVideo(); });
+
   function renderSide(g) {
     const side = document.getElementById('bg-side');
     const key = JSON.stringify([g.board.slice(0, 6), g.history, g.prize, g.winners, Hub.lang]);
     if (side && side.dataset.k !== key) {
       side.dataset.k = key;
       side.innerHTML = `${prizeLadder(g)}
-        <div class="bg-closest"><p class="eyebrow">${esc(t('bg.closest'))}</p>${g.board.slice(0, 6).map(b => `<div class="bg-close-row ${b.away === 1 ? 'hot' : ''}">${avatar(b.name)}<bdi>${esc(b.name)}</bdi><span class="bg-away">${esc(b.away === 0 ? t('bg.check') : t('bg.away', { n: num(b.away) }))}</span></div>`).join('')}</div>
+        <div class="bg-closest"><p class="eyebrow">${esc(t('bg.closest'))}</p>${g.board.slice(0, 6).map(b => `<div class="bg-close-row ${b.away === 1 ? 'hot' : ''} ${b.away === null ? 'out' : ''}">${avatar(b.name)}<bdi>${esc(b.name)}</bdi><span class="bg-away">${esc(b.away === null ? t('bg.out') : b.away === 0 ? t('bg.check') : t('bg.away', { n: num(b.away) }))}</span></div>`).join('')}</div>
         ${g.history.length ? `<div class="bg-history"><p class="eyebrow">${esc(t('bg.justPlayed'))}</p>${g.history.slice(0, 4).map(h => `<p class="bg-hist" dir="auto"><b>${esc(h.title)}</b> <span>${esc(h.artist)}</span></p>`).join('')}</div>` : ''}`;
     }
   }
 
   // ======================= phone =======================
-  let pending = new Map(); // cell -> wanted mark (until the server agrees)
+  let pending;             // this clip's pick while the tap is on its way (undefined = the server's)
+  let pendingCall = -1;
   let cardKey = '';
   let lastResultAt = 0;
   const player = {
     mount(root) {
       root.innerHTML = '<div class="bg-ph" id="bg-ph"></div>';
-      pending = new Map();
+      pending = undefined;
       cardKey = '';
       root.addEventListener('click', (e) => {
         const c = e.target.closest('[data-cell]');
         if (c && !c.classList.contains('free')) {
           const i = Number(c.dataset.cell);
-          const me = Hub.state && Hub.state.game && Hub.state.game.me;
-          const now = pending.has(i) ? pending.get(i) : !!(me && me.marks.includes(i));
-          pending.set(i, !now);
-          c.classList.toggle('marked', !now);
-          c.classList.remove('hint');
+          const g = Hub.state && Hub.state.game;
+          const me = g && g.me;
+          if (!me || c.classList.contains('got') || c.classList.contains('missed')) return;
+          if (!pickOpen(g)) { flashNote(me.sitOut && g.status === 'playing' ? t('bg.sittingOut') : t('bg.waitClip')); return; }
+          const was = pending !== undefined ? pending : me.pick;
+          pending = was === i ? null : i;
           Hub.vibrate(12);
-          if (!now) Hub.sfx.pop();
-          Hub.emit('player:bingo:mark', { cell: i, on: !now });
-          updateClaimBtn(Hub.state.game);
+          if (pending !== null) Hub.sfx.pop();
+          Hub.emit('player:bingo:mark', { cell: i, on: pending !== null });
+          paintCells(g);
+          updateClaimBtn(g);
           return;
         }
         if (e.target.closest('#bg-claim-btn')) {
@@ -415,7 +441,7 @@
       const key = me.cells.map(c => c.free ? '*' : c.title).join('|') + Hub.lang;
       if (key !== cardKey) {
         cardKey = key;
-        pending = new Map();
+        pending = undefined;
         el.innerHTML = `<div class="bg-ph-top" id="bg-ph-top"></div>
           <div class="bg-card n${g.size}" style="--n:${g.size}">${me.cells.map((c, i) => c.free
             ? `<div class="bg-cell free" data-cell="${i}"><span class="bg-free">⭐</span><small>${esc(t('bg.free'))}</small></div>`
@@ -423,19 +449,13 @@
           <button class="bg-claim-btn" id="bg-claim-btn" dir="auto">${esc(t('bg.bingoWord'))}</button>
           <p class="bg-ph-note" id="bg-ph-note"></p>`;
       }
-      // Marks: the server's, unless a tap is still on its way.
-      const marks = new Set(me.marks);
-      for (const [i, want] of pending) { if (marks.has(i) === want) pending.delete(i); else if (want) marks.add(i); else marks.delete(i); }
-      el.querySelectorAll('.bg-cell').forEach((c, i) => {
-        if (me.cells[i].free) return;
-        const on = marks.has(i);
-        c.classList.toggle('marked', on);
-        c.classList.toggle('shown', !!me.cells[i].shown);
-        // "Help": a revealed song you haven't marked yet glows.
-        c.classList.toggle('hint', !!(g.settings.help && me.cells[i].shown && !on));
-      });
+      // A tap on its way: shown until the server's payload agrees (or a new clip starts).
+      if (pendingCall !== me.call || !me.canPick) { pending = undefined; pendingCall = me.call; }
+      else if (pending !== undefined && pending === me.pick) pending = undefined;
+      paintCells(g);
       renderTop(g);
-      updateClaimBtn(g, marks);
+      renderResult(g);
+      updateClaimBtn(g);
     },
     events: {
       'bingo:result': (r) => {
@@ -451,6 +471,50 @@
       },
     },
   };
+  const myPick = (g) => (pending !== undefined ? pending : g.me.pick);
+  // Picking is open while the clip plays — also judged by this phone's own clock,
+  // so a tap after the timer hit 0 isn't even sent.
+  const pickOpen = (g) => !!(g && g.me && g.me.canPick && g.status === 'playing' && (!g.endsAt || Date.now() < g.endsAt + 150));
+  function paintCells(g) {
+    const me = g.me;
+    const card = document.querySelector('.bg-card');
+    if (!card) return;
+    const pick = g.status === 'playing' ? myPick(g) : null;
+    card.classList.toggle('open', pickOpen(g));
+    card.querySelectorAll('.bg-cell').forEach((c, i) => {
+      const x = me.cells[i];
+      if (x.free) return;
+      c.classList.toggle('got', x.state === 'got');
+      c.classList.toggle('missed', x.state === 'missed');
+      c.classList.toggle('picked', pick === i && !x.state);
+    });
+  }
+  let noteUntil = 0;
+  function flashNote(text) {
+    const note = document.getElementById('bg-ph-note');
+    if (!note) return;
+    note.textContent = text;
+    noteUntil = Date.now() + 3000;
+  }
+  // After each clip: how did my pick do?
+  let resultKey = '';
+  function renderResult(g) {
+    const last = g.me.last;
+    const key = last && (g.status === 'reveal' || g.status === 'claim') ? last.call + last.result : '';
+    if (key === resultKey) return;
+    resultKey = key;
+    if (!key) return;
+    if (last.result === 'got') { Hub.sfx.chime(); Hub.vibrate([20, 40, 20]); flashNote('✅ ' + t('bg.gotIt1')); }
+    else if (last.result === 'wrong') flashNote('❌ ' + t(last.cell >= 0 ? 'bg.wrongOnCard' : 'bg.wrongPick'));
+    else if (last.result === 'missed') flashNote('😬 ' + t('bg.missedIt'));
+    else flashNote(t('bg.notOnCard'));
+    const card = document.querySelector('.bg-card');
+    if (card && last.cell >= 0) {
+      const c = card.querySelectorAll('.bg-cell')[last.cell];
+      if (c) { c.classList.remove('just'); void c.offsetWidth; c.classList.add('just'); }
+    }
+  }
+
   function renderTop(g) {
     const top = document.getElementById('bg-ph-top');
     if (!top) return;
@@ -458,10 +522,10 @@
     let line = '';
     if (g.paused) line = `⏸ ${esc(t('bg.paused'))}`;
     else if (st === 'loading') line = `⏳ ${esc(t('bg.loading'))}`;
-    else if (st === 'playing') line = `🎧 ${esc(t('bg.listenPhone'))}`;
+    else if (st === 'playing') line = `🎧 ${esc(g.me && g.me.sitOut ? t('bg.sittingOut') : t('bg.listenPhone'))}`;
     else if (st === 'reveal' && g.song) line = `🎵 <b dir="auto">${esc(g.song.title)}</b> <span dir="auto">${esc(g.song.artist)}</span>`;
-    else if (st === 'claim' && g.claim) line = `🎉 ${esc(t('bg.gotBingo', { names: g.claim.winners.map(w => w.name).join(' & ') }))}`;
-    const key = st + g.paused + g.callNo + (g.song ? g.song.title : '') + (g.claim ? g.claim.winners.length : '') + g.prize + Hub.lang;
+    else if (st === 'claim' && g.claim) line = `🎉 ${esc(t(g.claim.auto ? 'bg.closestPhone' : 'bg.gotBingo', { names: g.claim.winners.map(w => w.name).join(' & ') }))}`;
+    const key = st + g.paused + (g.me && g.me.sitOut) + g.callNo + (g.song ? g.song.title : '') + (g.claim ? g.claim.winners.length : '') + g.prize + Hub.lang;
     if (top.dataset.k === key) return;
     top.dataset.k = key;
     top.innerHTML = `<div class="bg-ph-bar"><span class="pill">${esc(t('bg.songShort', { n: num(Math.max(1, g.callNo)), of: num(g.total) }))}</span>
@@ -470,15 +534,15 @@
       <p class="bg-ph-line ${st}">${line}</p>`;
     if (st === 'claim' && g.claim && !g.claim.winners.some(w => w.id === Hub.myId)) Hub.sfx.chime();
   }
-  function updateClaimBtn(g, marksIn) {
+  function updateClaimBtn(g) {
     const b = document.getElementById('bg-claim-btn');
     const me = g && g.me;
     if (!b || !me) return;
-    const marks = marksIn || new Set([...document.querySelectorAll('.bg-cell.marked')].map(c => Number(c.dataset.cell)));
-    // Light the button when your marks make the prize (the server still checks
-    // that those songs really played).
+    // Light the button when your daubed songs (+ this clip's pick, if it's
+    // right — the server checks) make the prize.
+    const pick = g.status === 'playing' ? myPick(g) : null;
     const n = g.size;
-    const has = (i) => me.cells[i].free || marks.has(i);
+    const has = (i) => me.cells[i].free || me.cells[i].state === 'got' || i === pick;
     const L = [];
     for (let r = 0; r < n; r++) L.push([...Array(n)].map((_, c) => r * n + c));
     for (let c = 0; c < n; c++) L.push([...Array(n)].map((_, r) => r * n + c));
@@ -489,8 +553,9 @@
     b.disabled = !open || me.sitOut || (g.status === 'claim' && g.claim && g.claim.winners.some(w => w.id === Hub.myId));
     b.classList.toggle('ready', ready && !b.disabled);
     const note = document.getElementById('bg-ph-note');
-    if (note && Date.now() - lastResultAt > 4000) {
-      note.textContent = me.sitOut ? t('bg.sittingOut') : ready && !b.disabled ? t('bg.tapBingo') : g.prize ? t('bg.needFor', { prize: prizeName(g.prize) }) : '';
+    if (note && Date.now() - lastResultAt > 4000 && Date.now() > noteUntil) {
+      note.textContent = me.sitOut ? t('bg.sittingOut') : ready && !b.disabled ? t('bg.tapBingo')
+        : pickOpen(g) ? t('bg.pickHint') : g.prize ? t('bg.needFor', { prize: prizeName(g.prize) }) : '';
     }
   }
 
@@ -513,7 +578,7 @@
         const sel = (key, opts) => `<select data-setting="${key}">${opts.map(([v, label]) => `<option value="${v}" ${String(g.settings[key]) === String(v) ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select>`;
         Hub.screen(el, st + JSON.stringify(g.settings) + online + g.available, `<section class="h-card span2 h-hero">
             <h2>${st === 'final' ? '🏆 Game over' : '🎵 Music Bingo'}</h2>
-            <p class="muted small">Every phone gets a card of songs from your playlist. The TV plays short clips without saying what they are; players mark the songs they recognise and tap BINGO for a line, then two lines, then a full house. Claims are checked against what was really played.</p>
+            <p class="muted small">Every phone gets a card of songs from your playlist. The TV plays short clips without saying what they are. While a clip plays, players tap the song on their card if they recognise it (one pick per clip): right = daubed. Once the clip is over the song is gone — one you didn't recognise in time is missed. BINGO for a line, then two lines, then a full house. If the songs run out first, the closest card wins the prize being played for.</p>
             <p class="bg-host-count ${enough ? '' : 'bad'}">${enough ? `✅ ${g.available} songs match these settings — ${g.needed} go on each card.` : `⚠️ Only ${g.available} songs match — a card needs ${g.needed}. Pick a wider pool or a smaller card.`}</p>
             <button class="primary big-btn" data-emit="host:bingo:start" ${enough && online ? '' : 'disabled'}>${st === 'final' ? 'Play again ▶' : 'Start ▶'}</button>
             <div class="roster">${UI.hostRoster(s.players)}</div></section>
@@ -527,7 +592,6 @@
             ${UI.hostField('Card', sel('size', [[3, '3×3 · ~9 min'], [4, '4×4 · ~17 min'], [5, '5×5 + free middle · ~23 min']]))}
             ${UI.hostField('Prizes', sel('prizes', [['all', 'Line → 2 lines → full'], ['lineFull', 'Line → full house'], ['line', 'One line only']]))}
           </div>
-          ${UI.toggle('help', g.settings.help, 'Help after the reveal', 'Once a song is revealed, it glows on the cards that have it if the player missed it')}
           ${UI.toggle('auto', g.settings.auto, 'Next song automatically', 'A few seconds after each reveal. Off: you press Next song.')}
           </section>`);
         UI.syncSettings(el, g.settings);
@@ -551,7 +615,7 @@
           ${peek && g.secret ? `<p class="h-secret">Now: <b dir="auto">${esc(g.secret.title)}</b> — <span dir="auto">${esc(g.secret.artist)}</span></p>` : ''}
         </section>
         <section class="h-card"><h2>Prizes</h2>${prizeLadder(g)}</section>
-        <section class="h-card"><h2>Closest</h2>${g.board.map(b => `<div class="trophy-row">${avatar(b.name)} <b>${esc(b.name)}</b> <span class="muted small">${b.away === 0 ? 'can call BINGO' : `${b.away} away`}</span></div>`).join('') || '<p class="muted small">No cards yet.</p>'}
+        <section class="h-card"><h2>Closest</h2>${g.board.map(b => `<div class="trophy-row">${avatar(b.name)} <b>${esc(b.name)}</b> <span class="muted small">${b.away === null ? 'out of reach' : b.away === 0 ? 'can call BINGO' : `${b.away} away`} · ${b.got} ✓</span></div>`).join('') || '<p class="muted small">No cards yet.</p>'}
           <h3>Points</h3>${g.standings.filter(r => r.points).map(r => `<div class="trophy-row">${avatar(r.name)} <b>${esc(r.name)}</b> ${r.points}</div>`).join('') || '<p class="muted small">No prizes yet.</p>'}</section>`;
     },
   };
